@@ -1,0 +1,22 @@
+from __future__ import annotations
+
+from fastapi import FastAPI
+
+from app.config import get_settings
+from app.routers.recommendations import router as recommendation_router
+from app.routers.health import router as system_router
+
+settings = get_settings()
+
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    description="Recommendation and AI support service for my-forever-music.",
+    docs_url="/docs",
+    redoc_url=None,
+    openapi_url="/openapi.json",
+    root_path=settings.root_path,
+)
+
+app.include_router(system_router)
+app.include_router(recommendation_router)

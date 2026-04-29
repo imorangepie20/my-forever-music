@@ -1,0 +1,49 @@
+#!/bin/sh
+
+set -eu
+
+APP_HOME=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+WRAPPER_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+
+find_java() {
+  if [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ]; then
+    printf '%s\n' "${JAVA_HOME}/bin/java"
+    return 0
+  fi
+
+  if command -v java >/dev/null 2>&1; then
+    command -v java
+    return 0
+  fi
+
+  return 1
+}
+
+if [ -f "$WRAPPER_JAR" ]; then
+  JAVACMD=$(find_java) || {
+    echo "ERROR: Java runtime not found. Set JAVA_HOME or install Java 21." >&2
+    exit 1
+  }
+
+  exec "$JAVACMD" \
+    -Dorg.gradle.appname=gradlew \
+    -classpath "$WRAPPER_JAR" \
+    org.gradle.wrapper.GradleWrapperMain \
+    "$@"
+fi
+
+if command -v gradle >/dev/null 2>&1; then
+  echo "gradle-wrapper.jar not found. Falling back to system Gradle." >&2
+  echo "Tip: run './gradlew wrapper' once to materialize official wrapper files." >&2
+  exec gradle "$@"
+fi
+
+cat >&2 <<'EOF'
+ERROR: gradle-wrapper.jar not found and system Gradle is unavailable.
+
+1. Install Java 21.
+2. Install Gradle 8.14.3 or later temporarily.
+3. Re-run this command, or run './gradlew wrapper' once.
+EOF
+
+exit 1
