@@ -8,6 +8,10 @@ FastAPI 기반 AI/추천 서비스 폴더입니다.
 - 임베딩/모델 추론
 - AI 보강 API
 - `services/api`가 호출하는 AI 전용 백엔드 제공
+- Spotify 오디오 특성 기반 분석 데이터 보강
+- 오디오 특성을 확보하지 못한 트랙의 fallback 특성 생성
+- 사용자 플레이리스트와 행동 데이터를 반영한 개인화 모델 지원
+- EMS 외부 플레이리스트와 트렌딩 트랙 평가 지원
 
 ## 현재 스캐폴드에 포함된 것
 
@@ -84,6 +88,8 @@ AI_ROOT_PATH=/ai uvicorn app.main:app --host 0.0.0.0 --port 8000
 pytest
 ```
 
+`pytest.ini`가 포함되어 있어 현재는 별도 `PYTHONPATH` 설정 없이 위 명령만 실행하면 됩니다.
+
 ## 추천 API 초안
 
 현재는 `services/api`가 붙기 전 단계라, 실제 모델 추론 대신 계약과 응답 구조를 먼저 고정하는 preview 엔드포인트를 제공합니다.
@@ -126,8 +132,17 @@ curl -X POST http://127.0.0.1:8000/v1/recommendations/preview \
 
 상세 계약 문서는 [AI_RECOMMENDATION_PREVIEW.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AI_RECOMMENDATION_PREVIEW.md) 에 정리했습니다.
 
+장기적으로는 이 서비스가 아래 역할까지 확장됩니다.
+
+- Spotify 오디오 특성 적재
+- 미수집 트랙의 오디오 특성 fallback 생성
+- 사용자별 취향 모델 추가 학습
+- EMS 수집 트랙을 사용자 모델로 평가해 GMS 후보 생성
+- 사용자 행동 데이터 기반 재학습
+
 ## 다음 구현 우선순위
 
-1. `services/api` 호출용 내부 계약과 에러 코드 정리
-2. 실제 카탈로그/벡터 검색 기반 ranking 로직 연결
-3. 모델 로딩 계층과 비동기 작업 분리
+1. Spotify 오디오 특성 적재와 fallback 특성 생성 전략 정리
+2. `services/api` 호출용 내부 계약과 에러 코드 정리
+3. 실제 카탈로그/벡터 검색 기반 ranking 로직 연결
+4. 사용자별 추가 학습과 EMS 평가 파이프라인 설계

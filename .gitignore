@@ -5,6 +5,7 @@
 node_modules/
 dist/
 build/
+services/api/bin/
 .gradle/
 out/
 .turbo/
@@ -14,6 +15,7 @@ out/
 __pycache__/
 *.pyc
 *.class
+*.tsbuildinfo
 coverage/
 tmp/
 temp/

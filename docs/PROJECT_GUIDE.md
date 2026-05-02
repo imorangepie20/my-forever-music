@@ -9,6 +9,22 @@
 
 `my-forever-music`은 기존 MusicSpace 개념을 바탕으로 다시 만드는 프로젝트이며, 먼저 웹앱을 완성한 뒤 같은 도메인과 UI 자산을 재사용해 Windows 데스크탑 앱까지 확장합니다.
 
+핵심 서비스 원문 정의는 [PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md) 를 기준으로 봅니다.
+
+## 1-1. 서비스 핵심 정의
+
+이 프로젝트가 만들려는 실제 서비스는 아래와 같습니다.
+
+- 사용자가 구독 중인 스트리밍 플랫폼을 선택하고 계정을 연결한다
+- 해당 플랫폼의 플레이리스트를 가져와 `PMS`에 저장한다
+- 각 트랙의 오디오 특성을 우선 `Spotify` 기반으로 확보한다
+- 오디오 특성을 직접 확보하지 못한 트랙은 웹 검색과 보강 로직으로 fallback 특성을 만든다
+- 사용자 플레이리스트와 행동 데이터를 바탕으로 개인별 취향 모델을 점진적으로 학습한다
+- `EMS`는 외부 플랫폼의 공개 플레이리스트와 트렌딩 트랙을 수집하는 외부 탐색 공간이다
+- `GMS`는 사용자 모델이 통과시킨 추천 결과가 모이는 개인화 게이트웨이 공간이다
+- 사용자가 `GMS` 결과를 평가하면 다시 `PMS` 학습 데이터로 환류된다
+- 어느 페이지에서든 음악 재생이 가능하고 페이지 이동 사이에도 플레이어 상태가 유지된다
+
 ## 2. 현재 확정된 큰 방향
 
 - 프론트엔드는 `React + TypeScript + Vite`
@@ -25,6 +41,7 @@
 - 메인 백엔드는 Node보다 Spring 구조가 현재 목표와 더 자연스럽게 맞음
 - 웹과 데스크탑이 같은 API와 도메인 모델을 공유해야 함
 - 추천/AI는 메인 API와 분리된 별도 서비스가 유지보수에 유리함
+- 핵심 서비스 문서 기준으로도 `플랫폼 연동 / 취향 모델 / EMS-GMS 환류`는 장기적으로 분리된 서비스 구조가 더 적합함
 
 자세한 근거는 아래 문서를 본다.
 
@@ -60,10 +77,10 @@ docs/
 
 ## 5. 각 영역의 책임
 
-- `apps/web`: PMS / EMS / GMS 중심 사용자 경험
+- `apps/web`: PMS / EMS / GMS 중심 사용자 경험과 공통 플레이어 UI
 - `apps/desktop`: 웹 UI와 공통 로직을 재사용하는 Windows 셸
-- `services/api`: 인증, 사용자, 트랙, 플레이리스트, 플랫폼 연동, 추천 오케스트레이션
-- `services/ai`: 모델 추론, 임베딩, 추천 계산, AI 보강
+- `services/api`: 인증, 사용자, 트랙, 플레이리스트, 플랫폼 연동, PMS / EMS / GMS 오케스트레이션
+- `services/ai`: 오디오 특성 보강, 모델 추론, 추천 계산, AI 보강
 - `packages/shared-types`: 프론트와 연계되는 도메인 타입
 - `packages/shared-utils`: 공통 헬퍼와 클라이언트 유틸
 - `packages/design-tokens`: 재사용 UI 토큰
@@ -75,13 +92,14 @@ docs/
 
 1. [README.md](/Users/woosungjo/music-space/my-forever-music/README.md)
 2. [PROJECT_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_GUIDE.md)
-3. [TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md)
-4. [DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md)
-5. [ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
-6. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
-7. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
-8. [UBUNTU_SERVER_RUNBOOK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_RUNBOOK.md)
-9. [UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
+3. [PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md)
+4. [TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md)
+5. [DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md)
+6. [ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
+7. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
+8. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
+9. [UBUNTU_SERVER_RUNBOOK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_RUNBOOK.md)
+10. [UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
 
 ## 7. 앞으로 문서를 갱신하는 규칙
 
@@ -92,11 +110,25 @@ docs/
 
 ## 8. 지금 시점의 우선순위
 
-1. `services/api` 로컬 실행 환경(Java/Gradle/PostgreSQL) 연결
-2. `apps/web` 템플릿을 PMS / EMS / GMS 중심 구조로 축소
-3. 공통 타입과 API 계약 체계 정리
-4. DB 스키마와 Flyway 마이그레이션 초안 작성
-5. 인증과 사용자 설정부터 API 구현 시작
+1. 스트리밍 플랫폼 연동과 사용자 플레이리스트 PMS 적재 흐름 설계
+2. Spotify 오디오 특성 수집과 fallback 특성 생성 파이프라인 정의
+3. PMS bootstrap demo 카탈로그를 실제 사용자/플레이리스트 데이터 모델로 확장
+4. 사용자 행동 데이터와 EMS 수집 데이터를 어떤 이벤트 모델로 저장할지 정의
+5. 공통 타입과 API 계약 체계 정리
+
+현재 참고 상태:
+
+- `services/api`는 `Java 21 + Gradle wrapper` 기준으로 로컬 부팅 검증 완료
+- `services/api`의 `local` 프로필은 현재 `PostgreSQL` 없이 부팅 가능
+- `GET /api/v1/platforms/catalog` 응답 경로 추가 완료
+- `GET /api/v1/pms/workspace/bootstrap` 응답 검증 완료
+- `POST /api/v1/ems/workspace/analysis` 응답 경로 추가 완료
+- `POST /api/v1/gms/recommendations/preview`는 `services/ai`와의 브리지까지 검증 완료
+- `services/api`에는 PMS bootstrap용 `Flyway + JPA` 최소 카탈로그 스키마와 demo 데이터가 추가됨
+- `pms_track`는 Spotify 오디오 특성 전체 스냅샷 저장 구조로 확장됨
+- DB 활성 프로필에서는 PMS bootstrap이 실제 `pms_*` 테이블 기반으로 응답 가능
+- `apps/web`에는 `/platforms` route가 추가되어 preferred PMS source platform을 선택할 수 있음
+- 현재 구현은 아직 `핵심 서비스 문서`의 전체 범위가 아니라, 그중 `PMS / EMS / GMS` 추천 흐름의 최소 검증 버전임
 
 ## 9. 참고 메모
 

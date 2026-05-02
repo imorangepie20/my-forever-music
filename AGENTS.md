@@ -6,12 +6,13 @@
 
 1. [README.md](/Users/woosungjo/music-space/my-forever-music/README.md)
 2. [docs/PROJECT_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_GUIDE.md)
-3. [docs/architecture/TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md)
-4. [docs/architecture/DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md)
-5. [docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
-6. [docs/decisions/ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
-7. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
-8. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
+3. [docs/PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md)
+4. [docs/architecture/TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md)
+5. [docs/architecture/DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md)
+6. [docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
+7. [docs/decisions/ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
+8. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
+9. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
 
 ## 현재 확정 사항
 
@@ -21,9 +22,11 @@
 - AI 서비스는 `FastAPI`
 - DB는 `PostgreSQL`, 마이그레이션은 `Flyway`
 - API 계약은 `OpenAPI`
+- 제품 핵심 정의는 `docs/PROJECT_KEY_SERVICE.md`를 기준으로 해석한다
 
 ## 작업 원칙
 
 - 구조나 스택을 바꾸면 관련 문서를 함께 업데이트한다
 - 새 세션은 추측으로 진행하지 말고 `docs/PROJECT_GUIDE.md`를 기준으로 현재 상태를 확인한다
+- 제품 목표를 해석할 때는 `docs/PROJECT_KEY_SERVICE.md`를 함께 확인하고, 현재 구현 상태와 목표 상태를 구분해서 문서화한다
 - 아키텍처 의사결정이 바뀌면 `docs/decisions`에 ADR을 추가한다

@@ -10,7 +10,17 @@ export default defineConfig({
         },
     },
     server: {
-        host: true,     // 외부 접속 허용 (0.0.0.0)
-        port: 5173,     // 포트 번호
+        host: true,
+        port: 5173,
+        proxy: {
+            '/api': {
+                target: 'http://localhost:8080',
+                changeOrigin: true,
+            },
+            '/actuator': {
+                target: 'http://localhost:8080',
+                changeOrigin: true,
+            },
+        },
     },
 })

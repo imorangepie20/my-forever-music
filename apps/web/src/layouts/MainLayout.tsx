@@ -5,22 +5,25 @@ import Header from '../components/layout/Header'
 
 const MainLayout = () => {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+    const [sidebarOpen, setSidebarOpen] = useState(false)
 
     return (
         <div className="min-h-screen bg-hud-bg-primary hud-grid-bg">
-            {/* Sidebar */}
             <Sidebar
                 collapsed={sidebarCollapsed}
-                onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+                open={sidebarOpen}
+                onClose={() => setSidebarOpen(false)}
+                onCollapseToggle={() => setSidebarCollapsed((current) => !current)}
             />
 
-            {/* Main Content */}
-            <div className={`transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
-                {/* Header */}
-                <Header onMenuToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+            <div
+                className={`min-h-screen transition-all duration-300 ${
+                    sidebarCollapsed ? 'lg:pl-24' : 'lg:pl-72'
+                }`}
+            >
+                <Header onMenuToggle={() => setSidebarOpen((current) => !current)} />
 
-                {/* Page Content */}
-                <main className="p-6">
+                <main className="px-4 pb-8 pt-6 sm:px-6 lg:px-8">
                     <Outlet />
                 </main>
             </div>

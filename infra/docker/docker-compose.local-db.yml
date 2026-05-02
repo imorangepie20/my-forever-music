@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: my-forever-music-local-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-my_forever_music}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-my_forever_music}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - local_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: my-forever-music-local-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - local_redis_data:/data
+
+volumes:
+  local_postgres_data:
+  local_redis_data:

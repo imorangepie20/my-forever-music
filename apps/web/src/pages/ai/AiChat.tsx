@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type KeyboardEvent } from 'react'
 import { Send, Bot, User, Copy, RefreshCw, Sparkles } from 'lucide-react'
 import HudCard from '../../components/common/HudCard'
 import Button from '../../components/common/Button'
@@ -65,7 +65,7 @@ const AiChat = () => {
         }, 1500)
     }
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
+    const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
             handleSend()
