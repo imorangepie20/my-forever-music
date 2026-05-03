@@ -54,7 +54,13 @@ services/api/
 - 기본 보안 설정
 - OpenAPI 설정
 - 샘플 엔드포인트: `/api/v1/system/info`
+- 회원가입 엔드포인트: `POST /api/v1/auth/register`
 - 플랫폼 카탈로그 엔드포인트: `GET /api/v1/platforms/catalog`
+- 플랫폼 연결 bootstrap 엔드포인트: `GET /api/v1/platforms/connections/bootstrap`
+- 플랫폼 연결 명령 엔드포인트: `POST /api/v1/platforms/connections/connect`, `POST /api/v1/platforms/connections/disconnect`
+- 플랫폼 OAuth 엔드포인트: `POST /api/v1/platforms/oauth/start`, `POST /api/v1/platforms/oauth/complete`
+- PMS import bootstrap 엔드포인트: `GET /api/v1/pms/import/bootstrap`
+- PMS import 명령 엔드포인트: `POST /api/v1/pms/import/playlists`
 - PMS workspace bootstrap 엔드포인트: `GET /api/v1/pms/workspace/bootstrap`
 - EMS workspace analysis 엔드포인트: `POST /api/v1/ems/workspace/analysis`
 - GMS AI preview 브리지 엔드포인트: `POST /api/v1/gms/recommendations/preview`
@@ -65,7 +71,19 @@ services/api/
 
 이 스캐폴드는 아직 핵심 서비스의 전체 구현이 아니라 `PMS bootstrap -> EMS analysis -> GMS preview` 최소 검증 버전이다. 장기적으로는 플랫폼 OAuth, 플레이리스트 동기화, 행동 이벤트 적재, GMS 평가 저장까지 확장한다.
 
+현재는 여기에 `회원가입 -> 기본 플랫폼 선택 -> 플랫폼 연결 상태 조회 -> sandbox/Spotify OAuth 승인/callback -> PMS playlist import -> EMS 다음 단계 안내`까지 추가되어, 서비스 구현을 온보딩부터 순차적으로 확장할 수 있는 상태다.
+
 현재 `pms_track`는 기본 메타데이터만이 아니라 `Spotify 오디오 특성 전체 스냅샷`을 저장할 수 있도록 확장되어 있다. 따라서 향후 플랫폼 playlist import는 트랙 저장 전에 오디오 특성 채움 과정을 반드시 거치는 것을 기본 전제로 한다.
+
+또한 현재는 `platform credential store`와 `platform playlist provider` 계층이 추가되어, sandbox와 실제 외부 플랫폼 연동을 같은 import 흐름 위에서 모드별로 처리할 수 있다.
+
+추가로 `platform authorization code exchange client` 계층도 들어가 있어서, Spotify PKCE draft가 켜져 있으면 callback의 authorization code를 실제 token endpoint와 교환하고 그 결과를 credential로 저장한다.
+
+현재 `spotify` provider는 실제 사용자 token으로 `GET /me/playlists`, `GET /playlists/{playlist_id}/items`를 호출하고, 트랙별 오디오 특성은 공식 `GET /audio-features`를 우선 시도한 뒤 실패하거나 누락된 항목은 `fallback_generated` 완전 스냅샷으로 보강한다.
+
+상세 저장 기준은 [PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md) 를 본다.
+
+API 계약 문서 인덱스는 [docs/api/README.md](/Users/woosungjo/music-space/my-forever-music/docs/api/README.md) 를 먼저 본다.
 
 ## 실행 전제
 
@@ -75,6 +93,8 @@ services/api/
 
 현재 `local` 프로필은 브라우저 확인과 API 연결 점검을 빠르게 할 수 있도록 `DataSource`, `JPA`, `Flyway` 자동 구성을 잠시 제외한다.  
 즉, 현재 스캐폴드 상태에서는 `PostgreSQL` 없이도 `./gradlew bootRun`이 가능하다.
+
+또한 macOS 로컬 개발에서는 `8080` 포트가 Docker나 다른 앱과 자주 충돌하므로, `local` 프로필 기본 포트는 `8081`을 사용한다. 운영/서버 기준 기본 포트는 여전히 `8080`이다.
 
 이 상태에서도 `EMS workspace analysis`는 동작한다. 다만 `local`에서는 입력 텍스트 시드 중심으로 분석하고, `database` 프로필에서는 `PMS` 카탈로그 seed track도 함께 반영한다.
 
@@ -91,6 +111,13 @@ services/api/
 - `APP_VERSION`
 - `AI_SERVICE_BASE_URL`
 - `AI_RECOMMENDATION_PREVIEW_PATH`
+- `SPOTIFY_OAUTH_ENABLED`
+- `SPOTIFY_CLIENT_ID`
+- `SPOTIFY_CLIENT_SECRET`
+- `SPOTIFY_REDIRECT_URI`
+- `SPOTIFY_AUTHORIZATION_URI`
+- `SPOTIFY_TOKEN_URI`
+- `SPOTIFY_API_BASE_URI`
 
 ## 실행 예시
 
@@ -137,10 +164,38 @@ export JAVA_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 AI_SERVICE_BASE_URL=http://localhost:8000 ./gradlew bootRun
 ```
 
+Spotify PKCE draft까지 같이 확인하려면:
+
+```bash
+export SPOTIFY_OAUTH_ENABLED=true
+export SPOTIFY_CLIENT_ID=your_spotify_client_id
+export SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+export SPOTIFY_REDIRECT_URI=https://your-domain.example.com/platforms/oauth/callback
+AI_SERVICE_BASE_URL=http://localhost:8000 ./gradlew bootRun
+```
+
+이 설정이 있으면 `/api/v1/platforms/oauth/start`의 Spotify 응답은 internal sandbox approval 대신 external authorization URL을 내려준다. 이후 `/api/v1/pms/import/bootstrap`와 `/api/v1/pms/import/playlists`는 실제 Spotify playlist/provider 경로를 사용한다.
+
+프로젝트에 맞춘 상세 설정과 실행 스크립트는 [SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md) 를 본다.
+
 예시 호출:
 
 ```bash
-curl -X POST http://127.0.0.1:8080/api/v1/gms/recommendations/preview \
+curl -X POST http://127.0.0.1:8081/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "display_name": "Forever Listener",
+    "email": "listener@example.com",
+    "password": "music2026",
+    "preferred_platform_id": "spotify",
+    "marketing_opt_in": true,
+    "accepted_terms": true,
+    "accepted_privacy_policy": true
+  }'
+```
+
+```bash
+curl -X POST http://127.0.0.1:8081/api/v1/gms/recommendations/preview \
   -H 'Content-Type: application/json' \
   -d '{
     "mode": "gms",
@@ -152,10 +207,11 @@ curl -X POST http://127.0.0.1:8080/api/v1/gms/recommendations/preview \
 
 이 엔드포인트는 현재 `GMS` preview 브리지이므로 `mode`는 생략하거나 `gms`로 고정해 사용하는 것을 기준으로 한다.
 
-PMS bootstrap은 현재 아래 두 모드로 동작한다.
+PMS bootstrap은 현재 아래 세 모드로 동작한다.
 
-- `local`: 정적 fallback bootstrap
+- `imported-user`: 현재 사용자 기준 PMS import 결과
 - `database`: Flyway로 적재된 `pms_playlist`, `pms_track`, `pms_playlist_track` 기반 bootstrap
+- `local`: 정적 fallback bootstrap
 
 ## Wrapper 상태
 

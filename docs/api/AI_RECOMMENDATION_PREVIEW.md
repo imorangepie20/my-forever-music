@@ -2,7 +2,7 @@
 
 작성일: `2026-04-29`
 
-이 문서는 `services/ai`의 첫 번째 추천 계약 초안입니다.
+이 문서는 `services/ai`가 제공하는 첫 번째 추천 preview 내부 계약입니다.
 
 ## 목적
 
@@ -15,7 +15,11 @@
 - 내부 경로: `POST /v1/recommendations/preview`
 - Nginx 프록시 뒤 공개 경로: `POST /ai/v1/recommendations/preview`
 
-## 요청 필드
+## 요청
+
+요청과 응답 JSON은 현재 `snake_case`를 사용합니다.
+
+### 요청 필드
 
 - `request_id`: 호출 추적용 식별자, 선택
 - `user_id`: 사용자 식별자, 선택
@@ -30,30 +34,7 @@
 - `seed_genres`: 장르 시드 목록
 - `include_explanations`: 설명 문자열 포함 여부
 
-## 응답 필드
-
-- `request_id`: 최종 추적 id
-- `generated_at`: 생성 시각
-- `service`: 항상 `ai`
-- `status`: 현재는 `ok`
-- `context.strategy`: 추천 전략
-- `context.engine`: 현재 엔진 식별자
-- `context.mode`: 사용된 추천 공간
-- `context.mood`: 사용된 mood
-- `context.energy_level`: 최종 적용 에너지 레벨
-- `context.seed_basis`: 내부 생성에 사용된 정규화 seed 목록
-- `input_summary`: 입력 요약
-- `items`: 추천 후보 목록
-- `warnings`: fallback 동작 등 안내 메시지
-
-## 전략 값
-
-- `pms-seed-match`
-- `ems-mood-match`
-- `gms-hybrid-blend`
-- `discovery-fallback`
-
-## 예시 요청
+### 예시 요청
 
 ```json
 {
@@ -72,7 +53,32 @@
 }
 ```
 
-## 예시 응답
+## 응답
+
+### 응답 필드
+
+- `request_id`: 최종 추적 id
+- `generated_at`: 생성 시각
+- `service`: 항상 `ai`
+- `status`: 현재는 `ok`
+- `context.strategy`: 추천 전략
+- `context.engine`: 현재 엔진 식별자
+- `context.mode`: 사용된 추천 공간
+- `context.mood`: 사용된 mood
+- `context.energy_level`: 최종 적용 에너지 레벨
+- `context.seed_basis`: 내부 생성에 사용된 정규화 seed 목록
+- `input_summary`: 입력 요약
+- `items`: 추천 후보 목록
+- `warnings`: fallback 동작 등 안내 메시지
+
+### 전략 값
+
+- `pms-seed-match`
+- `ems-mood-match`
+- `gms-hybrid-blend`
+- `discovery-fallback`
+
+### 예시 응답
 
 ```json
 {
@@ -113,11 +119,12 @@
 }
 ```
 
-## 현재 한계
+## 현재 구현 메모
 
 - 실제 음원 카탈로그 조회는 하지 않음
 - 벡터 검색, 임베딩, 모델 추론이 아직 연결되지 않음
 - 점수는 preview 단계의 규칙 기반 값임
+- 현재 `services/api`의 `POST /api/v1/gms/recommendations/preview`가 이 계약을 내부적으로 호출한다
 
 ## 다음 연결 지점
 

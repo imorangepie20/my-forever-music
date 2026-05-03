@@ -30,9 +30,9 @@ const architectureCards = [
 ]
 
 const deliveryTracks = [
+    'Signup and primary platform onboarding',
     'Platform connection and playlist intake',
     'Spotify audio-feature enrichment with fallback generation',
-    'GMS ranking replacement for the preview engine',
 ]
 
 const HomePage = () => {
@@ -85,6 +85,13 @@ const HomePage = () => {
 
                             <div className="mt-8 flex flex-wrap gap-3">
                                 <Link
+                                    to="/signup"
+                                    className="btn-glow inline-flex items-center gap-2 rounded-xl bg-hud-accent-primary px-5 py-3 text-sm font-semibold text-hud-bg-primary transition-hud"
+                                >
+                                    Start Signup
+                                    <ArrowRight size={16} />
+                                </Link>
+                                <Link
                                     to="/platforms"
                                     className="inline-flex items-center gap-2 rounded-xl border border-hud-border-secondary bg-hud-bg-primary/80 px-5 py-3 text-sm font-medium text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
                                 >
@@ -92,10 +99,9 @@ const HomePage = () => {
                                 </Link>
                                 <Link
                                     to="/gms-preview"
-                                    className="btn-glow inline-flex items-center gap-2 rounded-xl bg-hud-accent-primary px-5 py-3 text-sm font-semibold text-hud-bg-primary transition-hud"
+                                    className="inline-flex items-center gap-2 rounded-xl border border-hud-border-secondary bg-hud-bg-primary/80 px-5 py-3 text-sm font-medium text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
                                 >
                                     Open GMS Preview
-                                    <ArrowRight size={16} />
                                 </Link>
                                 <a
                                     href={getApiDocsUrl()}

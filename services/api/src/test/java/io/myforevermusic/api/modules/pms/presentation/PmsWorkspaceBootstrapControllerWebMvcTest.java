@@ -27,7 +27,7 @@ class PmsWorkspaceBootstrapControllerWebMvcTest {
 
     @Test
     void shouldReturnWorkspaceBootstrap() throws Exception {
-        when(pmsWorkspaceBootstrapService.getWorkspaceBootstrap()).thenReturn(sampleResponse());
+        when(pmsWorkspaceBootstrapService.getWorkspaceBootstrap(null)).thenReturn(sampleResponse());
 
         mockMvc.perform(get("/api/v1/pms/workspace/bootstrap"))
             .andExpect(status().isOk())
@@ -38,6 +38,15 @@ class PmsWorkspaceBootstrapControllerWebMvcTest {
             .andExpect(jsonPath("$.suggested_tracks[0].spotify_audio_features_filled").value(true))
             .andExpect(jsonPath("$.suggested_artists[1].artist_name").value("Artist Two"))
             .andExpect(jsonPath("$.suggested_genres[2].genre").value("indietronica"));
+    }
+
+    @Test
+    void shouldPassUserIdToWorkspaceBootstrap() throws Exception {
+        when(pmsWorkspaceBootstrapService.getWorkspaceBootstrap("user-123")).thenReturn(sampleResponse());
+
+        mockMvc.perform(get("/api/v1/pms/workspace/bootstrap").param("user_id", "user-123"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.workspace_defaults.user_id").value("user-001"));
     }
 
     private PmsWorkspaceBootstrapResponse sampleResponse() {

@@ -13,14 +13,14 @@ import org.springframework.stereotype.Component;
 public class PmsStaticWorkspaceBootstrapSource implements PmsWorkspaceBootstrapSource {
 
     @Override
-    public Optional<PmsWorkspaceBootstrapResponse> load() {
+    public Optional<PmsWorkspaceBootstrapResponse> load(String userId) {
         return Optional.of(
             new PmsWorkspaceBootstrapResponse(
                 "api",
                 "ok",
                 Instant.now(),
                 new PmsWorkspaceBootstrapResponse.WorkspaceDefaults(
-                    "user-001",
+                    userId == null || userId.isBlank() ? "user-001" : userId,
                     "playlist-001",
                     List.of("track-alpha", "track-beta"),
                     List.of("Artist One", "Artist Two"),

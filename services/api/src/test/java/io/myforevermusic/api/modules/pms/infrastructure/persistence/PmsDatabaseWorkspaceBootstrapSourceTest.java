@@ -77,7 +77,7 @@ class PmsDatabaseWorkspaceBootstrapSourceTest {
             playlistTrackRepository
         );
 
-        Optional<PmsWorkspaceBootstrapResponse> result = source.load();
+        Optional<PmsWorkspaceBootstrapResponse> result = source.load(null);
 
         assertThat(result).isPresent();
         assertThat(result.orElseThrow().workspaceDefaults().playlistId()).isEqualTo("playlist-001");

@@ -6,6 +6,9 @@ import HomePage from './pages/HomePage'
 import NotFoundPage from './pages/NotFoundPage'
 import PmsPage from './pages/PmsPage'
 import PlatformsPage from './pages/PlatformsPage'
+import Register from './pages/auth/Register'
+import PlatformOAuthCallbackPage from './pages/platforms/PlatformOAuthCallbackPage'
+import PlatformOAuthSandboxAuthorizePage from './pages/platforms/PlatformOAuthSandboxAuthorizePage'
 
 function App() {
     return (
@@ -14,10 +17,14 @@ function App() {
                 <Route path="/" element={<MainLayout />}>
                     <Route index element={<HomePage />} />
                     <Route path="platforms" element={<PlatformsPage />} />
+                    <Route path="platforms/oauth/authorize" element={<PlatformOAuthSandboxAuthorizePage />} />
+                    <Route path="platforms/oauth/callback" element={<PlatformOAuthCallbackPage />} />
                     <Route path="pms" element={<PmsPage />} />
                     <Route path="ems" element={<EmsPage />} />
                     <Route path="gms-preview" element={<GmsPreviewPage />} />
                 </Route>
+                <Route path="signup" element={<Register />} />
+                <Route path="register" element={<Register />} />
                 <Route path="*" element={<NotFoundPage />} />
             </Routes>
         </BrowserRouter>

@@ -16,13 +16,13 @@ class PmsWorkspaceBootstrapServiceTest {
         PmsWorkspaceBootstrapResponse expected = sampleResponse("playlist-db");
         PmsWorkspaceBootstrapService service = new PmsWorkspaceBootstrapService(
             List.of(
-                () -> Optional.empty(),
-                () -> Optional.of(expected),
-                () -> Optional.of(sampleResponse("playlist-fallback"))
+                userId -> Optional.empty(),
+                userId -> Optional.of(expected),
+                userId -> Optional.of(sampleResponse("playlist-fallback"))
             )
         );
 
-        PmsWorkspaceBootstrapResponse actual = service.getWorkspaceBootstrap();
+        PmsWorkspaceBootstrapResponse actual = service.getWorkspaceBootstrap(null);
 
         assertThat(actual.workspaceDefaults().playlistId()).isEqualTo("playlist-db");
     }
@@ -30,10 +30,10 @@ class PmsWorkspaceBootstrapServiceTest {
     @Test
     void shouldFailWhenNoSourceReturnsData() {
         PmsWorkspaceBootstrapService service = new PmsWorkspaceBootstrapService(
-            List.of(() -> Optional.empty())
+            List.of(userId -> Optional.empty())
         );
 
-        assertThatThrownBy(service::getWorkspaceBootstrap)
+        assertThatThrownBy(() -> service.getWorkspaceBootstrap(null))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("No PMS workspace bootstrap source");
     }

@@ -5,6 +5,37 @@ export interface SystemInfoResponse {
     timestamp: string
 }
 
+export interface AuthRegistrationRequest {
+    display_name: string
+    email: string
+    password: string
+    preferred_platform_id: 'spotify' | 'apple-music' | 'tidal'
+    marketing_opt_in: boolean
+    accepted_terms: boolean
+    accepted_privacy_policy: boolean
+}
+
+export interface AuthRegistrationResponse {
+    service: string
+    status: string
+    registered_at: string
+    user: {
+        user_id: string
+        email: string
+        display_name: string
+        email_verified: boolean
+    }
+    onboarding: {
+        stage: string
+        preferred_platform_id: 'spotify' | 'apple-music' | 'tidal'
+        platform_connection_required: boolean
+        next_step_path: string
+        next_step_message: string
+    }
+}
+
+export type WorkspacePlatformId = 'spotify' | 'apple-music' | 'tidal'
+
 export interface PlatformCatalogResponse {
     service: string
     status: string
@@ -12,7 +43,7 @@ export interface PlatformCatalogResponse {
     primary_audio_feature_source: string
     onboarding_flow: string[]
     platforms: Array<{
-        platform_id: 'spotify' | 'apple-music' | 'tidal'
+        platform_id: WorkspacePlatformId
         display_name: string
         integration_stage: string
         pms_import_supported: boolean
@@ -22,6 +53,138 @@ export interface PlatformCatalogResponse {
         ems_role: string
         notes: string[]
     }>
+}
+
+export interface PlatformConnectionBootstrapResponse {
+    service: string
+    status: string
+    generated_at: string
+    user: {
+        user_id: string
+        display_name: string
+        email: string
+        preferred_platform_id: WorkspacePlatformId
+    }
+    summary: {
+        connected_platform_count: number
+        preferred_platform_connected: boolean
+        onboarding_stage: string
+        next_step_path: string
+        next_step_message: string
+    }
+    connections: Array<{
+        platform_id: WorkspacePlatformId
+        display_name: string
+        preferred: boolean
+        connected: boolean
+        connection_status: string
+        connection_mode: string | null
+        external_account_label: string | null
+        sync_ready: boolean
+        connected_at: string | null
+        next_action_label: string
+    }>
+}
+
+export interface PlatformConnectRequest {
+    user_id: string
+    platform_id: WorkspacePlatformId
+    connection_mode?: string
+    external_account_label?: string
+}
+
+export interface PlatformDisconnectRequest {
+    user_id: string
+    platform_id: WorkspacePlatformId
+}
+
+export interface PlatformConnectionCommandResponse {
+    service: string
+    status: string
+    processed_at: string
+    connection: {
+        user_id: string
+        platform_id: WorkspacePlatformId
+        display_name: string
+        connected: boolean
+        connection_status: string
+        connection_mode: string
+        external_account_label: string | null
+        scope_summary: string | null
+        sync_ready: boolean
+        connected_at: string | null
+    }
+    next_step: {
+        path: string
+        message: string
+    }
+}
+
+export interface PlatformAuthorizationStartRequest {
+    user_id: string
+    platform_id: WorkspacePlatformId
+}
+
+export interface PlatformAuthorizationStartResponse {
+    service: string
+    status: string
+    generated_at: string
+    user: {
+        user_id: string
+        display_name: string
+        email: string
+    }
+    authorization: {
+        state: string
+        platform_id: WorkspacePlatformId
+        platform_display_name: string
+        authorization_mode: string
+        authorization_channel: 'internal_approval_page' | 'external_browser_redirect'
+        requested_scopes: string[]
+        expires_at: string
+        approval_page_path: string | null
+        callback_path: string
+        sandbox_approval_code: string | null
+        external_authorization_url: string | null
+        redirect_uri: string | null
+    }
+}
+
+export interface PlatformAuthorizationCompleteRequest {
+    user_id: string
+    platform_id: WorkspacePlatformId
+    state: string
+    approval_code?: string
+    authorization_code?: string
+}
+
+export interface PlatformAuthorizationCompleteResponse {
+    service: string
+    status: string
+    processed_at: string
+    authorization: {
+        state: string
+        platform_id: WorkspacePlatformId
+        platform_display_name: string
+        authorization_mode: string
+        requested_scopes: string[]
+        completed_at: string
+    }
+    connection: {
+        user_id: string
+        platform_id: WorkspacePlatformId
+        connected: boolean
+        connection_status: string
+        connection_mode: string
+        external_account_label: string | null
+        scope_summary: string | null
+        sync_ready: boolean
+        connected_at: string | null
+    }
+    next_step: {
+        path: string
+        message: string
+    }
 }
 
 export interface PmsWorkspaceBootstrapResponse {
@@ -62,6 +225,83 @@ export interface PmsWorkspaceBootstrapResponse {
         weight: number
         reason: string
     }>
+}
+
+export interface PmsPlaylistImportBootstrapResponse {
+    service: string
+    status: string
+    generated_at: string
+    user: {
+        user_id: string
+        display_name: string
+        preferred_platform_id: WorkspacePlatformId
+    }
+    platform_connection: {
+        platform_id: WorkspacePlatformId
+        display_name: string
+        connected: boolean
+        connection_mode: string | null
+        external_account_label: string | null
+        sync_ready: boolean
+    }
+    summary: {
+        preferred_platform_connected: boolean
+        available_playlist_count: number
+        imported_playlist_count: number
+        next_step_path: string
+        next_step_message: string
+    }
+    available_playlists: Array<{
+        external_playlist_id: string
+        title: string
+        source_platform: string
+        track_count: number
+        curator: string
+        description: string
+        already_imported: boolean
+        audio_feature_policy: string
+    }>
+    imported_playlists: Array<{
+        playlist_id: string
+        external_playlist_id: string
+        title: string
+        source_platform: string
+        track_count: number
+        imported_at: string
+    }>
+}
+
+export interface PmsPlaylistImportRequest {
+    user_id: string
+    platform_id: WorkspacePlatformId
+    external_playlist_ids: string[]
+}
+
+export interface PmsPlaylistImportResponse {
+    service: string
+    status: string
+    processed_at: string
+    import_result: {
+        user_id: string
+        platform_id: WorkspacePlatformId
+        platform_display_name: string
+        imported_playlist_count: number
+        imported_track_count: number
+        complete_spotify_audio_feature_track_count: number
+        connection_mode: string
+    }
+    playlists: Array<{
+        playlist_id: string
+        external_playlist_id: string
+        title: string
+        source_platform: string
+        track_count: number
+        imported_at: string
+    }>
+    next_step: {
+        path: string
+        message: string
+    }
 }
 
 export interface EmsWorkspaceAnalysisRequest {

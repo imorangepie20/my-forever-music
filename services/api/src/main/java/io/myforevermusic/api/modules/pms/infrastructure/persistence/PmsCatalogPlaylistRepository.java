@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface PmsCatalogPlaylistRepository extends JpaRepository<PmsCatalogPlaylistEntity, String> {
 
     List<PmsCatalogPlaylistEntity> findAllByOrderByDisplayOrderAscIdAsc();
+
+    List<PmsCatalogPlaylistEntity> findAllByOwnerUserIdOrderByDisplayOrderAscIdAsc(String ownerUserId);
 }

@@ -7,6 +7,8 @@
 - [PROJECT_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_GUIDE.md): 새 세션과 새 작업자가 먼저 읽어야 하는 통합 가이드
 - [PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md): 서비스 핵심 기능과 장기 제품 흐름의 원문 정의
 - [architecture/TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md): 현재 채택 기술 스택
+- [architecture/SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md): Spotify OAuth Redirect URI, env, HTTPS 테스트 기준
+- [architecture/HTTPS_DOMAIN_DEV_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/HTTPS_DOMAIN_DEV_SETUP.md): `imapplepie20.tplinkdns.com` 기준 HTTPS reverse proxy와 Certbot 적용 절차
 - [architecture/DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md): 웹 이후 Windows 데스크탑 확장 전략
 - [architecture/UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md): Ubuntu 서버 최초 설치부터 개발 환경 준비까지의 상세 가이드
 - [architecture/UBUNTU_SERVER_RUNBOOK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_RUNBOOK.md): Ubuntu 서버 운영/개발 방향 요약
@@ -23,10 +25,16 @@
 
 ## API 문서
 
-- [api/AI_RECOMMENDATION_PREVIEW.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AI_RECOMMENDATION_PREVIEW.md): AI 추천 preview 계약 초안
+- [api/README.md](/Users/woosungjo/music-space/my-forever-music/docs/api/README.md): `docs/api` 전체 진입점과 읽는 순서
+- [api/AUTH_REGISTER_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AUTH_REGISTER_API.md): 회원가입과 기본 플랫폼 선택 계약
+- [api/PLATFORM_CONNECTION_ONBOARDING_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_CONNECTION_ONBOARDING_API.md): 가입 직후 플랫폼 연결 상태와 connect/disconnect 계약
+- [api/PLATFORM_OAUTH_SANDBOX_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_OAUTH_SANDBOX_API.md): sandbox OAuth 시작/승인/callback 완료 계약
+- [api/PMS_PLAYLIST_IMPORT_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_PLAYLIST_IMPORT_API.md): sandbox 플랫폼 playlist import와 PMS 적재 계약
+- [api/AI_RECOMMENDATION_PREVIEW.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AI_RECOMMENDATION_PREVIEW.md): AI 추천 preview 내부 계약
 - [api/EMS_WORKSPACE_ANALYSIS_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/EMS_WORKSPACE_ANALYSIS_API.md): EMS workspace 추천값 분석 계약
 - [api/GMS_RECOMMENDATION_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_PREVIEW_API.md): Spring Boot API의 GMS preview 엔드포인트 초안
 - [api/PLATFORM_CATALOG_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_CATALOG_API.md): 플랫폼 선택과 제품 역할 설명용 카탈로그 계약
+- [api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md): PMS track의 Spotify 오디오 특성 전체 저장 기준
 - [api/PMS_WORKSPACE_BOOTSTRAP_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_WORKSPACE_BOOTSTRAP_API.md): PMS 화면 bootstrap 데이터 계약
 
 ## 참고 문서

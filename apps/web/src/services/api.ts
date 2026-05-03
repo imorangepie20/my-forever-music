@@ -1,10 +1,23 @@
 import type {
+    AuthRegistrationRequest,
+    AuthRegistrationResponse,
+    PlatformAuthorizationCompleteRequest,
+    PlatformAuthorizationCompleteResponse,
+    PlatformAuthorizationStartRequest,
+    PlatformAuthorizationStartResponse,
+    PlatformConnectionBootstrapResponse,
+    PlatformConnectionCommandResponse,
+    PlatformConnectRequest,
+    PlatformDisconnectRequest,
     PlatformCatalogResponse,
     EmsWorkspaceAnalysisRequest,
     EmsWorkspaceAnalysisResponse,
     GmsRecommendationPreviewRequest,
     GmsRecommendationPreviewResponse,
     PmsWorkspaceBootstrapResponse,
+    PmsPlaylistImportBootstrapResponse,
+    PmsPlaylistImportRequest,
+    PmsPlaylistImportResponse,
     SystemInfoResponse,
 } from '@/types/api'
 
@@ -77,7 +90,7 @@ export const getApiConnectionLabel = () =>
     API_BASE_URL || 'same-origin (/api via Vite proxy)'
 
 export const getApiDocsUrl = () =>
-    resolveDocsUrl(import.meta.env.VITE_API_DOCS_URL, '/docs', '8080', '/docs')
+    resolveDocsUrl(import.meta.env.VITE_API_DOCS_URL, '/docs', '8081', '/docs')
 
 export const getAiDocsUrl = () =>
     resolveDocsUrl(import.meta.env.VITE_AI_DOCS_URL, '/ai/docs', '8000', '/docs')
@@ -85,11 +98,82 @@ export const getAiDocsUrl = () =>
 export const fetchSystemInfo = (signal?: AbortSignal) =>
     requestJson<SystemInfoResponse>('/api/v1/system/info', { signal })
 
+export const registerAccount = (payload: AuthRegistrationRequest) =>
+    requestJson<AuthRegistrationResponse>('/api/v1/auth/register', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    })
+
 export const fetchPlatformCatalog = (signal?: AbortSignal) =>
     requestJson<PlatformCatalogResponse>('/api/v1/platforms/catalog', { signal })
 
-export const fetchPmsWorkspaceBootstrap = (signal?: AbortSignal) =>
-    requestJson<PmsWorkspaceBootstrapResponse>('/api/v1/pms/workspace/bootstrap', { signal })
+export const fetchPlatformConnectionBootstrap = (userId: string, signal?: AbortSignal) =>
+    requestJson<PlatformConnectionBootstrapResponse>(
+        `/api/v1/platforms/connections/bootstrap?user_id=${encodeURIComponent(userId)}`,
+        { signal },
+    )
+
+export const connectPlatformAccount = (payload: PlatformConnectRequest) =>
+    requestJson<PlatformConnectionCommandResponse>('/api/v1/platforms/connections/connect', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    })
+
+export const disconnectPlatformAccount = (payload: PlatformDisconnectRequest) =>
+    requestJson<PlatformConnectionCommandResponse>('/api/v1/platforms/connections/disconnect', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    })
+
+export const startPlatformAuthorization = (payload: PlatformAuthorizationStartRequest) =>
+    requestJson<PlatformAuthorizationStartResponse>('/api/v1/platforms/oauth/start', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    })
+
+export const completePlatformAuthorization = (payload: PlatformAuthorizationCompleteRequest) =>
+    requestJson<PlatformAuthorizationCompleteResponse>('/api/v1/platforms/oauth/complete', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    })
+
+export const fetchPmsWorkspaceBootstrap = (userId?: string, signal?: AbortSignal) =>
+    requestJson<PmsWorkspaceBootstrapResponse>(
+        userId
+            ? `/api/v1/pms/workspace/bootstrap?user_id=${encodeURIComponent(userId)}`
+            : '/api/v1/pms/workspace/bootstrap',
+        { signal },
+    )
+
+export const fetchPmsPlaylistImportBootstrap = (userId: string, signal?: AbortSignal) =>
+    requestJson<PmsPlaylistImportBootstrapResponse>(
+        `/api/v1/pms/import/bootstrap?user_id=${encodeURIComponent(userId)}`,
+        { signal },
+    )
+
+export const importPmsPlaylists = (payload: PmsPlaylistImportRequest) =>
+    requestJson<PmsPlaylistImportResponse>('/api/v1/pms/import/playlists', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    })
 
 export const analyzeEmsWorkspace = (payload: EmsWorkspaceAnalysisRequest, signal?: AbortSignal) =>
     requestJson<EmsWorkspaceAnalysisResponse>('/api/v1/ems/workspace/analysis', {

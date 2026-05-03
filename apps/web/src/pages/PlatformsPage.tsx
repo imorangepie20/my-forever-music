@@ -1,21 +1,38 @@
 import { useEffect, useState } from 'react'
 import { ArrowRight, CheckCircle2, Disc3, Radio, RefreshCw, Sparkles } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
+import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
-import { ApiError, fetchPlatformCatalog } from '@/services/api'
-import type { PlatformCatalogResponse } from '@/types/api'
+import {
+    ApiError,
+    disconnectPlatformAccount,
+    fetchPlatformCatalog,
+    fetchPlatformConnectionBootstrap,
+    startPlatformAuthorization,
+} from '@/services/api'
+import type {
+    PlatformCatalogResponse,
+    PlatformConnectionBootstrapResponse,
+    WorkspacePlatformId,
+} from '@/types/api'
 
 const stageLabel: Record<string, string> = {
     'planned-pms-import': 'Planned PMS Import',
     'priority-analysis-source': 'Priority Analysis Source',
 }
 
+const OAUTH_STORAGE_KEY = 'my-forever-music.platform-oauth-session'
+
 const PlatformsPage = () => {
+    const navigate = useNavigate()
+    const { session, updateSession } = useAuthSession()
     const { workspace, updateWorkspace } = useRecommendationWorkspace()
     const [catalog, setCatalog] = useState<PlatformCatalogResponse | null>(null)
+    const [connectionBootstrap, setConnectionBootstrap] = useState<PlatformConnectionBootstrapResponse | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const [isMutating, setIsMutating] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
@@ -27,6 +44,21 @@ const PlatformsPage = () => {
         fetchPlatformCatalog(controller.signal)
             .then((response) => {
                 setCatalog(response)
+                if (!session) {
+                    setConnectionBootstrap(null)
+                    return null
+                }
+
+                return fetchPlatformConnectionBootstrap(session.userId, controller.signal)
+            })
+            .then((bootstrap) => {
+                if (bootstrap) {
+                    setConnectionBootstrap(bootstrap)
+                    updateWorkspace({
+                        userId: bootstrap.user.user_id,
+                        preferredPlatformId: bootstrap.user.preferred_platform_id,
+                    })
+                }
                 setError(null)
             })
             .catch((requestError: unknown) => {
@@ -47,7 +79,79 @@ const PlatformsPage = () => {
             })
 
         return () => controller.abort()
-    }, [])
+    }, [session, updateWorkspace])
+
+    const reloadConnections = async () => {
+        if (!session) {
+            return
+        }
+
+        const bootstrap = await fetchPlatformConnectionBootstrap(session.userId)
+        setConnectionBootstrap(bootstrap)
+        updateSession({
+            preferredPlatformId: bootstrap.user.preferred_platform_id,
+            onboardingStage: bootstrap.summary.onboarding_stage,
+            nextStepPath: bootstrap.summary.next_step_path,
+            nextStepMessage: bootstrap.summary.next_step_message,
+            platformConnectionRequired: !bootstrap.summary.preferred_platform_connected,
+        })
+    }
+
+    const handleConnectToggle = async (platformId: WorkspacePlatformId, connected: boolean) => {
+        if (!session) {
+            setError('Create an account first so platform onboarding can attach to a user.')
+            return
+        }
+
+        setIsMutating(platformId)
+        setError(null)
+
+        try {
+            if (connected) {
+                await disconnectPlatformAccount({
+                    user_id: session.userId,
+                    platform_id: platformId,
+                })
+
+                await reloadConnections()
+            } else {
+                const response = await startPlatformAuthorization({
+                    user_id: session.userId,
+                    platform_id: platformId,
+                })
+
+                if (typeof window !== 'undefined') {
+                    window.sessionStorage.setItem(
+                        `${OAUTH_STORAGE_KEY}.${response.authorization.state}`,
+                        JSON.stringify(response),
+                    )
+                }
+
+                if (
+                    response.authorization.authorization_channel === 'external_browser_redirect' &&
+                    response.authorization.external_authorization_url
+                ) {
+                    window.location.assign(response.authorization.external_authorization_url)
+                    return
+                }
+
+                if (!response.authorization.approval_page_path) {
+                    throw new Error('Authorization approval page is missing for the current platform mode.')
+                }
+
+                navigate(response.authorization.approval_page_path)
+                return
+            }
+        } catch (requestError: unknown) {
+            const message =
+                requestError instanceof ApiError
+                    ? requestError.message
+                    : 'Unable to update platform connection state right now.'
+            setError(message)
+        } finally {
+            setIsMutating(null)
+        }
+    }
 
     return (
         <div className="space-y-6">
@@ -69,12 +173,23 @@ const PlatformsPage = () => {
                             </p>
 
                             <div className="mt-8 flex flex-wrap gap-3">
-                                <Link to="/pms">
-                                    <Button type="button" variant="primary" glow>
-                                        Continue to PMS
-                                        <ArrowRight size={16} />
-                                    </Button>
-                                </Link>
+                                {connectionBootstrap?.summary.next_step_path ? (
+                                    <Link to={connectionBootstrap.summary.next_step_path}>
+                                        <Button type="button" variant="primary" glow>
+                                            {connectionBootstrap.summary.preferred_platform_connected
+                                                ? 'Continue to PMS'
+                                                : 'Stay in Platform Onboarding'}
+                                            <ArrowRight size={16} />
+                                        </Button>
+                                    </Link>
+                                ) : (
+                                    <Link to="/signup">
+                                        <Button type="button" variant="primary" glow>
+                                            Start Signup
+                                            <ArrowRight size={16} />
+                                        </Button>
+                                    </Link>
+                                )}
                                 <Link to="/ems">
                                     <Button type="button" variant="outline">
                                         Open EMS
@@ -100,23 +215,32 @@ const PlatformsPage = () => {
                     <div className="space-y-4">
                         <div className="rounded-2xl border border-hud-border-primary bg-hud-accent-primary/10 p-4">
                             <p className="text-xs uppercase tracking-[0.24em] text-hud-accent-primary">
-                                Preferred Platform
+                                {session ? 'Signed-in Member' : 'Preferred Platform'}
                             </p>
-                            <p className="mt-2 text-2xl font-semibold capitalize text-hud-text-primary">
-                                {workspace.preferredPlatformId.replace('-', ' ')}
-                            </p>
+                            {session ? (
+                                <>
+                                    <p className="mt-2 text-2xl font-semibold text-hud-text-primary">
+                                        {session.displayName}
+                                    </p>
+                                    <p className="mt-2 text-sm text-hud-text-secondary">{session.email}</p>
+                                </>
+                            ) : (
+                                <p className="mt-2 text-2xl font-semibold capitalize text-hud-text-primary">
+                                    {workspace.preferredPlatformId.replace('-', ' ')}
+                                </p>
+                            )}
                         </div>
 
                         <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
                             <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
-                                Audio Feature Source
+                                Onboarding State
                             </p>
                             <p className="mt-2 text-sm font-medium text-hud-text-primary">
-                                {catalog?.primary_audio_feature_source ?? 'spotify'}
+                                {connectionBootstrap?.summary.onboarding_stage ?? 'signup-required'}
                             </p>
                             <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
-                                The current product direction still treats Spotify audio features as the first analysis
-                                baseline, even when PMS source playlists come from Apple Music or TIDAL.
+                                {connectionBootstrap?.summary.next_step_message ??
+                                    'Create an account first so platform connection state can be attached to a user.'}
                             </p>
                         </div>
 
@@ -131,6 +255,21 @@ const PlatformsPage = () => {
 
             <section className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
                 <HudCard title="Onboarding Flow" subtitle="How platform selection feeds the product loop">
+                    {session ? (
+                        <div className="mb-4 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4 text-sm leading-6 text-hud-text-secondary">
+                            Current account: <span className="font-medium text-hud-text-primary">{session.displayName}</span>
+                            {' '}with preferred source{' '}
+                            <span className="font-medium capitalize text-hud-text-primary">
+                                {session.preferredPlatformId.replace('-', ' ')}
+                            </span>
+                            .
+                        </div>
+                    ) : (
+                        <div className="mb-4 rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-4 text-sm leading-6 text-hud-text-secondary">
+                            Create an account first. Platform connection bootstrap needs a user to attach onboarding state.
+                        </div>
+                    )}
+
                     {catalog ? (
                         <div className="space-y-4">
                             {catalog.onboarding_flow.map((step, index) => (
@@ -157,6 +296,9 @@ const PlatformsPage = () => {
                         <div className="grid gap-4">
                             {catalog.platforms.map((platform) => {
                                 const isPreferred = workspace.preferredPlatformId === platform.platform_id
+                                const currentConnection = connectionBootstrap?.connections.find(
+                                    (connection) => connection.platform_id === platform.platform_id,
+                                )
 
                                 return (
                                     <div
@@ -206,6 +348,23 @@ const PlatformsPage = () => {
                                                     'Use as Source'
                                                 )}
                                             </Button>
+                                            <Button
+                                                type="button"
+                                                variant={currentConnection?.connected ? 'secondary' : 'ghost'}
+                                                disabled={!session || isMutating === platform.platform_id}
+                                                onClick={() =>
+                                                    handleConnectToggle(
+                                                        platform.platform_id,
+                                                        currentConnection?.connected ?? false,
+                                                    )
+                                                }
+                                            >
+                                                {isMutating === platform.platform_id
+                                                    ? 'Working...'
+                                                    : currentConnection?.connected
+                                                      ? 'Disconnect'
+                                                      : 'Start OAuth Sandbox'}
+                                            </Button>
                                         </div>
 
                                         <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -237,7 +396,23 @@ const PlatformsPage = () => {
                                             <span className="rounded-full border border-hud-border-secondary px-3 py-1 text-xs text-hud-text-secondary">
                                                 {platform.audio_feature_strategy}
                                             </span>
+                                            {currentConnection?.connected && (
+                                                <span className="rounded-full border border-hud-border-primary bg-hud-accent-primary/10 px-3 py-1 text-xs text-hud-accent-primary">
+                                                    connected
+                                                </span>
+                                            )}
                                         </div>
+
+                                        {currentConnection?.external_account_label && (
+                                            <div className="mt-4 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                                <p className="text-xs uppercase tracking-[0.2em] text-hud-text-muted">
+                                                    Connection Label
+                                                </p>
+                                                <p className="mt-2 text-sm text-hud-text-primary">
+                                                    {currentConnection.external_account_label}
+                                                </p>
+                                            </div>
+                                        )}
 
                                         <div className="mt-4 space-y-2 text-sm leading-6 text-hud-text-secondary">
                                             {platform.notes.map((note) => (

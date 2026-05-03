@@ -44,14 +44,17 @@
 Ubuntu 서버 개발용 Nginx 설정은 아래 파일을 사용합니다.
 
 - [ubuntu.server.dev.conf](/Users/woosungjo/music-space/my-forever-music/infra/nginx/ubuntu.server.dev.conf)
+- [ubuntu.server.dev.https.conf](/Users/woosungjo/music-space/my-forever-music/infra/nginx/ubuntu.server.dev.https.conf)
 
 경로 라우팅은 다음 기준입니다.
 
 - `/` -> `apps/web` Vite 서버
-- `/api/` -> `services/api`
+- `/api/` -> `services/api` 기본 `8081`
 - `/actuator/` -> `services/api`
 - `/docs`, `/openapi` -> `services/api`
 - `/ai/` -> `services/ai`
+
+Spotify OAuth callback까지 포함한 실제 HTTPS 도메인 절차는 [HTTPS_DOMAIN_DEV_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/HTTPS_DOMAIN_DEV_SETUP.md) 를 본다.
 
 ## Docker Compose 기준
 

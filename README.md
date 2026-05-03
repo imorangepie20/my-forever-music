@@ -74,17 +74,26 @@ my-forever-music/
 
 - 제품 목표는 `스트리밍 플랫폼 플레이리스트 수집 -> 오디오 특성 분석 -> 사용자 취향 모델 -> EMS/GMS 추천 루프` 구조로 정의됨
 - `apps/web`는 Vite 기반 최소 제품 셸과 `GMS preview` 테스트 화면까지 정리 완료
-- `apps/web`는 `/platforms` 화면에서 스트리밍 플랫폼 카탈로그와 PMS source 선택 흐름을 제공
-- `apps/web`는 `PMS bootstrap -> EMS workspace -> GMS preview` 흐름까지 반영 완료
+- `apps/web`는 `/signup` 화면에서 회원가입과 기본 스트리밍 플랫폼 선택 가능
+- `apps/web`는 `/platforms` 화면에서 스트리밍 플랫폼 카탈로그, 가입 사용자 세션, sandbox 연결/해제와 Spotify OAuth redirect 흐름을 제공
+- `apps/web`는 `/pms` 화면에서 사용자별 PMS bootstrap과 platform playlist import를 제공
+- `apps/web`는 `PMS import/bootstrap -> EMS workspace -> GMS preview` 흐름까지 반영 완료
 - `apps/web`의 `EMS` 화면은 Spring Boot `workspace analysis` 결과를 받아 추천값 적용 가능
 - `apps/desktop`는 향후 Windows 앱 개발을 위한 예약 구조 생성 완료
 - `services/api`는 `GET /api/v1/platforms/catalog` 엔드포인트로 플랫폼 역할과 온보딩 흐름 제공
+- `services/api`는 `POST /api/v1/auth/register` 엔드포인트로 회원가입과 기본 플랫폼 선택 제공
+- `services/api`는 `GET/POST /api/v1/platforms/connections/*` 엔드포인트로 가입 직후 플랫폼 연결 온보딩 제공
+- `services/api`는 `GET/POST /api/v1/pms/import/*` 엔드포인트로 PMS playlist import 제공
+- `services/api`는 platform credential 저장과 playlist provider 추상화를 통해 sandbox와 실제 Spotify import를 같은 흐름에서 처리함
+- `services/api`는 Spotify PKCE draft 시작 URL, external callback, authorization code token exchange까지 반영됨
+- `services/api`는 실제 Spotify playlist 목록과 playlist item import 경로를 추가함
 - `services/api`는 PMS workspace bootstrap과 `services/ai` preview 호출용 GMS 브리지 엔드포인트 생성 완료
 - `services/api`는 PMS seed 기반 `EMS workspace analysis` 엔드포인트 추가 완료
 - `services/api`는 `local` 프로필 기준으로 DB 없이 로컬 부팅 검증 완료
 - `services/api`의 `PMS bootstrap`과 `GMS preview -> services/ai` 브리지 응답 검증 완료
 - `services/api`는 PMS bootstrap용 `Flyway + JPA` 최소 카탈로그와 demo seed 데이터 추가 완료
 - `services/api`의 `pms_track`는 Spotify 오디오 특성 전체 스냅샷을 저장할 수 있게 확장됨
+- PMS import 시 Spotify 오디오 특성 전체 저장 기준 문서가 추가됨
 - `services/api`는 DB 활성 프로필에서 `pms_playlist / pms_track / pms_playlist_track` 기반 bootstrap 응답 가능
 - `services/ai`는 최소 FastAPI 스캐폴드와 추천 preview API 초안 생성 완료
 - `infra/nginx`는 로컬/운영용 리버스 프록시 설정 템플릿 생성 완료
@@ -93,20 +102,20 @@ my-forever-music/
 - 새 프로젝트 전용 폴더 구조는 그대로 유지
 - 웹 우선 개발 후 데스크탑 확장을 전제로 문서화 시작
 
-아직 미구현이지만 핵심 서비스 문서에 정의된 목표:
+아직 미구현이거나 sandbox 단계인 핵심 서비스 문서의 목표:
 
-- 회원가입 시 사용 중인 스트리밍 플랫폼 선택 및 연동
-- 사용자 플레이리스트를 PMS로 동기화
-- Spotify 오디오 특성 기반 분석과 미수집 곡의 fallback 특성 생성
+- Spotify access token refresh와 장기 세션 유지
+- Apple Music / TIDAL 실제 플랫폼 연동
+- PMS import 결과의 영속 사용자/플레이리스트 동기화
 - 사용자 행동 데이터 기반 개인화 모델 업데이트
 - EMS 외부 플레이리스트 수집, GMS 추천 통과, 사용자 평가의 PMS 환류
 - 페이지 이동 간 유지되는 공통 음악 플레이어
 
 ## 다음 추천 작업
 
-1. 스트리밍 플랫폼 계정 연동과 사용자 플레이리스트 PMS 적재 흐름 설계
-2. Spotify 오디오 특성 수집과 fallback 특성 생성 파이프라인 정의
-3. PMS demo 카탈로그를 실제 사용자/플레이리스트 데이터 모델로 확장
+1. Spotify access token refresh와 만료 복구 흐름 추가
+2. PMS import 결과를 영속 사용자/플레이리스트 데이터 모델로 확장
+3. Apple Music / TIDAL 실제 플랫폼 provider 설계
 4. EMS 외부 플레이리스트 수집과 GMS 환류 구조 설계
 5. 공통 플레이어와 데스크탑 재사용을 고려한 프론트 구조 정리
 
@@ -114,3 +123,13 @@ my-forever-music/
 
 - [infra/docker/README.md](/Users/woosungjo/music-space/my-forever-music/infra/docker/README.md)
 - [infra/docker/docker-compose.local-db.yml](/Users/woosungjo/music-space/my-forever-music/infra/docker/docker-compose.local-db.yml)
+
+## 구현 기준 문서
+
+- [docs/PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md)
+- [docs/architecture/SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md)
+- [docs/api/README.md](/Users/woosungjo/music-space/my-forever-music/docs/api/README.md)
+- [docs/api/AUTH_REGISTER_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AUTH_REGISTER_API.md)
+- [docs/api/PLATFORM_CONNECTION_ONBOARDING_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_CONNECTION_ONBOARDING_API.md)
+- [docs/api/PMS_PLAYLIST_IMPORT_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_PLAYLIST_IMPORT_API.md)
+- [docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md)

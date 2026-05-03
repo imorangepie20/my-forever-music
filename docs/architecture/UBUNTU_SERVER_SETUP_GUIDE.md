@@ -12,7 +12,7 @@
 
 - Ubuntu 서버: `24.04 LTS` 권장
 - 웹 프론트엔드: `Vite dev server` on `5173`
-- 메인 API: `Spring Boot` on `8080`
+- 메인 API: `Spring Boot` on `8081`
 - AI 서비스: `FastAPI` on `8000`
 - DB: `PostgreSQL` on Docker
 - 캐시: `Redis` on Docker
@@ -23,6 +23,7 @@
 - 호스트에서 `web`, `api` 실행
 - Docker는 `PostgreSQL`, `Redis`만 사용
 - Nginx는 호스트에 직접 설치해서 `/`, `/api`, `/docs`, `/actuator`, `/ai`를 프록시
+- Spotify OAuth callback 테스트를 위해 이후 `443` HTTPS reverse proxy도 연결
 
 ## 2. 서버 OS 선택
 

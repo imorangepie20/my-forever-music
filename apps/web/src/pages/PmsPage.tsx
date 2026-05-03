@@ -1,11 +1,20 @@
-import { startTransition, useEffect, useState } from 'react'
+import { startTransition, useEffect, useMemo, useState } from 'react'
 import { LibraryBig, ListMusic, RefreshCw, Sparkles, UserRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
-import { ApiError, fetchPmsWorkspaceBootstrap } from '@/services/api'
+import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
-import type { PmsWorkspaceBootstrapResponse } from '@/types/api'
+import {
+    ApiError,
+    fetchPmsPlaylistImportBootstrap,
+    fetchPmsWorkspaceBootstrap,
+    importPmsPlaylists,
+} from '@/services/api'
+import type {
+    PmsPlaylistImportBootstrapResponse,
+    PmsWorkspaceBootstrapResponse,
+} from '@/types/api'
 
 const splitItems = (value: string) =>
     value
@@ -19,6 +28,7 @@ const mergeCsv = (current: string, nextValue: string) => {
 }
 
 const PmsPage = () => {
+    const { session, updateSession } = useAuthSession()
     const {
         workspace,
         updateWorkspace,
@@ -28,8 +38,24 @@ const PmsPage = () => {
         seedGenreCount,
     } = useRecommendationWorkspace()
     const [bootstrap, setBootstrap] = useState<PmsWorkspaceBootstrapResponse | null>(null)
+    const [importBootstrap, setImportBootstrap] = useState<PmsPlaylistImportBootstrapResponse | null>(null)
+    const [selectedExternalPlaylistIds, setSelectedExternalPlaylistIds] = useState<string[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [isImporting, setIsImporting] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [importMessage, setImportMessage] = useState<string | null>(null)
+
+    const activeUserId = session?.userId
+
+    const hydrateWorkspaceFromBootstrap = (response: PmsWorkspaceBootstrapResponse) => {
+        updateWorkspace({
+            userId: response.workspace_defaults.user_id,
+            playlistId: response.workspace_defaults.playlist_id,
+            seedTrackIdsText: response.workspace_defaults.seed_track_ids.join(', '),
+            seedArtistNamesText: response.workspace_defaults.seed_artist_names.join(', '),
+            seedGenresText: response.workspace_defaults.seed_genres.join(', '),
+        })
+    }
 
     useEffect(() => {
         const controller = new AbortController()
@@ -37,14 +63,38 @@ const PmsPage = () => {
         setIsLoading(true)
         setError(null)
 
-        fetchPmsWorkspaceBootstrap(controller.signal)
-            .then((response) => {
+        const load = async () => {
+            try {
+                const [workspaceResponse, importResponse] = await Promise.all([
+                    fetchPmsWorkspaceBootstrap(activeUserId, controller.signal),
+                    activeUserId
+                        ? fetchPmsPlaylistImportBootstrap(activeUserId, controller.signal)
+                        : Promise.resolve(null),
+                ])
+
                 startTransition(() => {
-                    setBootstrap(response)
+                    setBootstrap(workspaceResponse)
+                    setImportBootstrap(importResponse)
+                    setSelectedExternalPlaylistIds((current) => {
+                        const nextAvailable = importResponse?.available_playlists
+                            .filter((playlist) => !playlist.already_imported)
+                            .map((playlist) => playlist.external_playlist_id) ?? []
+
+                        if (current.length > 0) {
+                            return current.filter((playlistId) => nextAvailable.includes(playlistId))
+                        }
+
+                        return nextAvailable.slice(0, 1)
+                    })
                     setError(null)
                 })
-            })
-            .catch((requestError: unknown) => {
+
+                updateWorkspace({
+                    userId: activeUserId ?? workspaceResponse.workspace_defaults.user_id,
+                    preferredPlatformId:
+                        session?.preferredPlatformId ?? workspace.preferredPlatformId,
+                })
+            } catch (requestError: unknown) {
                 if (requestError instanceof DOMException && requestError.name === 'AbortError') {
                     return
                 }
@@ -57,26 +107,92 @@ const PmsPage = () => {
                 startTransition(() => {
                     setError(message)
                 })
-            })
-            .finally(() => {
+            } finally {
                 setIsLoading(false)
-            })
+            }
+        }
+
+        void load()
 
         return () => controller.abort()
-    }, [])
+    }, [activeUserId, session?.preferredPlatformId, updateWorkspace, workspace.preferredPlatformId])
+
+    const importablePlaylists = useMemo(
+        () => importBootstrap?.available_playlists.filter((playlist) => !playlist.already_imported) ?? [],
+        [importBootstrap],
+    )
+
+    const togglePlaylistSelection = (externalPlaylistId: string) => {
+        setSelectedExternalPlaylistIds((current) =>
+            current.includes(externalPlaylistId)
+                ? current.filter((playlistId) => playlistId !== externalPlaylistId)
+                : [...current, externalPlaylistId],
+        )
+    }
+
+    const reloadPmsData = async () => {
+        const [workspaceResponse, importResponse] = await Promise.all([
+            fetchPmsWorkspaceBootstrap(activeUserId),
+            activeUserId ? fetchPmsPlaylistImportBootstrap(activeUserId) : Promise.resolve(null),
+        ])
+
+        setBootstrap(workspaceResponse)
+        setImportBootstrap(importResponse)
+        setSelectedExternalPlaylistIds(
+            importResponse?.available_playlists
+                .filter((playlist) => !playlist.already_imported)
+                .map((playlist) => playlist.external_playlist_id)
+                .slice(0, 1) ?? [],
+        )
+        hydrateWorkspaceFromBootstrap(workspaceResponse)
+    }
+
+    const handleImportPlaylists = async () => {
+        if (!session || !importBootstrap) {
+            setError('Create an account and connect a preferred platform before importing playlists.')
+            return
+        }
+
+        if (selectedExternalPlaylistIds.length === 0) {
+            setError('Choose at least one connected platform playlist to import into PMS.')
+            return
+        }
+
+        setIsImporting(true)
+        setError(null)
+        setImportMessage(null)
+
+        try {
+            const response = await importPmsPlaylists({
+                user_id: session.userId,
+                platform_id: importBootstrap.platform_connection.platform_id,
+                external_playlist_ids: selectedExternalPlaylistIds,
+            })
+
+            await reloadPmsData()
+            updateSession({
+                onboardingStage: 'pms-imported',
+                nextStepPath: response.next_step.path,
+                nextStepMessage: response.next_step.message,
+            })
+            setImportMessage(response.next_step.message)
+        } catch (requestError: unknown) {
+            const message =
+                requestError instanceof ApiError
+                    ? requestError.message
+                    : 'Unable to import the selected platform playlists into PMS.'
+            setError(message)
+        } finally {
+            setIsImporting(false)
+        }
+    }
 
     const applyBootstrapDefaults = () => {
         if (!bootstrap) {
             return
         }
 
-        updateWorkspace({
-            userId: bootstrap.workspace_defaults.user_id,
-            playlistId: bootstrap.workspace_defaults.playlist_id,
-            seedTrackIdsText: bootstrap.workspace_defaults.seed_track_ids.join(', '),
-            seedArtistNamesText: bootstrap.workspace_defaults.seed_artist_names.join(', '),
-            seedGenresText: bootstrap.workspace_defaults.seed_genres.join(', '),
-        })
+        hydrateWorkspaceFromBootstrap(bootstrap)
     }
 
     return (
@@ -142,7 +258,7 @@ const PmsPage = () => {
 
                     <div className="mt-6 flex flex-wrap gap-3">
                         <Button type="button" variant="ghost" onClick={applyBootstrapDefaults} disabled={!bootstrap}>
-                            Use API Defaults
+                            Use PMS Defaults
                         </Button>
                         <Button type="button" variant="outline" onClick={resetWorkspace}>
                             Reset Workspace
@@ -156,6 +272,156 @@ const PmsPage = () => {
                 </HudCard>
 
                 <div className="space-y-6">
+                    <HudCard
+                        title="PMS Import Queue"
+                        subtitle="Bring connected platform playlists into the personal music space"
+                        action={
+                            isLoading ? (
+                                <span className="inline-flex items-center gap-2 text-xs text-hud-text-muted">
+                                    <RefreshCw size={14} className="animate-spin" />
+                                    Loading
+                                </span>
+                            ) : null
+                        }
+                    >
+                        {!session ? (
+                            <div className="space-y-4">
+                                <div className="rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-4 text-sm leading-6 text-hud-text-secondary">
+                                    Create an account and connect a preferred streaming platform first. The PMS import
+                                    step attaches imported playlists to a specific member.
+                                </div>
+                                <Link to="/signup">
+                                    <Button type="button" variant="primary" glow>
+                                        Start Signup
+                                    </Button>
+                                </Link>
+                            </div>
+                        ) : importBootstrap ? (
+                            <div className="space-y-4">
+                                <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                    <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                        Preferred Platform
+                                    </p>
+                                    <p className="mt-2 text-lg font-semibold text-hud-text-primary">
+                                        {importBootstrap.platform_connection.display_name}
+                                    </p>
+                                    <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
+                                        {importBootstrap.summary.next_step_message}
+                                    </p>
+                                </div>
+
+                                {importMessage && (
+                                    <div className="rounded-2xl border border-hud-accent-primary/40 bg-hud-accent-primary/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                                        {importMessage}
+                                    </div>
+                                )}
+
+                                {importBootstrap.summary.preferred_platform_connected ? (
+                                    <>
+                                        <div className="space-y-3">
+                                            {importBootstrap.available_playlists.map((playlist) => {
+                                                const isSelected = selectedExternalPlaylistIds.includes(
+                                                    playlist.external_playlist_id,
+                                                )
+
+                                                return (
+                                                    <button
+                                                        key={playlist.external_playlist_id}
+                                                        type="button"
+                                                        disabled={playlist.already_imported}
+                                                        onClick={() => togglePlaylistSelection(playlist.external_playlist_id)}
+                                                        className={`w-full rounded-2xl border p-4 text-left transition-hud ${
+                                                            playlist.already_imported
+                                                                ? 'cursor-not-allowed border-hud-border-secondary bg-hud-bg-primary/60 opacity-70'
+                                                                : isSelected
+                                                                    ? 'border-hud-border-primary bg-hud-accent-primary/10'
+                                                                    : 'border-hud-border-secondary bg-hud-bg-primary/70 hover:border-hud-border-primary'
+                                                        }`}
+                                                    >
+                                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                                            <div>
+                                                                <p className="text-sm font-semibold text-hud-text-primary">
+                                                                    {playlist.title}
+                                                                </p>
+                                                                <p className="mt-1 text-xs uppercase tracking-[0.2em] text-hud-text-muted">
+                                                                    {playlist.source_platform} · {playlist.track_count} tracks · {playlist.curator}
+                                                                </p>
+                                                            </div>
+                                                            <span className="rounded-full border border-hud-border-secondary px-3 py-1 text-xs text-hud-text-secondary">
+                                                                {playlist.already_imported ? 'Imported' : 'Ready to Import'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-3 text-sm leading-6 text-hud-text-secondary">
+                                                            {playlist.description}
+                                                        </p>
+                                                        <p className="mt-3 text-[11px] uppercase tracking-[0.2em] text-hud-text-muted">
+                                                            {playlist.audio_feature_policy.replace(/_/g, ' ')}
+                                                        </p>
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-3">
+                                            <Button
+                                                type="button"
+                                                variant="primary"
+                                                glow
+                                                onClick={handleImportPlaylists}
+                                                disabled={isImporting || importablePlaylists.length === 0}
+                                            >
+                                                {isImporting ? 'Importing to PMS...' : 'Import Selected Playlists'}
+                                            </Button>
+                                            <Link to="/platforms">
+                                                <Button type="button" variant="outline">
+                                                    Back to Platforms
+                                                </Button>
+                                            </Link>
+                                        </div>
+
+                                        {importBootstrap.imported_playlists.length > 0 && (
+                                            <div>
+                                                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-hud-text-muted">
+                                                    Imported PMS Playlists
+                                                </p>
+                                                <div className="space-y-2">
+                                                    {importBootstrap.imported_playlists.map((playlist) => (
+                                                        <div
+                                                            key={playlist.playlist_id}
+                                                            className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 px-4 py-3"
+                                                        >
+                                                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                                                <p className="text-sm font-medium text-hud-text-primary">
+                                                                    {playlist.title}
+                                                                </p>
+                                                                <span className="text-xs text-hud-text-muted">
+                                                                    {playlist.track_count} tracks
+                                                                </span>
+                                                            </div>
+                                                            <p className="mt-2 text-sm text-hud-text-secondary">
+                                                                Imported {new Date(playlist.imported_at).toLocaleString()}
+                                                            </p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <Link to="/platforms">
+                                        <Button type="button" variant="primary" glow>
+                                            Connect Preferred Platform
+                                        </Button>
+                                    </Link>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-4 text-sm leading-6 text-hud-text-secondary">
+                                Waiting for PMS import bootstrap data from the API.
+                            </div>
+                        )}
+                    </HudCard>
+
                     <HudCard title="Seed Summary" subtitle="What will feed the recommendation pipeline">
                         <div className="space-y-4">
                             <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
@@ -389,12 +655,12 @@ const PmsPage = () => {
                     <HudCard title="PMS Notes" subtitle="What this screen is responsible for">
                         <div className="space-y-3 text-sm leading-6 text-hud-text-secondary">
                             <p>
-                                PMS is where we capture catalog anchors: playlist context, explicit track seeds, artist
-                                affinity, and genre direction.
+                                PMS is where imported playlists, explicit track seeds, artist affinity, and genre
+                                direction start to become a user-specific recommendation workspace.
                             </p>
                             <p>
-                                The page now hydrates from a Spring Boot bootstrap endpoint. The next step is replacing
-                                that static payload with real playlist and library data.
+                                The current slice now supports sandbox platform playlist import with complete Spotify
+                                audio feature snapshots before the EMS analysis step.
                             </p>
                         </div>
                     </HudCard>

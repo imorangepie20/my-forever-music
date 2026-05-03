@@ -15,6 +15,14 @@ const pageCopy: Record<string, { title: string; subtitle: string }> = {
         title: 'Platform Intake Workspace',
         subtitle: 'Choose the streaming source that will feed PMS and define how audio features will be resolved.',
     },
+    '/platforms/oauth/authorize': {
+        title: 'Platform OAuth Approval',
+        subtitle: 'Review the sandbox provider consent step before the callback completes.',
+    },
+    '/platforms/oauth/callback': {
+        title: 'Platform OAuth Callback',
+        subtitle: 'Finalize the sandbox authorization and move into the next onboarding stage.',
+    },
     '/pms': {
         title: 'PMS Seed Workspace',
         subtitle: 'Capture playlist and catalog anchors before we shape the emotional signal.',

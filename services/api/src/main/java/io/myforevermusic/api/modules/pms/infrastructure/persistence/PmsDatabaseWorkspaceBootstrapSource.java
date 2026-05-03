@@ -36,8 +36,15 @@ public class PmsDatabaseWorkspaceBootstrapSource implements PmsWorkspaceBootstra
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<PmsWorkspaceBootstrapResponse> load() {
-        List<PmsCatalogPlaylistEntity> playlists = playlistRepository.findAllByOrderByDisplayOrderAscIdAsc();
+    public Optional<PmsWorkspaceBootstrapResponse> load(String userId) {
+        List<PmsCatalogPlaylistEntity> playlists = hasText(userId)
+            ? playlistRepository.findAllByOwnerUserIdOrderByDisplayOrderAscIdAsc(userId)
+            : playlistRepository.findAllByOrderByDisplayOrderAscIdAsc();
+
+        if (playlists.isEmpty() && hasText(userId)) {
+            playlists = playlistRepository.findAllByOrderByDisplayOrderAscIdAsc();
+        }
+
         if (playlists.isEmpty()) {
             return Optional.empty();
         }

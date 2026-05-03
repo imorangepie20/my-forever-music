@@ -1,128 +1,369 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
+import {
+    ArrowRight,
+    CheckCircle2,
+    Eye,
+    EyeOff,
+    Loader,
+    Lock,
+    Mail,
+    Radio,
+    ShieldCheck,
+    User,
+} from 'lucide-react'
 import Button from '../../components/common/Button'
+import { useAuthSession } from '../../contexts/AuthSessionContext'
+import { useRecommendationWorkspace } from '../../contexts/RecommendationWorkspaceContext'
+import { ApiError, fetchPlatformCatalog, registerAccount } from '../../services/api'
+import type { AuthRegistrationResponse, PlatformCatalogResponse } from '../../types/api'
 
 const Register = () => {
+    const { setSessionFromRegistration } = useAuthSession()
+    const { updateWorkspace } = useRecommendationWorkspace()
     const [showPassword, setShowPassword] = useState(false)
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
+    const [preferredPlatformId, setPreferredPlatformId] = useState<'spotify' | 'apple-music' | 'tidal'>('spotify')
+    const [marketingOptIn, setMarketingOptIn] = useState(false)
+    const [acceptedTerms, setAcceptedTerms] = useState(false)
+    const [acceptedPrivacyPolicy, setAcceptedPrivacyPolicy] = useState(false)
+    const [platforms, setPlatforms] = useState<PlatformCatalogResponse['platforms']>([])
+    const [loadingPlatforms, setLoadingPlatforms] = useState(true)
+    const [submitting, setSubmitting] = useState(false)
+    const [errorMessage, setErrorMessage] = useState<string | null>(null)
+    const [successState, setSuccessState] = useState<AuthRegistrationResponse | null>(null)
+
+    useEffect(() => {
+        const controller = new AbortController()
+
+        fetchPlatformCatalog(controller.signal)
+            .then((response) => {
+                setPlatforms(response.platforms)
+                if (response.platforms.length > 0) {
+                    setPreferredPlatformId(response.platforms[0].platform_id)
+                }
+                setLoadingPlatforms(false)
+            })
+            .catch(() => {
+                setLoadingPlatforms(false)
+            })
+
+        return () => controller.abort()
+    }, [])
+
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
+
+        if (password !== confirmPassword) {
+            setErrorMessage('Password confirmation does not match.')
+            return
+        }
+
+        setSubmitting(true)
+        setErrorMessage(null)
+
+        try {
+            const response = await registerAccount({
+                display_name: name.trim(),
+                email: email.trim(),
+                password,
+                preferred_platform_id: preferredPlatformId,
+                marketing_opt_in: marketingOptIn,
+                accepted_terms: acceptedTerms,
+                accepted_privacy_policy: acceptedPrivacyPolicy,
+            })
+
+            setSessionFromRegistration(response)
+            updateWorkspace({
+                userId: response.user.user_id,
+                preferredPlatformId: response.onboarding.preferred_platform_id,
+            })
+            setSuccessState(response)
+        } catch (error: unknown) {
+            if (error instanceof ApiError) {
+                setErrorMessage(error.message)
+            } else {
+                setErrorMessage('Unable to create your account right now.')
+            }
+        } finally {
+            setSubmitting(false)
+        }
+    }
 
     return (
-        <div className="min-h-screen bg-hud-bg-primary hud-grid-bg flex items-center justify-center p-6">
-            <div className="w-full max-w-md">
-                {/* Logo */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center gap-3 mb-6">
-                        <div className="w-12 h-12 bg-gradient-to-br from-hud-accent-primary to-hud-accent-info rounded-lg flex items-center justify-center font-bold text-xl text-hud-bg-primary">
-                            H
-                        </div>
-                        <span className="font-bold text-2xl text-hud-text-primary text-glow">ALPHA TEAM</span>
-                    </div>
-                    <h1 className="text-2xl font-bold text-hud-text-primary">Create Account</h1>
-                    <p className="text-hud-text-muted mt-2">Sign up to get started with ALPHA TEAM</p>
-                </div>
-
-                {/* Register Form */}
-                <div className="hud-card hud-card-bottom rounded-lg p-8">
-                    <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
-                        {/* Name */}
-                        <div>
-                            <label className="block text-sm text-hud-text-secondary mb-2">Full Name</label>
-                            <div className="relative">
-                                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-hud-text-muted" size={18} />
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    placeholder="Enter your name"
-                                    className="w-full pl-12 pr-4 py-3 bg-hud-bg-primary border border-hud-border-secondary rounded-lg text-hud-text-primary placeholder-hud-text-muted focus:outline-none focus:border-hud-accent-primary transition-hud"
-                                />
-                            </div>
+        <div className="min-h-screen bg-hud-bg-primary hud-grid-bg px-6 py-10">
+            <div className="mx-auto grid w-full max-w-6xl gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+                <section className="rounded-[28px] border border-hud-border-secondary bg-hud-bg-secondary/80 p-8 backdrop-blur-xl xl:p-10">
+                    <div className="max-w-2xl">
+                        <div className="inline-flex items-center gap-3 rounded-full border border-hud-border-primary bg-hud-accent-primary/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-hud-accent-primary">
+                            <ShieldCheck size={15} />
+                            Membership Onboarding
                         </div>
 
-                        {/* Email */}
-                        <div>
-                            <label className="block text-sm text-hud-text-secondary mb-2">Email Address</label>
-                            <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-hud-text-muted" size={18} />
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="Enter your email"
-                                    className="w-full pl-12 pr-4 py-3 bg-hud-bg-primary border border-hud-border-secondary rounded-lg text-hud-text-primary placeholder-hud-text-muted focus:outline-none focus:border-hud-accent-primary transition-hud"
-                                />
-                            </div>
-                        </div>
+                        <h1 className="mt-6 text-4xl font-semibold tracking-tight text-hud-text-primary sm:text-5xl">
+                            Start with signup, then connect the streaming source that will feed your PMS.
+                        </h1>
+                        <p className="mt-5 max-w-xl text-base leading-7 text-hud-text-secondary">
+                            This first step creates the account shell, captures the primary subscription platform, and
+                            prepares the next onboarding move for playlist import and Spotify feature enrichment.
+                        </p>
 
-                        {/* Password */}
-                        <div>
-                            <label className="block text-sm text-hud-text-secondary mb-2">Password</label>
-                            <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-hud-text-muted" size={18} />
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="Create a password"
-                                    className="w-full pl-12 pr-12 py-3 bg-hud-bg-primary border border-hud-border-secondary rounded-lg text-hud-text-primary placeholder-hud-text-muted focus:outline-none focus:border-hud-accent-primary transition-hud"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-hud-text-muted hover:text-hud-text-primary transition-hud"
+                        <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                            {[
+                                {
+                                    title: 'Account Shell',
+                                    body: 'Create the user record and reserve the onboarding stage for platform connection.',
+                                },
+                                {
+                                    title: 'Platform Choice',
+                                    body: 'Pick the subscription source we will use as the first PMS intake target.',
+                                },
+                                {
+                                    title: 'Next Step',
+                                    body: 'Continue into platform connection so playlist import and audio-feature fill can begin.',
+                                },
+                            ].map((item) => (
+                                <div
+                                    key={item.title}
+                                    className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-5"
                                 >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                </button>
-                            </div>
+                                    <p className="text-sm font-semibold text-hud-text-primary">{item.title}</p>
+                                    <p className="mt-2 text-sm leading-6 text-hud-text-secondary">{item.body}</p>
+                                </div>
+                            ))}
                         </div>
 
-                        {/* Confirm Password */}
+                        <div className="mt-8 rounded-3xl border border-hud-border-secondary bg-hud-bg-primary/70 p-5">
+                            <div className="flex items-center gap-3">
+                                <span className="rounded-xl bg-hud-accent-primary/10 p-2 text-hud-accent-primary">
+                                    <Radio size={18} />
+                                </span>
+                                <div>
+                                    <p className="text-xs uppercase tracking-[0.24em] text-hud-text-muted">
+                                        Supported Sources
+                                    </p>
+                                    <p className="mt-1 text-sm text-hud-text-primary">
+                                        {loadingPlatforms
+                                            ? 'Loading platform catalog...'
+                                            : platforms.map((platform) => platform.display_name).join(' / ') || 'Spotify / Apple Music / TIDAL'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="rounded-[28px] border border-hud-border-secondary bg-hud-bg-secondary/88 p-8 backdrop-blur-xl xl:p-10">
+                    <div className="flex items-center justify-between gap-4">
                         <div>
-                            <label className="block text-sm text-hud-text-secondary mb-2">Confirm Password</label>
-                            <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-hud-text-muted" size={18} />
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    placeholder="Confirm your password"
-                                    className="w-full pl-12 pr-4 py-3 bg-hud-bg-primary border border-hud-border-secondary rounded-lg text-hud-text-primary placeholder-hud-text-muted focus:outline-none focus:border-hud-accent-primary transition-hud"
-                                />
+                            <p className="text-xs font-semibold uppercase tracking-[0.26em] text-hud-accent-primary">
+                                Create Account
+                            </p>
+                            <h2 className="mt-3 text-2xl font-semibold text-hud-text-primary">
+                                Membership entry point
+                            </h2>
+                        </div>
+                        <Link
+                            to="/"
+                            className="text-sm text-hud-text-muted transition-hud hover:text-hud-text-primary"
+                        >
+                            Back to workspace
+                        </Link>
+                    </div>
+
+                    {successState ? (
+                        <div className="mt-8 space-y-6">
+                            <div className="rounded-3xl border border-emerald-400/30 bg-emerald-400/10 p-6">
+                                <div className="flex items-start gap-4">
+                                    <span className="rounded-2xl bg-emerald-400/15 p-3 text-emerald-300">
+                                        <CheckCircle2 size={22} />
+                                    </span>
+                                    <div>
+                                        <p className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-300">
+                                            Registration Complete
+                                        </p>
+                                        <h3 className="mt-2 text-xl font-semibold text-hud-text-primary">
+                                            {successState.user.display_name} is ready for onboarding.
+                                        </h3>
+                                        <p className="mt-3 text-sm leading-6 text-hud-text-secondary">
+                                            {successState.onboarding.next_step_message}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-5">
+                                    <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">User ID</p>
+                                    <p className="mt-2 text-sm text-hud-text-primary">{successState.user.user_id}</p>
+                                </div>
+                                <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-5">
+                                    <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">Preferred Platform</p>
+                                    <p className="mt-2 text-sm text-hud-text-primary">
+                                        {successState.onboarding.preferred_platform_id}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-3">
+                                <Link to={successState.onboarding.next_step_path}>
+                                    <Button variant="primary" glow rightIcon={<ArrowRight size={16} />}>
+                                        Continue to Platforms
+                                    </Button>
+                                </Link>
+                                <Link to="/">
+                                    <Button variant="outline">Open Control Room</Button>
+                                </Link>
                             </div>
                         </div>
+                    ) : (
+                        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+                            <div>
+                                <label className="mb-2 block text-sm text-hud-text-secondary">Display Name</label>
+                                <div className="relative">
+                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-hud-text-muted" size={18} />
+                                    <input
+                                        type="text"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        placeholder="Forever Listener"
+                                        className="w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary pl-12 pr-4 py-3 text-hud-text-primary placeholder-hud-text-muted focus:border-hud-accent-primary focus:outline-none transition-hud"
+                                    />
+                                </div>
+                            </div>
 
-                        {/* Terms */}
-                        <label className="flex items-start gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                className="w-4 h-4 mt-0.5 rounded border-hud-border-secondary bg-hud-bg-primary text-hud-accent-primary focus:ring-hud-accent-primary"
-                            />
-                            <span className="text-sm text-hud-text-secondary">
-                                I agree to the{' '}
-                                <a href="#" className="text-hud-accent-primary hover:underline">Terms of Service</a>
-                                {' '}and{' '}
-                                <a href="#" className="text-hud-accent-primary hover:underline">Privacy Policy</a>
-                            </span>
-                        </label>
+                            <div>
+                                <label className="mb-2 block text-sm text-hud-text-secondary">Email</label>
+                                <div className="relative">
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-hud-text-muted" size={18} />
+                                    <input
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        placeholder="listener@example.com"
+                                        className="w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary pl-12 pr-4 py-3 text-hud-text-primary placeholder-hud-text-muted focus:border-hud-accent-primary focus:outline-none transition-hud"
+                                    />
+                                </div>
+                            </div>
 
-                        {/* Submit */}
-                        <Button variant="primary" fullWidth glow type="submit">
-                            Create Account
-                        </Button>
-                    </form>
+                            <div className="grid gap-5 sm:grid-cols-2">
+                                <div>
+                                    <label className="mb-2 block text-sm text-hud-text-secondary">Password</label>
+                                    <div className="relative">
+                                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-hud-text-muted" size={18} />
+                                        <input
+                                            type={showPassword ? 'text' : 'password'}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="At least 8 chars"
+                                            className="w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary pl-12 pr-12 py-3 text-hud-text-primary placeholder-hud-text-muted focus:border-hud-accent-primary focus:outline-none transition-hud"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword((current) => !current)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-hud-text-muted transition-hud hover:text-hud-text-primary"
+                                        >
+                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </button>
+                                    </div>
+                                </div>
 
-                    {/* Login Link */}
-                    <p className="text-center text-sm text-hud-text-muted mt-6">
-                        Already have an account?{' '}
-                        <Link to="/login" className="text-hud-accent-primary hover:underline">
-                            Sign in
-                        </Link>
-                    </p>
-                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm text-hud-text-secondary">Confirm Password</label>
+                                    <div className="relative">
+                                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-hud-text-muted" size={18} />
+                                        <input
+                                            type={showPassword ? 'text' : 'password'}
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            placeholder="Repeat password"
+                                            className="w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary pl-12 pr-4 py-3 text-hud-text-primary placeholder-hud-text-muted focus:border-hud-accent-primary focus:outline-none transition-hud"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="mb-2 block text-sm text-hud-text-secondary">Preferred Streaming Platform</label>
+                                <select
+                                    value={preferredPlatformId}
+                                    onChange={(e) => setPreferredPlatformId(e.target.value as typeof preferredPlatformId)}
+                                    className="w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-hud-text-primary focus:border-hud-accent-primary focus:outline-none transition-hud"
+                                >
+                                    {platforms.length > 0 ? (
+                                        platforms.map((platform) => (
+                                            <option key={platform.platform_id} value={platform.platform_id}>
+                                                {platform.display_name}
+                                            </option>
+                                        ))
+                                    ) : (
+                                        <>
+                                            <option value="spotify">Spotify</option>
+                                            <option value="apple-music">Apple Music</option>
+                                            <option value="tidal">TIDAL</option>
+                                        </>
+                                    )}
+                                </select>
+                            </div>
+
+                            <label className="flex items-start gap-3 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                <input
+                                    type="checkbox"
+                                    checked={marketingOptIn}
+                                    onChange={(e) => setMarketingOptIn(e.target.checked)}
+                                    className="mt-1 h-4 w-4 rounded border-hud-border-secondary bg-hud-bg-primary text-hud-accent-primary focus:ring-hud-accent-primary"
+                                />
+                                <span className="text-sm leading-6 text-hud-text-secondary">
+                                    Send occasional updates about new recommendation features and platform integrations.
+                                </span>
+                            </label>
+
+                            <label className="flex items-start gap-3 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                <input
+                                    type="checkbox"
+                                    checked={acceptedTerms}
+                                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                                    className="mt-1 h-4 w-4 rounded border-hud-border-secondary bg-hud-bg-primary text-hud-accent-primary focus:ring-hud-accent-primary"
+                                />
+                                <span className="text-sm leading-6 text-hud-text-secondary">
+                                    I agree to the Terms of Service for account creation and platform onboarding.
+                                </span>
+                            </label>
+
+                            <label className="flex items-start gap-3 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                <input
+                                    type="checkbox"
+                                    checked={acceptedPrivacyPolicy}
+                                    onChange={(e) => setAcceptedPrivacyPolicy(e.target.checked)}
+                                    className="mt-1 h-4 w-4 rounded border-hud-border-secondary bg-hud-bg-primary text-hud-accent-primary focus:ring-hud-accent-primary"
+                                />
+                                <span className="text-sm leading-6 text-hud-text-secondary">
+                                    I agree to the Privacy Policy for storing profile, playlist import, and onboarding data.
+                                </span>
+                            </label>
+
+                            {errorMessage && (
+                                <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                                    {errorMessage}
+                                </div>
+                            )}
+
+                            <Button
+                                variant="primary"
+                                fullWidth
+                                glow
+                                type="submit"
+                                disabled={submitting}
+                                rightIcon={submitting ? <Loader className="animate-spin" size={16} /> : <ArrowRight size={16} />}
+                            >
+                                {submitting ? 'Creating account...' : 'Create account and continue'}
+                            </Button>
+                        </form>
+                    )}
+                </section>
             </div>
         </div>
     )

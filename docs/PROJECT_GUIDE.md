@@ -95,11 +95,14 @@ docs/
 3. [PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md)
 4. [TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md)
 5. [DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md)
-6. [ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
-7. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
-8. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
-9. [UBUNTU_SERVER_RUNBOOK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_RUNBOOK.md)
-10. [UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
+6. [SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md)
+7. [HTTPS_DOMAIN_DEV_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/HTTPS_DOMAIN_DEV_SETUP.md)
+8. [ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
+9. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
+10. [docs/api/README.md](/Users/woosungjo/music-space/my-forever-music/docs/api/README.md)
+11. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
+12. [UBUNTU_SERVER_RUNBOOK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_RUNBOOK.md)
+13. [UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
 
 ## 7. 앞으로 문서를 갱신하는 규칙
 
@@ -110,9 +113,9 @@ docs/
 
 ## 8. 지금 시점의 우선순위
 
-1. 스트리밍 플랫폼 연동과 사용자 플레이리스트 PMS 적재 흐름 설계
-2. Spotify 오디오 특성 수집과 fallback 특성 생성 파이프라인 정의
-3. PMS bootstrap demo 카탈로그를 실제 사용자/플레이리스트 데이터 모델로 확장
+1. Spotify access token refresh와 만료 복구 흐름 추가
+2. PMS import 결과를 영속 사용자/플레이리스트 데이터 모델로 확장
+3. Apple Music / TIDAL provider 확장 설계
 4. 사용자 행동 데이터와 EMS 수집 데이터를 어떤 이벤트 모델로 저장할지 정의
 5. 공통 타입과 API 계약 체계 정리
 
@@ -121,13 +124,24 @@ docs/
 - `services/api`는 `Java 21 + Gradle wrapper` 기준으로 로컬 부팅 검증 완료
 - `services/api`의 `local` 프로필은 현재 `PostgreSQL` 없이 부팅 가능
 - `GET /api/v1/platforms/catalog` 응답 경로 추가 완료
+- `POST /api/v1/auth/register` 회원가입 경로 추가 완료
+- `GET/POST /api/v1/platforms/connections/*` 온보딩 연결 경로 추가 완료
+- `POST /api/v1/platforms/oauth/*` sandbox/Spotify OAuth 시작/완료 경로 추가 완료
+- `GET/POST /api/v1/pms/import/*` PMS playlist import 경로 추가 완료
+- `services/api`에는 platform credential 저장소와 playlist provider 추상화가 추가되어 sandbox와 실제 Spotify import를 같은 흐름으로 처리함
+- `services/api`는 실제 Spotify playlist listing/item import와 audio-features fallback 보강까지 반영됨
 - `GET /api/v1/pms/workspace/bootstrap` 응답 검증 완료
 - `POST /api/v1/ems/workspace/analysis` 응답 경로 추가 완료
 - `POST /api/v1/gms/recommendations/preview`는 `services/ai`와의 브리지까지 검증 완료
 - `services/api`에는 PMS bootstrap용 `Flyway + JPA` 최소 카탈로그 스키마와 demo 데이터가 추가됨
 - `pms_track`는 Spotify 오디오 특성 전체 스냅샷 저장 구조로 확장됨
+- PMS import 시 오디오 특성 전체 저장 기준 문서가 추가됨
+- `docs/api/README.md`가 API 계약 문서의 공식 진입점으로 추가됨
 - DB 활성 프로필에서는 PMS bootstrap이 실제 `pms_*` 테이블 기반으로 응답 가능
 - `apps/web`에는 `/platforms` route가 추가되어 preferred PMS source platform을 선택할 수 있음
+- `apps/web`에는 `/signup` route가 추가되어 회원가입과 기본 플랫폼 선택이 가능함
+- `apps/web`는 가입 후 세션을 로컬에 저장하고 `/platforms`에서 sandbox 연결/해제와 Spotify OAuth redirect를 처리할 수 있음
+- `apps/web`는 `/pms`에서 platform playlist import와 사용자별 workspace bootstrap을 사용할 수 있음
 - 현재 구현은 아직 `핵심 서비스 문서`의 전체 범위가 아니라, 그중 `PMS / EMS / GMS` 추천 흐름의 최소 검증 버전임
 
 ## 9. 참고 메모
