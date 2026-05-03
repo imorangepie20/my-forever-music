@@ -84,10 +84,13 @@ class PlatformConnectionBootstrapControllerWebMvcTest {
                 "user-001",
                 "Forever Listener",
                 "listener@example.com",
-                "spotify"
+                "spotify",
+                null,
+                null
             ),
             new PlatformConnectionBootstrapResponse.ConnectionSummary(
                 0,
+                false,
                 false,
                 "connect-platform",
                 "/platforms",
@@ -102,6 +105,8 @@ class PlatformConnectionBootstrapControllerWebMvcTest {
                     "not_connected",
                     null,
                     null,
+                    false,
+                    "missing",
                     false,
                     null,
                     "Connect"

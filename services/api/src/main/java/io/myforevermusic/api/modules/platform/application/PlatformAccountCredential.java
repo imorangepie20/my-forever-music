@@ -1,5 +1,6 @@
 package io.myforevermusic.api.modules.platform.application;
 
+import java.time.Duration;
 import java.time.Instant;
 
 public record PlatformAccountCredential(
@@ -18,6 +19,15 @@ public record PlatformAccountCredential(
 ) {
 
     public boolean isExpired(Instant now) {
-        return accessTokenExpiresAt != null && accessTokenExpiresAt.isBefore(now);
+        return isExpiringWithin(Duration.ZERO, now);
+    }
+
+    public boolean isExpiringWithin(Duration buffer, Instant now) {
+        if (accessTokenExpiresAt == null) {
+            return false;
+        }
+
+        Instant threshold = buffer == null ? now : now.plus(buffer);
+        return !accessTokenExpiresAt.isAfter(threshold);
     }
 }

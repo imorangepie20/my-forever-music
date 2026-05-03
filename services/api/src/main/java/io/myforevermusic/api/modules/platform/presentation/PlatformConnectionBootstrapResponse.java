@@ -20,7 +20,9 @@ public record PlatformConnectionBootstrapResponse(
         String userId,
         String displayName,
         String email,
-        String preferredPlatformId
+        String preferredPlatformId,
+        String lastFmUsername,
+        Instant lastFmConnectedAt
     ) {
     }
 
@@ -28,6 +30,7 @@ public record PlatformConnectionBootstrapResponse(
     public record ConnectionSummary(
         Integer connectedPlatformCount,
         boolean preferredPlatformConnected,
+        boolean preferredPlatformReconnectRequired,
         String onboardingStage,
         String nextStepPath,
         String nextStepMessage
@@ -44,6 +47,8 @@ public record PlatformConnectionBootstrapResponse(
         String connectionMode,
         String externalAccountLabel,
         boolean syncReady,
+        String credentialStatus,
+        boolean reconnectRequired,
         Instant connectedAt,
         String nextActionLabel
     ) {

@@ -121,6 +121,8 @@ const PmsPage = () => {
         () => importBootstrap?.available_playlists.filter((playlist) => !playlist.already_imported) ?? [],
         [importBootstrap],
     )
+    const reconnectRequired = importBootstrap?.platform_connection.reconnect_required ?? false
+    const pmsImportSupported = importBootstrap?.platform_connection.pms_import_supported ?? true
 
     const togglePlaylistSelection = (externalPlaylistId: string) => {
         setSelectedExternalPlaylistIds((current) =>
@@ -182,6 +184,9 @@ const PmsPage = () => {
                     ? requestError.message
                     : 'Unable to import the selected platform playlists into PMS.'
             setError(message)
+            if (requestError instanceof ApiError && requestError.code === 'platform_reconnect_required') {
+                setImportMessage(null)
+            }
         } finally {
             setIsImporting(false)
         }
@@ -316,6 +321,47 @@ const PmsPage = () => {
                                     </div>
                                 )}
 
+                                {reconnectRequired && (
+                                    <div className="rounded-2xl border border-hud-accent-warning/40 bg-hud-accent-warning/10 p-4">
+                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-accent-warning">
+                                            Reconnect Required
+                                        </p>
+                                        <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
+                                            {importBootstrap.platform_connection.display_name} is still marked as the
+                                            preferred import source, but its saved session is no longer usable. Reconnect
+                                            the platform before importing playlists into PMS.
+                                        </p>
+                                        <div className="mt-4">
+                                            <Link to="/platforms">
+                                                <Button type="button" variant="outline">
+                                                    Reconnect {importBootstrap.platform_connection.display_name}
+                                                </Button>
+                                            </Link>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!pmsImportSupported && (
+                                    <div className="rounded-2xl border border-hud-accent-info/40 bg-hud-accent-info/10 p-4">
+                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-accent-info">
+                                            Analysis Signal Source
+                                        </p>
+                                        <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
+                                            {importBootstrap.platform_connection.display_name} is available for long-term
+                                            listening and affinity analysis, but PMS playlist import is not supported yet.
+                                            Choose Spotify, YouTube Music, Apple Music, or TIDAL on the Platforms screen
+                                            if you want playlist-based PMS seeds.
+                                        </p>
+                                        <div className="mt-4">
+                                            <Link to="/platforms">
+                                                <Button type="button" variant="outline">
+                                                    Choose PMS Source
+                                                </Button>
+                                            </Link>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {importBootstrap.summary.preferred_platform_connected ? (
                                     <>
                                         <div className="space-y-3">
@@ -368,7 +414,12 @@ const PmsPage = () => {
                                                 variant="primary"
                                                 glow
                                                 onClick={handleImportPlaylists}
-                                                disabled={isImporting || importablePlaylists.length === 0}
+                                                disabled={
+                                                    isImporting
+                                                    || reconnectRequired
+                                                    || !pmsImportSupported
+                                                    || importablePlaylists.length === 0
+                                                }
                                             >
                                                 {isImporting ? 'Importing to PMS...' : 'Import Selected Playlists'}
                                             </Button>
@@ -410,7 +461,11 @@ const PmsPage = () => {
                                 ) : (
                                     <Link to="/platforms">
                                         <Button type="button" variant="primary" glow>
-                                            Connect Preferred Platform
+                                            {reconnectRequired
+                                                ? 'Reconnect Preferred Platform'
+                                                : !pmsImportSupported
+                                                    ? 'Choose PMS Source'
+                                                    : 'Connect Preferred Platform'}
                                         </Button>
                                     </Link>
                                 )}

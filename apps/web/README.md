@@ -12,6 +12,10 @@
 
 ## 핵심 라우트
 
+- `/login`
+  - 기존 계정 재로그인
+  - 현재 온보딩 다음 단계 복원
+  - 로컬 시험 서비스 중 세션 재구성
 - `/signup`
   - 계정 생성
   - 기본 스트리밍 플랫폼 선택
@@ -24,6 +28,10 @@
   - 가입 사용자 세션 기준 연결 bootstrap 로드
   - sandbox OAuth start
   - connect / disconnect 상태 반영
+  - Last.fm public username preview 로드
+  - Last.fm signal profile 저장
+  - Last.fm recent scrobble sync 실행
+  - 저장된 scrobble snapshot 확인
   - PMS import 기준 플랫폼 선택
   - Spotify 오디오 특성 기준과 fallback 전략 표시
 - `/platforms/oauth/authorize`
@@ -70,7 +78,7 @@
 ## 다음 추천 작업
 
 1. sandbox PMS import를 실제 플랫폼 playlist API와 연결
-2. EMS 신호에 최근 재생/행동 기반 값 추가
+2. 저장된 Last.fm signal profile과 scrobble snapshot을 EMS/GMS UI 설명에 더 직접 반영
 3. preview 응답을 실제 카탈로그 카드 UI와 연결
 4. 공통 타입을 `packages/shared-types`로 옮길지 결정
 5. 데스크탑 앱 재사용을 고려해 API 클라이언트 모듈 분리

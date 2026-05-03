@@ -8,6 +8,8 @@ public record AuthRegisteredAccount(
     String normalizedEmail,
     String displayName,
     String preferredPlatformId,
+    String lastFmUsername,
+    Instant lastFmConnectedAt,
     boolean marketingOptIn,
     String onboardingStage,
     Instant registeredAt,

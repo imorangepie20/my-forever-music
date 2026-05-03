@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, CheckCircle2, Disc3, Radio, RefreshCw, Sparkles } from 'lucide-react'
+import { ArrowRight, BarChart3, CheckCircle2, Disc3, PlayCircle, Radio, RefreshCw, Sparkles } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
@@ -7,12 +7,18 @@ import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
 import {
     ApiError,
+    connectLastFmProfile,
     disconnectPlatformAccount,
+    fetchLastFmScrobbleBootstrap,
+    fetchLastFmSignalPreview,
     fetchPlatformCatalog,
     fetchPlatformConnectionBootstrap,
+    syncLastFmScrobbles,
     startPlatformAuthorization,
 } from '@/services/api'
 import type {
+    LastFmScrobbleBootstrapResponse,
+    LastFmSignalPreviewResponse,
     PlatformCatalogResponse,
     PlatformConnectionBootstrapResponse,
     WorkspacePlatformId,
@@ -21,6 +27,7 @@ import type {
 const stageLabel: Record<string, string> = {
     'planned-pms-import': 'Planned PMS Import',
     'priority-analysis-source': 'Priority Analysis Source',
+    'analysis-signal-source': 'Analysis Signal Source',
 }
 
 const OAUTH_STORAGE_KEY = 'my-forever-music.platform-oauth-session'
@@ -34,6 +41,14 @@ const PlatformsPage = () => {
     const [isLoading, setIsLoading] = useState(true)
     const [isMutating, setIsMutating] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
+    const [lastFmUsername, setLastFmUsername] = useState('')
+    const [lastFmPeriod, setLastFmPeriod] = useState<'overall' | '7day' | '1month' | '3month' | '6month' | '12month'>('1month')
+    const [lastFmPreview, setLastFmPreview] = useState<LastFmSignalPreviewResponse | null>(null)
+    const [lastFmScrobbleBootstrap, setLastFmScrobbleBootstrap] = useState<LastFmScrobbleBootstrapResponse | null>(null)
+    const [lastFmPreviewError, setLastFmPreviewError] = useState<string | null>(null)
+    const [isLastFmPreviewLoading, setIsLastFmPreviewLoading] = useState(false)
+    const [isLastFmSyncing, setIsLastFmSyncing] = useState(false)
+    const preferredConnection = connectionBootstrap?.connections.find((connection) => connection.preferred) ?? null
 
     useEffect(() => {
         const controller = new AbortController()
@@ -46,14 +61,23 @@ const PlatformsPage = () => {
                 setCatalog(response)
                 if (!session) {
                     setConnectionBootstrap(null)
+                    setLastFmScrobbleBootstrap(null)
                     return null
                 }
 
-                return fetchPlatformConnectionBootstrap(session.userId, controller.signal)
+                return Promise.all([
+                    fetchPlatformConnectionBootstrap(session.userId, controller.signal),
+                    fetchLastFmScrobbleBootstrap(session.userId, controller.signal),
+                ])
             })
-            .then((bootstrap) => {
-                if (bootstrap) {
+            .then((payload) => {
+                if (payload) {
+                    const [bootstrap, scrobbleBootstrap] = payload
                     setConnectionBootstrap(bootstrap)
+                    setLastFmScrobbleBootstrap(scrobbleBootstrap)
+                    setLastFmUsername((current) =>
+                        current || bootstrap.user.last_fm_username || '',
+                    )
                     updateWorkspace({
                         userId: bootstrap.user.user_id,
                         preferredPlatformId: bootstrap.user.preferred_platform_id,
@@ -97,7 +121,20 @@ const PlatformsPage = () => {
         })
     }
 
-    const handleConnectToggle = async (platformId: WorkspacePlatformId, connected: boolean) => {
+    const reloadLastFmScrobbles = async () => {
+        if (!session) {
+            return
+        }
+
+        const bootstrap = await fetchLastFmScrobbleBootstrap(session.userId)
+        setLastFmScrobbleBootstrap(bootstrap)
+    }
+
+    const handleConnectToggle = async (
+        platformId: WorkspacePlatformId,
+        connected: boolean,
+        reconnectRequired = false,
+    ) => {
         if (!session) {
             setError('Create an account first so platform onboarding can attach to a user.')
             return
@@ -107,7 +144,7 @@ const PlatformsPage = () => {
         setError(null)
 
         try {
-            if (connected) {
+            if (connected && !reconnectRequired) {
                 await disconnectPlatformAccount({
                     user_id: session.userId,
                     platform_id: platformId,
@@ -153,6 +190,105 @@ const PlatformsPage = () => {
         }
     }
 
+    const handleLoadLastFmPreview = async () => {
+        if (!lastFmUsername.trim()) {
+            setLastFmPreviewError('Enter a Last.fm username first.')
+            return
+        }
+
+        setIsLastFmPreviewLoading(true)
+        setLastFmPreviewError(null)
+
+        try {
+            const preview = await fetchLastFmSignalPreview(lastFmUsername.trim(), lastFmPeriod, 8, 6)
+            setLastFmPreview(preview)
+        } catch (requestError: unknown) {
+            const message =
+                requestError instanceof ApiError
+                    ? requestError.message
+                    : 'Unable to load the Last.fm signal preview right now.'
+            setLastFmPreview(null)
+            setLastFmPreviewError(message)
+        } finally {
+            setIsLastFmPreviewLoading(false)
+        }
+    }
+
+    const handleSaveLastFmProfile = async () => {
+        if (!session) {
+            setLastFmPreviewError('Create an account first so Last.fm profile data can be attached to a user.')
+            return
+        }
+
+        if (!lastFmUsername.trim()) {
+            setLastFmPreviewError('Enter a Last.fm username first.')
+            return
+        }
+
+        setIsMutating('last-fm')
+        setLastFmPreviewError(null)
+
+        try {
+            await connectLastFmProfile({
+                user_id: session.userId,
+                username: lastFmUsername.trim(),
+            })
+            await reloadConnections()
+            await reloadLastFmScrobbles()
+        } catch (requestError: unknown) {
+            const message =
+                requestError instanceof ApiError
+                    ? requestError.message
+                    : 'Unable to save the Last.fm signal profile right now.'
+            setLastFmPreviewError(message)
+        } finally {
+            setIsMutating(null)
+        }
+    }
+
+    const handleSyncLastFmScrobbles = async () => {
+        if (!session) {
+            setLastFmPreviewError('Create an account first so Last.fm scrobbles can be attached to a user.')
+            return
+        }
+
+        setIsLastFmSyncing(true)
+        setLastFmPreviewError(null)
+
+        try {
+            await syncLastFmScrobbles({
+                user_id: session.userId,
+                limit: 40,
+            })
+            await reloadLastFmScrobbles()
+        } catch (requestError: unknown) {
+            const message =
+                requestError instanceof ApiError
+                    ? requestError.message
+                    : 'Unable to sync recent Last.fm scrobbles right now.'
+            setLastFmPreviewError(message)
+        } finally {
+            setIsLastFmSyncing(false)
+        }
+    }
+
+    const handleUseLastFmArtists = () => {
+        if (!lastFmPreview) {
+            return
+        }
+
+        const seedArtists = lastFmPreview.top_artists
+            .map((artist) => artist.artist_name)
+            .filter((artistName): artistName is string => Boolean(artistName && artistName.trim()))
+            .slice(0, 5)
+            .join(', ')
+
+        updateWorkspace({
+            preferredPlatformId: 'last-fm',
+            seedArtistNamesText: seedArtists || workspace.seedArtistNamesText,
+        })
+    }
+
     return (
         <div className="space-y-6">
             <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -178,7 +314,9 @@ const PlatformsPage = () => {
                                         <Button type="button" variant="primary" glow>
                                             {connectionBootstrap.summary.preferred_platform_connected
                                                 ? 'Continue to PMS'
-                                                : 'Stay in Platform Onboarding'}
+                                                : connectionBootstrap.summary.preferred_platform_reconnect_required
+                                                    ? 'Reconnect Preferred Platform'
+                                                    : 'Stay in Platform Onboarding'}
                                             <ArrowRight size={16} />
                                         </Button>
                                     </Link>
@@ -243,6 +381,36 @@ const PlatformsPage = () => {
                                     'Create an account first so platform connection state can be attached to a user.'}
                             </p>
                         </div>
+
+                        {connectionBootstrap?.summary.preferred_platform_reconnect_required && preferredConnection && (
+                            <div className="rounded-2xl border border-hud-accent-warning/40 bg-hud-accent-warning/10 p-4">
+                                <p className="text-xs uppercase tracking-[0.22em] text-hud-accent-warning">
+                                    Reconnect Required
+                                </p>
+                                <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
+                                    {preferredConnection.display_name} is still attached to this account, but the saved
+                                    session is no longer usable for PMS import. Reconnect the platform to continue.
+                                </p>
+                                <div className="mt-4">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        disabled={isMutating === preferredConnection.platform_id}
+                                        onClick={() =>
+                                            handleConnectToggle(
+                                                preferredConnection.platform_id,
+                                                preferredConnection.connected,
+                                                true,
+                                            )
+                                        }
+                                    >
+                                        {isMutating === preferredConnection.platform_id
+                                            ? 'Working...'
+                                            : `Reconnect ${preferredConnection.display_name}`}
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
 
                         {error && (
                             <div className="rounded-2xl border border-hud-accent-danger/40 bg-hud-accent-danger/10 p-4 text-sm leading-6 text-hud-text-secondary">
@@ -317,6 +485,10 @@ const PlatformsPage = () => {
                                                             <Disc3 size={20} />
                                                         ) : platform.platform_id === 'apple-music' ? (
                                                             <Sparkles size={20} />
+                                                        ) : platform.platform_id === 'youtube-music' ? (
+                                                            <PlayCircle size={20} />
+                                                        ) : platform.platform_id === 'last-fm' ? (
+                                                            <BarChart3 size={20} />
                                                         ) : (
                                                             <Radio size={20} />
                                                         )}
@@ -350,20 +522,29 @@ const PlatformsPage = () => {
                                             </Button>
                                             <Button
                                                 type="button"
-                                                variant={currentConnection?.connected ? 'secondary' : 'ghost'}
+                                                variant={
+                                                    currentConnection?.reconnect_required
+                                                        ? 'primary'
+                                                        : currentConnection?.connected
+                                                            ? 'secondary'
+                                                            : 'ghost'
+                                                }
                                                 disabled={!session || isMutating === platform.platform_id}
                                                 onClick={() =>
-                                                    handleConnectToggle(
-                                                        platform.platform_id,
-                                                        currentConnection?.connected ?? false,
-                                                    )
+                                                    platform.platform_id === 'last-fm' && !(currentConnection?.connected ?? false)
+                                                        ? handleSaveLastFmProfile()
+                                                        : handleConnectToggle(
+                                                            platform.platform_id,
+                                                            currentConnection?.connected ?? false,
+                                                            currentConnection?.reconnect_required ?? false,
+                                                        )
                                                 }
                                             >
                                                 {isMutating === platform.platform_id
                                                     ? 'Working...'
-                                                    : currentConnection?.connected
-                                                      ? 'Disconnect'
-                                                      : 'Start OAuth Sandbox'}
+                                                    : platform.platform_id === 'last-fm' && !(currentConnection?.connected ?? false)
+                                                        ? 'Save Signal Profile'
+                                                        : currentConnection?.next_action_label ?? 'Start OAuth Sandbox'}
                                             </Button>
                                         </div>
 
@@ -401,6 +582,11 @@ const PlatformsPage = () => {
                                                     connected
                                                 </span>
                                             )}
+                                            {currentConnection?.reconnect_required && (
+                                                <span className="rounded-full border border-hud-accent-warning/40 bg-hud-accent-warning/10 px-3 py-1 text-xs text-hud-accent-warning">
+                                                    reconnect required
+                                                </span>
+                                            )}
                                         </div>
 
                                         {currentConnection?.external_account_label && (
@@ -411,6 +597,16 @@ const PlatformsPage = () => {
                                                 <p className="mt-2 text-sm text-hud-text-primary">
                                                     {currentConnection.external_account_label}
                                                 </p>
+                                            </div>
+                                        )}
+
+                                        {currentConnection?.reconnect_required && (
+                                            <div className="mt-4 rounded-2xl border border-hud-accent-warning/40 bg-hud-accent-warning/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                                                The saved session for {platform.display_name} has expired or no longer
+                                                has a usable token. Use <span className="font-medium text-hud-text-primary">
+                                                    {currentConnection.next_action_label}
+                                                </span>{' '}
+                                                to restore PMS import access.
                                             </div>
                                         )}
 
@@ -426,6 +622,310 @@ const PlatformsPage = () => {
                     ) : (
                         <div className="text-sm leading-6 text-hud-text-secondary">
                             Supported platform details will appear here after the API responds.
+                        </div>
+                    )}
+                </HudCard>
+            </section>
+
+            <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+                <HudCard
+                    title="Last.fm Signal Preview"
+                    subtitle="Public scrobble and affinity snapshot before full account linking"
+                >
+                    <div className="space-y-4">
+                        <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4 text-sm leading-6 text-hud-text-secondary">
+                            Use a public Last.fm username to inspect recent scrobbles, top artists, and top tracks.
+                            This preview is aimed at EMS/GMS signal shaping, not PMS playlist import.
+                        </div>
+
+                        {session?.preferredPlatformId === 'last-fm' && (
+                            <div className="rounded-2xl border border-hud-accent-primary/30 bg-hud-accent-primary/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                                This account prefers <span className="font-medium text-hud-text-primary">Last.fm</span>.
+                                Load a public signal preview first, then copy top artists into EMS seeds or choose a
+                                separate PMS import source.
+                            </div>
+                        )}
+
+                        <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
+                            <div>
+                                <label className="mb-2 block text-sm text-hud-text-secondary">Last.fm Username</label>
+                                <input
+                                    type="text"
+                                    value={lastFmUsername}
+                                    onChange={(event) => setLastFmUsername(event.target.value)}
+                                    placeholder="lastfm-user-name"
+                                    className="w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-hud-text-primary placeholder-hud-text-muted focus:border-hud-accent-primary focus:outline-none transition-hud"
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-2 block text-sm text-hud-text-secondary">Signal Window</label>
+                                <select
+                                    value={lastFmPeriod}
+                                    onChange={(event) => setLastFmPeriod(event.target.value as typeof lastFmPeriod)}
+                                    className="w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-hud-text-primary focus:border-hud-accent-primary focus:outline-none transition-hud"
+                                >
+                                    <option value="7day">Last 7 Days</option>
+                                    <option value="1month">Last Month</option>
+                                    <option value="3month">Last 3 Months</option>
+                                    <option value="6month">Last 6 Months</option>
+                                    <option value="12month">Last 12 Months</option>
+                                    <option value="overall">Overall</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3">
+                            <Button
+                                type="button"
+                                variant="primary"
+                                glow
+                                disabled={isLastFmPreviewLoading}
+                                onClick={handleLoadLastFmPreview}
+                            >
+                                {isLastFmPreviewLoading ? 'Loading Preview...' : 'Load Last.fm Preview'}
+                            </Button>
+                            {lastFmPreview && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleUseLastFmArtists}
+                                >
+                                    Use Top Artists as EMS Seeds
+                                </Button>
+                            )}
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={!session || isMutating === 'last-fm'}
+                                onClick={handleSaveLastFmProfile}
+                            >
+                                {isMutating === 'last-fm' ? 'Saving...' : 'Save Last.fm Profile to Account'}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={!session || isLastFmSyncing || !connectionBootstrap?.user.last_fm_username}
+                                onClick={handleSyncLastFmScrobbles}
+                            >
+                                {isLastFmSyncing ? 'Syncing...' : 'Sync Recent Scrobbles'}
+                            </Button>
+                            <Link to="/ems">
+                                <Button type="button" variant="ghost">
+                                    Open EMS
+                                </Button>
+                            </Link>
+                        </div>
+
+                        {connectionBootstrap?.user.last_fm_username && (
+                            <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4 text-sm leading-6 text-hud-text-secondary">
+                                Saved profile: <span className="font-medium text-hud-text-primary">
+                                    {connectionBootstrap.user.last_fm_username}
+                                </span>
+                            </div>
+                        )}
+
+                        {lastFmScrobbleBootstrap && (
+                            <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                            Stored Scrobble Snapshot
+                                        </p>
+                                        <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
+                                            {lastFmScrobbleBootstrap.summary.next_step_message}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                    <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                            Stored
+                                        </p>
+                                        <p className="mt-2 text-2xl font-semibold text-hud-text-primary">
+                                            {lastFmScrobbleBootstrap.summary.stored_scrobble_count}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                            Returned
+                                        </p>
+                                        <p className="mt-2 text-2xl font-semibold text-hud-text-primary">
+                                            {lastFmScrobbleBootstrap.summary.returned_scrobble_count}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                            Last Synced
+                                        </p>
+                                        <p className="mt-2 text-sm font-medium text-hud-text-primary">
+                                            {lastFmScrobbleBootstrap.summary.last_synced_at
+                                                ? new Date(lastFmScrobbleBootstrap.summary.last_synced_at).toLocaleString()
+                                                : 'Not synced yet'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {lastFmPreviewError && (
+                            <div className="rounded-2xl border border-hud-accent-danger/40 bg-hud-accent-danger/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                                {lastFmPreviewError}
+                            </div>
+                        )}
+
+                        {lastFmPreview && (
+                            <>
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                    <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                            Recent Scrobbles
+                                        </p>
+                                        <p className="mt-2 text-2xl font-semibold text-hud-text-primary">
+                                            {lastFmPreview.summary.recent_track_count}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                            Top Artists
+                                        </p>
+                                        <p className="mt-2 text-2xl font-semibold text-hud-text-primary">
+                                            {lastFmPreview.summary.top_artist_count}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                            Distinct Recent Artists
+                                        </p>
+                                        <p className="mt-2 text-2xl font-semibold text-hud-text-primary">
+                                            {lastFmPreview.summary.distinct_recent_artist_count}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                    <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                        Profile Snapshot
+                                    </p>
+                                    <p className="mt-2 text-lg font-semibold text-hud-text-primary">
+                                        {lastFmPreview.user.real_name || lastFmPreview.user.username}
+                                    </p>
+                                    <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
+                                        {lastFmPreview.user.country
+                                            ? `${lastFmPreview.user.country} · `
+                                            : ''}
+                                        {lastFmPreview.user.playcount
+                                            ? `${lastFmPreview.user.playcount.toLocaleString()} total plays`
+                                            : 'Total playcount unavailable'}
+                                    </p>
+                                    <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
+                                        {lastFmPreview.summary.next_step_message}
+                                    </p>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </HudCard>
+
+                <HudCard title="Preview Results" subtitle="Signals you can feed into EMS/GMS planning">
+                    {lastFmPreview ? (
+                        <div className="space-y-4">
+                            <div className="grid gap-3">
+                                {lastFmPreview.insights.map((insight) => (
+                                    <div
+                                        key={insight.insight_id}
+                                        className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4"
+                                    >
+                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-accent-primary">
+                                            {insight.title}
+                                        </p>
+                                        <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
+                                            {insight.detail}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                    <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                        Recent Tracks
+                                    </p>
+                                    <div className="mt-3 space-y-3">
+                                        {lastFmPreview.recent_tracks.slice(0, 4).map((track, index) => (
+                                            <div key={`${track.track_name}-${index}`} className="text-sm leading-6 text-hud-text-secondary">
+                                                <p className="font-medium text-hud-text-primary">
+                                                    {track.track_name || 'Unknown Track'}
+                                                </p>
+                                                <p>
+                                                    {track.artist_name || 'Unknown Artist'}
+                                                    {track.now_playing ? ' · now playing' : ''}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                    <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                        Top Artists
+                                    </p>
+                                    <div className="mt-3 space-y-3">
+                                        {lastFmPreview.top_artists.slice(0, 4).map((artist, index) => (
+                                            <div key={`${artist.artist_name}-${index}`} className="text-sm leading-6 text-hud-text-secondary">
+                                                <p className="font-medium text-hud-text-primary">
+                                                    #{artist.rank ?? index + 1} {artist.artist_name || 'Unknown Artist'}
+                                                </p>
+                                                <p>{artist.playcount?.toLocaleString() ?? 'Unknown'} plays</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                    <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                        Top Tracks
+                                    </p>
+                                    <div className="mt-3 space-y-3">
+                                        {lastFmPreview.top_tracks.slice(0, 4).map((track, index) => (
+                                            <div key={`${track.track_name}-${index}`} className="text-sm leading-6 text-hud-text-secondary">
+                                                <p className="font-medium text-hud-text-primary">
+                                                    #{track.rank ?? index + 1} {track.track_name || 'Unknown Track'}
+                                                </p>
+                                                <p>{track.artist_name || 'Unknown Artist'}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {lastFmScrobbleBootstrap && lastFmScrobbleBootstrap.recent_scrobbles.length > 0 && (
+                                <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                                    <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                        Stored Recent Scrobbles
+                                    </p>
+                                    <div className="mt-3 space-y-3">
+                                        {lastFmScrobbleBootstrap.recent_scrobbles.slice(0, 5).map((track, index) => (
+                                            <div
+                                                key={`${track.track_name}-${track.played_at}-${index}`}
+                                                className="text-sm leading-6 text-hud-text-secondary"
+                                            >
+                                                <p className="font-medium text-hud-text-primary">
+                                                    {track.track_name}
+                                                </p>
+                                                <p>
+                                                    {track.artist_name}
+                                                    {track.album_name ? ` · ${track.album_name}` : ''}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-4 text-sm leading-6 text-hud-text-secondary">
+                            Enter a Last.fm username and load the preview to inspect public listening history signals.
                         </div>
                     )}
                 </HudCard>

@@ -6,9 +6,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile("local")
 public class InMemoryPmsPlaylistImportStore implements PmsPlaylistImportStore {
 
     private final Map<String, Map<String, ImportedPlaylistState>> importsByUserId = new ConcurrentHashMap<>();

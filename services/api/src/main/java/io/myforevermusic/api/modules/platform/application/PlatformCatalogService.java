@@ -8,6 +8,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class PlatformCatalogService {
 
+    public PlatformCatalogResponse.PlatformOption getRequiredPlatform(String platformId) {
+        return getCatalog().platforms().stream()
+            .filter(platform -> platform.platformId().equals(platformId))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Platform is not supported: %s".formatted(platformId)));
+    }
+
     public PlatformCatalogResponse getCatalog() {
         return new PlatformCatalogResponse(
             "api",
@@ -63,6 +70,37 @@ public class PlatformCatalogService {
                     List.of(
                         "고음질 중심 사용자 취향과 niche catalog를 PMS/EMS 신호로 활용",
                         "Spotify 기준 특성과 매칭되지 않는 곡은 fallback 특성 생성 필요"
+                    )
+                ),
+                new PlatformCatalogResponse.PlatformOption(
+                    "youtube-music",
+                    "YouTube Music",
+                    "planned-pms-import",
+                    true,
+                    true,
+                    "cross-platform-spotify-match",
+                    "사용자 업로드/저장 플레이리스트를 PMS로 가져오는 확장 대상",
+                    "알고리즘 믹스와 재생 흐름을 EMS 수집 신호로 활용할 수 있는 대상",
+                    List.of(
+                        "초기 단계에서는 sandbox playlist import로 연결하고 이후 실연동을 붙인다",
+                        "트랙 메타데이터를 Spotify 기준 특성과 매칭하는 보강 단계가 필요하다",
+                        "미매칭 곡은 fallback 특성 생성으로 PMS/GMS 입력을 유지한다"
+                    )
+                ),
+                new PlatformCatalogResponse.PlatformOption(
+                    "last-fm",
+                    "Last.fm",
+                    "analysis-signal-source",
+                    false,
+                    true,
+                    "scrobble-history-with-spotify-match",
+                    "플레이리스트 import보다는 장기 청취 이력과 아티스트 affinity를 보강하는 신호 소스",
+                    "scrobble, top track, top artist 데이터를 EMS/GMS 학습 신호로 연결하는 대상",
+                    List.of(
+                        "현재 단계에서는 PMS playlist import 대상이 아니다",
+                        "public profile preview로 recent scrobble, top artist, top track 신호를 먼저 읽는다",
+                        "재생 이력과 태그, top artist 데이터를 장기 취향 모델 입력으로 사용할 계획이다",
+                        "트랙 단위 특성은 Spotify 매칭이나 fallback 특성 생성 파이프라인이 필요하다"
                     )
                 )
             )

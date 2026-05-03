@@ -9,6 +9,7 @@ import java.util.List;
 public record ApiErrorResponse(
     String service,
     String status,
+    String code,
     String message,
     Instant timestamp,
     List<FieldIssue> errors

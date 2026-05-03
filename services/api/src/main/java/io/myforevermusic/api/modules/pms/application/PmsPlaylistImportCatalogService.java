@@ -207,6 +207,71 @@ public class PmsPlaylistImportCatalogService {
                     audioFeatures("sp-track-glass-ferry", "fallback_generated", 227000, 8, 1, 4, 0.33, 0.6, 0.55, 0.07, 0.11, -9.6, 0.04, 105.7, 0.59)
                 )
             )
+        ),
+        "youtube-music",
+        List.of(
+            playlist(
+                "ytm-loop-late-code",
+                "Late Code Loop",
+                "youtube-music",
+                "youtube-music-library",
+                "Saved loop for focused night sessions with melodic electronic edges.",
+                track(
+                    "ytm-code-001",
+                    "Hex Horizon",
+                    "Signal Motel",
+                    "synthwave",
+                    true,
+                    audioFeatures("sp-track-hex-horizon", "spotify_match", 224000, 9, 1, 4, 0.17, 0.72, 0.77, 0.01, 0.12, -7.4, 0.04, 118.1, 0.62)
+                ),
+                track(
+                    "ytm-code-002",
+                    "Cursor Bloom",
+                    "Neon Minutes",
+                    "electropop",
+                    true,
+                    audioFeatures("sp-track-cursor-bloom", "spotify_match", 208000, 4, 1, 4, 0.22, 0.7, 0.73, 0.02, 0.14, -8.2, 0.05, 114.6, 0.58)
+                ),
+                track(
+                    "ytm-code-003",
+                    "Window Delay",
+                    "Tape District",
+                    "indietronica",
+                    false,
+                    audioFeatures("sp-track-window-delay", "fallback_generated", 237000, 7, 0, 4, 0.28, 0.63, 0.59, 0.08, 0.1, -9.8, 0.04, 103.7, 0.44)
+                )
+            ),
+            playlist(
+                "ytm-morning-burst",
+                "Morning Burst Mix",
+                "youtube-music",
+                "youtube-music-mix",
+                "Brighter recommendation mix for upbeat PMS seed expansion.",
+                track(
+                    "ytm-morning-001",
+                    "Sunline Arcade",
+                    "Velvet Driver",
+                    "synth-pop",
+                    true,
+                    audioFeatures("sp-track-sunline-arcade", "spotify_match", 211000, 1, 1, 4, 0.12, 0.78, 0.81, 0.0, 0.11, -7.1, 0.04, 123.0, 0.74)
+                ),
+                track(
+                    "ytm-morning-002",
+                    "Routine Sparks",
+                    "Color Index",
+                    "dance-pop",
+                    true,
+                    audioFeatures("sp-track-routine-sparks", "spotify_match", 205000, 6, 1, 4, 0.15, 0.76, 0.79, 0.01, 0.16, -7.5, 0.05, 120.8, 0.7)
+                ),
+                track(
+                    "ytm-morning-003",
+                    "Sky Receipt",
+                    "June Motor",
+                    "dream-pop",
+                    false,
+                    audioFeatures("sp-track-sky-receipt", "fallback_generated", 229000, 10, 1, 4, 0.31, 0.61, 0.56, 0.04, 0.09, -9.4, 0.03, 106.3, 0.55)
+                )
+            )
         )
     );
 

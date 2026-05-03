@@ -1,6 +1,7 @@
 package io.myforevermusic.api.modules.auth.infrastructure.persistence;
 
 import io.myforevermusic.api.modules.auth.application.AuthRegisteredAccount;
+import io.myforevermusic.api.modules.auth.application.AuthAuthenticationAccount;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -30,6 +31,12 @@ public class AuthUserAccountEntity {
     @Column(name = "preferred_platform_id", nullable = false, length = 50)
     private String preferredPlatformId;
 
+    @Column(name = "last_fm_username", length = 120)
+    private String lastFmUsername;
+
+    @Column(name = "last_fm_connected_at")
+    private Instant lastFmConnectedAt;
+
     @Column(name = "marketing_opt_in", nullable = false)
     private boolean marketingOptIn;
 
@@ -55,6 +62,8 @@ public class AuthUserAccountEntity {
         String displayName,
         String passwordHash,
         String preferredPlatformId,
+        String lastFmUsername,
+        Instant lastFmConnectedAt,
         boolean marketingOptIn,
         String onboardingStage,
         Instant registeredAt,
@@ -67,6 +76,8 @@ public class AuthUserAccountEntity {
         this.displayName = displayName;
         this.passwordHash = passwordHash;
         this.preferredPlatformId = preferredPlatformId;
+        this.lastFmUsername = lastFmUsername;
+        this.lastFmConnectedAt = lastFmConnectedAt;
         this.marketingOptIn = marketingOptIn;
         this.onboardingStage = onboardingStage;
         this.registeredAt = registeredAt;
@@ -81,11 +92,25 @@ public class AuthUserAccountEntity {
             normalizedEmail,
             displayName,
             preferredPlatformId,
+            lastFmUsername,
+            lastFmConnectedAt,
             marketingOptIn,
             onboardingStage,
             registeredAt,
             acceptedTermsAt,
             acceptedPrivacyPolicyAt
         );
+    }
+
+    public AuthAuthenticationAccount toAuthenticationAccount() {
+        return new AuthAuthenticationAccount(
+            toRegisteredAccount(),
+            passwordHash
+        );
+    }
+
+    public void setLastFmProfile(String lastFmUsername, Instant lastFmConnectedAt) {
+        this.lastFmUsername = lastFmUsername;
+        this.lastFmConnectedAt = lastFmConnectedAt;
     }
 }

@@ -19,7 +19,7 @@ public class SandboxPlatformPlaylistProvider implements PlatformPlaylistProvider
 
     @Override
     public boolean supports(String platformId, PlatformAccountCredential credential) {
-        if ("apple-music".equals(platformId) || "tidal".equals(platformId)) {
+        if ("apple-music".equals(platformId) || "tidal".equals(platformId) || "youtube-music".equals(platformId)) {
             return true;
         }
 

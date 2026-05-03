@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage'
 import NotFoundPage from './pages/NotFoundPage'
 import PmsPage from './pages/PmsPage'
 import PlatformsPage from './pages/PlatformsPage'
+import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
 import PlatformOAuthCallbackPage from './pages/platforms/PlatformOAuthCallbackPage'
 import PlatformOAuthSandboxAuthorizePage from './pages/platforms/PlatformOAuthSandboxAuthorizePage'
@@ -23,6 +24,8 @@ function App() {
                     <Route path="ems" element={<EmsPage />} />
                     <Route path="gms-preview" element={<GmsPreviewPage />} />
                 </Route>
+                <Route path="login" element={<Login />} />
+                <Route path="signin" element={<Login />} />
                 <Route path="signup" element={<Register />} />
                 <Route path="register" element={<Register />} />
                 <Route path="*" element={<NotFoundPage />} />

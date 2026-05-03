@@ -6,7 +6,7 @@ import {
     useState,
     type ReactNode,
 } from 'react'
-import type { AuthRegistrationResponse, WorkspacePlatformId } from '@/types/api'
+import type { AuthLoginResponse, AuthRegistrationResponse, WorkspacePlatformId } from '@/types/api'
 
 interface AuthSessionState {
     userId: string
@@ -22,7 +22,7 @@ interface AuthSessionState {
 
 interface AuthSessionContextValue {
     session: AuthSessionState | null
-    setSessionFromRegistration: (response: AuthRegistrationResponse) => void
+    setSessionFromAuthentication: (response: AuthRegistrationResponse | AuthLoginResponse) => void
     updateSession: (patch: Partial<AuthSessionState>) => void
     clearSession: () => void
 }
@@ -48,13 +48,13 @@ const getInitialSession = (): AuthSessionState | null => {
     }
 }
 
-const toSessionState = (response: AuthRegistrationResponse): AuthSessionState => ({
+const toSessionState = (response: AuthRegistrationResponse | AuthLoginResponse): AuthSessionState => ({
     userId: response.user.user_id,
     email: response.user.email,
     displayName: response.user.display_name,
     preferredPlatformId: response.onboarding.preferred_platform_id,
     onboardingStage: response.onboarding.stage,
-    registeredAt: response.registered_at,
+    registeredAt: 'registered_at' in response ? response.registered_at : response.authenticated_at,
     platformConnectionRequired: response.onboarding.platform_connection_required,
     nextStepPath: response.onboarding.next_step_path,
     nextStepMessage: response.onboarding.next_step_message,
@@ -79,7 +79,7 @@ export const AuthSessionProvider = ({ children }: { children: ReactNode }) => {
     const value = useMemo<AuthSessionContextValue>(
         () => ({
             session,
-            setSessionFromRegistration: (response) => setSession(toSessionState(response)),
+            setSessionFromAuthentication: (response) => setSession(toSessionState(response)),
             updateSession: (patch) => {
                 setSession((current) => (current ? { ...current, ...patch } : current))
             },

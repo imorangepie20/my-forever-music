@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
 import StatCard from '@/components/common/StatCard'
+import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
 import { ApiError, fetchSystemInfo, getAiDocsUrl, getApiDocsUrl } from '@/services/api'
 import type { SystemInfoResponse } from '@/types/api'
@@ -36,6 +37,7 @@ const deliveryTracks = [
 ]
 
 const HomePage = () => {
+    const { session } = useAuthSession()
     const { workspace, seedTrackCount, seedArtistCount, seedGenreCount } = useRecommendationWorkspace()
     const [systemInfo, setSystemInfo] = useState<SystemInfoResponse | null>(null)
     const [statusError, setStatusError] = useState<string | null>(null)
@@ -84,13 +86,31 @@ const HomePage = () => {
                             </p>
 
                             <div className="mt-8 flex flex-wrap gap-3">
-                                <Link
-                                    to="/signup"
-                                    className="btn-glow inline-flex items-center gap-2 rounded-xl bg-hud-accent-primary px-5 py-3 text-sm font-semibold text-hud-bg-primary transition-hud"
-                                >
-                                    Start Signup
-                                    <ArrowRight size={16} />
-                                </Link>
+                                {session ? (
+                                    <Link
+                                        to={session.nextStepPath || '/platforms'}
+                                        className="btn-glow inline-flex items-center gap-2 rounded-xl bg-hud-accent-primary px-5 py-3 text-sm font-semibold text-hud-bg-primary transition-hud"
+                                    >
+                                        Continue Onboarding
+                                        <ArrowRight size={16} />
+                                    </Link>
+                                ) : (
+                                    <Link
+                                        to="/signup"
+                                        className="btn-glow inline-flex items-center gap-2 rounded-xl bg-hud-accent-primary px-5 py-3 text-sm font-semibold text-hud-bg-primary transition-hud"
+                                    >
+                                        Start Signup
+                                        <ArrowRight size={16} />
+                                    </Link>
+                                )}
+                                {!session && (
+                                    <Link
+                                        to="/login"
+                                        className="inline-flex items-center gap-2 rounded-xl border border-hud-border-secondary bg-hud-bg-primary/80 px-5 py-3 text-sm font-medium text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
+                                    >
+                                        Sign In
+                                    </Link>
+                                )}
                                 <Link
                                     to="/platforms"
                                     className="inline-flex items-center gap-2 rounded-xl border border-hud-border-secondary bg-hud-bg-primary/80 px-5 py-3 text-sm font-medium text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"

@@ -4,17 +4,25 @@
 
 이 문서는 `my-forever-music`을 Ubuntu 서버에서 개발 및 서비스할 때의 기준 가이드입니다.
 
+현재 프로젝트의 1차 구현과 시험 서비스 환경은 `MacBook 로컬`입니다. 따라서 이 문서는 `지금 당장 주 개발 환경`이 아니라, 로컬 검증 후 Ubuntu로 승격할 때 따르는 기준 문서로 봅니다.
+
 ## 기본 전략
 
 현재 프로젝트는 아래 두 단계를 기준으로 운영합니다.
 
-1. 개발 단계
+1. MacBook 로컬 개발/시험 단계
+   - `apps/web`: MacBook에서 `Vite`
+   - `services/api`: MacBook에서 `Spring Boot`
+   - `services/ai`: MacBook에서 `FastAPI`
+   - 필요 시 로컬 Docker로 `PostgreSQL`, `Redis` 사용
+
+2. Ubuntu 이전 후 개발/서비스 단계
    - `apps/web`: 호스트에서 `Vite`
    - `services/api`: 호스트에서 `Spring Boot`
    - `services/ai`: 호스트 또는 컨테이너에서 `FastAPI`
    - `Nginx`: Ubuntu 서버에서 리버스 프록시
 
-2. 서비스 단계
+3. 서비스 단계
    - `Nginx + API + AI + PostgreSQL + Redis`를 Docker Compose 또는 systemd 조합으로 운영
    - 프론트는 빌드 결과물을 Nginx가 직접 서빙
 

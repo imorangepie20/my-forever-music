@@ -4,6 +4,8 @@ import io.myforevermusic.api.modules.auth.application.AuthAccountStore;
 import io.myforevermusic.api.modules.auth.application.AuthEmailAlreadyRegisteredException;
 import io.myforevermusic.api.modules.auth.application.AuthRegisteredAccount;
 import io.myforevermusic.api.modules.auth.application.AuthRegistrationDraft;
+import io.myforevermusic.api.common.error.ApiResourceNotFoundException;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -35,6 +37,40 @@ public class InMemoryAuthAccountStore implements AuthAccountStore {
         return Optional.ofNullable(accountsByUserId.get(userId)).map(StoredAccount::toRegisteredAccount);
     }
 
+    @Override
+    public Optional<io.myforevermusic.api.modules.auth.application.AuthAuthenticationAccount> findAuthenticationByNormalizedEmail(
+        String normalizedEmail
+    ) {
+        return Optional.ofNullable(accountsByNormalizedEmail.get(normalizedEmail))
+            .map(StoredAccount::toAuthenticationAccount);
+    }
+
+    @Override
+    public AuthRegisteredAccount saveLastFmProfile(String userId, String lastFmUsername, Instant connectedAt) {
+        StoredAccount current = accountsByUserId.get(userId);
+        if (current == null) {
+            throw new ApiResourceNotFoundException("No registered account found for user: %s".formatted(userId));
+        }
+
+        StoredAccount updated = current.withLastFmProfile(lastFmUsername, connectedAt);
+        accountsByUserId.put(userId, updated);
+        accountsByNormalizedEmail.put(updated.normalizedEmail(), updated);
+        return updated.toRegisteredAccount();
+    }
+
+    @Override
+    public AuthRegisteredAccount clearLastFmProfile(String userId) {
+        StoredAccount current = accountsByUserId.get(userId);
+        if (current == null) {
+            throw new ApiResourceNotFoundException("No registered account found for user: %s".formatted(userId));
+        }
+
+        StoredAccount updated = current.clearLastFmProfile();
+        accountsByUserId.put(userId, updated);
+        accountsByNormalizedEmail.put(updated.normalizedEmail(), updated);
+        return updated.toRegisteredAccount();
+    }
+
     private record StoredAccount(
         String userId,
         String email,
@@ -42,6 +78,8 @@ public class InMemoryAuthAccountStore implements AuthAccountStore {
         String displayName,
         String passwordHash,
         String preferredPlatformId,
+        String lastFmUsername,
+        Instant lastFmConnectedAt,
         boolean marketingOptIn,
         String onboardingStage,
         java.time.Instant registeredAt,
@@ -57,12 +95,36 @@ public class InMemoryAuthAccountStore implements AuthAccountStore {
                 draft.displayName(),
                 draft.passwordHash(),
                 draft.preferredPlatformId(),
+                null,
+                null,
                 draft.marketingOptIn(),
                 draft.onboardingStage(),
                 draft.registeredAt(),
                 draft.acceptedTermsAt(),
                 draft.acceptedPrivacyPolicyAt()
             );
+        }
+
+        private StoredAccount withLastFmProfile(String username, Instant connectedAt) {
+            return new StoredAccount(
+                userId,
+                email,
+                normalizedEmail,
+                displayName,
+                passwordHash,
+                preferredPlatformId,
+                username,
+                connectedAt,
+                marketingOptIn,
+                onboardingStage,
+                registeredAt,
+                acceptedTermsAt,
+                acceptedPrivacyPolicyAt
+            );
+        }
+
+        private StoredAccount clearLastFmProfile() {
+            return withLastFmProfile(null, null);
         }
 
         private AuthRegisteredAccount toRegisteredAccount() {
@@ -72,11 +134,20 @@ public class InMemoryAuthAccountStore implements AuthAccountStore {
                 normalizedEmail,
                 displayName,
                 preferredPlatformId,
+                lastFmUsername,
+                lastFmConnectedAt,
                 marketingOptIn,
                 onboardingStage,
                 registeredAt,
                 acceptedTermsAt,
                 acceptedPrivacyPolicyAt
+            );
+        }
+
+        private io.myforevermusic.api.modules.auth.application.AuthAuthenticationAccount toAuthenticationAccount() {
+            return new io.myforevermusic.api.modules.auth.application.AuthAuthenticationAccount(
+                toRegisteredAccount(),
+                passwordHash
             );
         }
     }

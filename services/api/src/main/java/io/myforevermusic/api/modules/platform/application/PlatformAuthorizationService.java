@@ -148,6 +148,7 @@ public class PlatformAuthorizationService {
         PlatformTokenExchangeResult tokenExchangeResult = platformAuthorizationCodeExchangeRegistry
             .getRequiredClient(session)
             .exchangeAuthorizationCode(session, callbackCode);
+        PlatformOption platform = findPlatform(session.platformId());
         String scopeSummary = String.join(", ", tokenExchangeResult.grantedScopes());
         String externalAccountLabel = "%s %s account".formatted(account.displayName(), session.platformDisplayName());
 
@@ -175,14 +176,16 @@ public class PlatformAuthorizationService {
                 session.authorizationMode(),
                 externalAccountLabel,
                 scopeSummary,
-                true,
+                platform.pmsImportSupported(),
                 now,
                 now
             )
         );
         PlatformAuthorizationSession completedSession = platformAuthorizationSessionStore.markCompleted(session.state(), now);
 
-        boolean preferredConnected = account.preferredPlatformId().equals(session.platformId()) && connectionState.connected();
+        boolean preferredConnected = account.preferredPlatformId().equals(session.platformId())
+            && connectionState.connected()
+            && platform.pmsImportSupported();
 
         return new PlatformAuthorizationCompleteResponse(
             "api",
@@ -211,7 +214,9 @@ public class PlatformAuthorizationService {
                 preferredConnected ? "/pms" : "/platforms",
                 preferredConnected
                     ? "Preferred platform connected. Continue to PMS import."
-                    : "Platform connected. Return to platform onboarding to continue setup."
+                    : account.preferredPlatformId().equals(session.platformId()) && !platform.pmsImportSupported()
+                        ? "Platform connected. This source is available for analysis signals, but PMS import is not ready yet."
+                        : "Platform connected. Return to platform onboarding to continue setup."
             )
         );
     }

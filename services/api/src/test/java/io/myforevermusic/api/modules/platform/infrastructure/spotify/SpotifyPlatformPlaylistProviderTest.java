@@ -145,6 +145,8 @@ class SpotifyPlatformPlaylistProviderTest {
             "listener@example.com",
             "Forever Listener",
             "spotify",
+            null,
+            null,
             true,
             "platform-onboarding",
             Instant.parse("2026-05-03T00:00:00Z"),

@@ -38,6 +38,7 @@
   "summary": {
     "connected_platform_count": 1,
     "preferred_platform_connected": true,
+    "preferred_platform_reconnect_required": false,
     "onboarding_stage": "import-playlists",
     "next_step_path": "/pms",
     "next_step_message": "Preferred platform is connected. You can continue into PMS import."
@@ -52,6 +53,8 @@
       "connection_mode": "sandbox",
       "external_account_label": "Forever Listener Spotify account",
       "sync_ready": true,
+      "credential_status": "ready",
+      "reconnect_required": false,
       "connected_at": "2026-05-03T07:00:00Z",
       "next_action_label": "Disconnect"
     }
@@ -101,6 +104,8 @@
 - `database` 같은 DB 활성 프로필에서는 `platform_account_connection` 테이블을 사용할 수 있도록 자리가 준비되어 있다
 - 웹앱 기준 연결 시작은 현재 `sandbox OAuth` 승인 흐름으로 진행된다
 - preferred platform이 연결되면 다음 단계가 `/pms`로 바뀐다
+- 저장된 credential이 refresh 실패나 만료로 usable 하지 않으면 `preferred_platform_reconnect_required=true`가 되고, 카드의 `next_action_label`은 `Reconnect`로 바뀐다
+- 이 상태는 `connected=true`일 수 있지만 `sync_ready=false`이므로, PMS import는 계속 막히고 사용자는 `/platforms`에서 다시 OAuth를 시작해야 한다
 
 ## 다음 연결 지점
 

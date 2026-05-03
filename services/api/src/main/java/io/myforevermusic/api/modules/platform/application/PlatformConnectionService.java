@@ -13,7 +13,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import org.springframework.stereotype.Service;
@@ -25,17 +24,20 @@ public class PlatformConnectionService {
     private final PlatformCatalogService platformCatalogService;
     private final PlatformConnectionStore platformConnectionStore;
     private final PlatformCredentialStore platformCredentialStore;
+    private final PlatformCredentialService platformCredentialService;
 
     public PlatformConnectionService(
         AuthAccountStore authAccountStore,
         PlatformCatalogService platformCatalogService,
         PlatformConnectionStore platformConnectionStore,
-        PlatformCredentialStore platformCredentialStore
+        PlatformCredentialStore platformCredentialStore,
+        PlatformCredentialService platformCredentialService
     ) {
         this.authAccountStore = authAccountStore;
         this.platformCatalogService = platformCatalogService;
         this.platformConnectionStore = platformConnectionStore;
         this.platformCredentialStore = platformCredentialStore;
+        this.platformCredentialService = platformCredentialService;
     }
 
     public PlatformConnectionBootstrapResponse getBootstrap(String userId) {
@@ -51,8 +53,18 @@ public class PlatformConnectionService {
                 .thenComparing(PlatformConnectionBootstrapResponse.PlatformConnectionCard::displayName))
             .toList();
 
-        boolean preferredConnected = connections.stream()
-            .anyMatch(connection -> connection.preferred() && connection.connected() && connection.syncReady());
+        PlatformConnectionBootstrapResponse.PlatformConnectionCard preferredConnection = connections.stream()
+            .filter(PlatformConnectionBootstrapResponse.PlatformConnectionCard::preferred)
+            .findFirst()
+            .orElse(null);
+        PlatformOption preferredPlatform = findPlatform(account.preferredPlatformId());
+        boolean preferredConnected = preferredConnection != null
+            && preferredConnection.connected()
+            && preferredConnection.syncReady();
+        boolean preferredReconnectRequired = preferredConnection != null && preferredConnection.reconnectRequired();
+        boolean preferredPmsImportUnsupported = preferredConnection != null
+            && preferredConnection.connected()
+            && !preferredPlatform.pmsImportSupported();
 
         return new PlatformConnectionBootstrapResponse(
             "api",
@@ -62,16 +74,23 @@ public class PlatformConnectionService {
                 account.userId(),
                 account.displayName(),
                 account.email(),
-                account.preferredPlatformId()
+                account.preferredPlatformId(),
+                account.lastFmUsername(),
+                account.lastFmConnectedAt()
             ),
             new PlatformConnectionBootstrapResponse.ConnectionSummary(
                 (int) connections.stream().filter(PlatformConnectionBootstrapResponse.PlatformConnectionCard::connected).count(),
                 preferredConnected,
-                preferredConnected ? "import-playlists" : "connect-platform",
+                preferredReconnectRequired,
+                preferredConnected ? "import-playlists" : preferredPmsImportUnsupported ? "analysis-only-platform" : "connect-platform",
                 preferredConnected ? "/pms" : "/platforms",
                 preferredConnected
                     ? "Preferred platform is connected. You can continue into PMS import."
-                    : "Connect your preferred platform first, then continue to PMS import."
+                    : preferredReconnectRequired
+                        ? "Preferred platform needs to be reconnected before PMS can import playlists."
+                        : preferredPmsImportUnsupported
+                            ? "Preferred platform is connected, but PMS playlist import is not supported yet. Choose another PMS source or keep it as an EMS signal platform."
+                            : "Connect your preferred platform first, then continue to PMS import."
             ),
             connections
         );
@@ -95,7 +114,7 @@ public class PlatformConnectionService {
                 connectionMode,
                 externalAccountLabel,
                 "playlist-read, profile-read",
-                true,
+                platform.pmsImportSupported(),
                 now,
                 now
             )
@@ -119,6 +138,9 @@ public class PlatformConnectionService {
         AuthRegisteredAccount account = findAccount(request.userId());
         PlatformOption platform = findPlatform(request.platformId());
         platformCredentialStore.clear(request.userId(), request.platformId());
+        if ("last-fm".equals(platform.platformId())) {
+            authAccountStore.clearLastFmProfile(request.userId());
+        }
         PlatformConnectionState state = platformConnectionStore.disconnect(request.userId(), request.platformId());
         return toCommandResponse(account, platform, state, "disconnected");
     }
@@ -143,12 +165,13 @@ public class PlatformConnectionService {
         PlatformConnectionState state
     ) {
         boolean preferred = account.preferredPlatformId().equals(platform.platformId());
-        Optional<PlatformAccountCredential> credential = platformCredentialStore.findByUserIdAndPlatformId(
+        PlatformCredentialResolution credentialResolution = platformCredentialService.resolveCredential(
             account.userId(),
             platform.platformId()
         );
         boolean connected = state != null && state.connected();
-        boolean syncReady = connected && credential.isPresent() && !credential.orElseThrow().isExpired(Instant.now());
+        boolean syncReady = connected && platform.pmsImportSupported() && credentialResolution.usable();
+        boolean reconnectRequired = platform.pmsImportSupported() && credentialResolution.needsReconnect(connected);
 
         return new PlatformConnectionBootstrapResponse.PlatformConnectionCard(
             platform.platformId(),
@@ -159,8 +182,10 @@ public class PlatformConnectionService {
             state == null ? null : state.connectionMode(),
             state == null ? null : state.externalAccountLabel(),
             syncReady,
+            credentialResolution.status(),
+            reconnectRequired,
             state == null ? null : state.connectedAt(),
-            connected ? "Disconnect" : "Connect"
+            reconnectRequired ? "Reconnect" : connected ? "Disconnect" : "Connect"
         );
     }
 
@@ -170,7 +195,9 @@ public class PlatformConnectionService {
         PlatformConnectionState state,
         String status
     ) {
-        boolean preferredConnected = state.connected() && account.preferredPlatformId().equals(platform.platformId());
+        boolean preferredConnected = state.connected()
+            && account.preferredPlatformId().equals(platform.platformId())
+            && platform.pmsImportSupported();
 
         return new PlatformConnectionCommandResponse(
             "api",
@@ -192,7 +219,9 @@ public class PlatformConnectionService {
                 preferredConnected ? "/pms" : "/platforms",
                 preferredConnected
                     ? "Preferred platform connected. Continue to PMS import."
-                    : "You can connect more platforms or continue the onboarding setup."
+                    : state.connected() && account.preferredPlatformId().equals(platform.platformId()) && !platform.pmsImportSupported()
+                        ? "Preferred platform is connected, but PMS import is not available yet for this source."
+                        : "You can connect more platforms or continue the onboarding setup."
             )
         );
     }

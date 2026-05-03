@@ -91,13 +91,14 @@ Nginx와 Certbot 기준 실제 배치 절차는 [HTTPS_DOMAIN_DEV_SETUP.md](/Use
 - `/api/v1/platforms/oauth/start` 는 Spotify PKCE authorize URL을 생성합니다.
 - `/platforms/oauth/callback` 은 프론트에서 `code` 와 `state` 를 읽어 `/api/v1/platforms/oauth/complete` 로 넘깁니다.
 - `/api/v1/platforms/oauth/complete` 는 Spotify token endpoint와 authorization code를 교환합니다.
+- 저장된 credential은 만료 60초 전부터 refresh token으로 자동 갱신을 시도합니다.
 - 이후 `PMS import` 는 실제 Spotify playlist/provider 흐름을 사용합니다.
 
 ## 다음 연결 지점
 
 1. HTTPS 도메인에서 실제 callback 페이지 서빙 확인
 2. Spotify OAuth live 테스트
-3. Spotify access token refresh 구현
+3. refresh 실패 시 reconnect 정책과 사용자 안내 정리
 
 ## 공식 참고
 

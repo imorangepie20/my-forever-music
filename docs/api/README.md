@@ -10,14 +10,18 @@
 
 1. [PLATFORM_CATALOG_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_CATALOG_API.md)
 2. [AUTH_REGISTER_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AUTH_REGISTER_API.md)
-3. [PLATFORM_CONNECTION_ONBOARDING_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_CONNECTION_ONBOARDING_API.md)
-4. [PLATFORM_OAUTH_SANDBOX_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_OAUTH_SANDBOX_API.md)
-5. [PMS_PLAYLIST_IMPORT_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_PLAYLIST_IMPORT_API.md)
-6. [PMS_WORKSPACE_BOOTSTRAP_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_WORKSPACE_BOOTSTRAP_API.md)
-7. [EMS_WORKSPACE_ANALYSIS_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/EMS_WORKSPACE_ANALYSIS_API.md)
-8. [GMS_RECOMMENDATION_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_PREVIEW_API.md)
-9. [AI_RECOMMENDATION_PREVIEW.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AI_RECOMMENDATION_PREVIEW.md)
-10. [PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md)
+3. [AUTH_LOGIN_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AUTH_LOGIN_API.md)
+4. [PLATFORM_CONNECTION_ONBOARDING_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_CONNECTION_ONBOARDING_API.md)
+5. [LASTFM_SIGNAL_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/LASTFM_SIGNAL_PREVIEW_API.md)
+6. [LASTFM_PROFILE_CONNECTION_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/LASTFM_PROFILE_CONNECTION_API.md)
+7. [LASTFM_SCROBBLE_SYNC_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/LASTFM_SCROBBLE_SYNC_API.md)
+8. [PLATFORM_OAUTH_SANDBOX_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_OAUTH_SANDBOX_API.md)
+9. [PMS_PLAYLIST_IMPORT_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_PLAYLIST_IMPORT_API.md)
+10. [PMS_WORKSPACE_BOOTSTRAP_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_WORKSPACE_BOOTSTRAP_API.md)
+11. [EMS_WORKSPACE_ANALYSIS_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/EMS_WORKSPACE_ANALYSIS_API.md)
+12. [GMS_RECOMMENDATION_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_PREVIEW_API.md)
+13. [AI_RECOMMENDATION_PREVIEW.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AI_RECOMMENDATION_PREVIEW.md)
+14. [PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md)
 
 ## 문서 분류
 
@@ -27,7 +31,11 @@
 
 - [PLATFORM_CATALOG_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_CATALOG_API.md)
 - [AUTH_REGISTER_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AUTH_REGISTER_API.md)
+- [AUTH_LOGIN_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AUTH_LOGIN_API.md)
 - [PLATFORM_CONNECTION_ONBOARDING_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_CONNECTION_ONBOARDING_API.md)
+- [LASTFM_SIGNAL_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/LASTFM_SIGNAL_PREVIEW_API.md)
+- [LASTFM_PROFILE_CONNECTION_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/LASTFM_PROFILE_CONNECTION_API.md)
+- [LASTFM_SCROBBLE_SYNC_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/LASTFM_SCROBBLE_SYNC_API.md)
 - [PLATFORM_OAUTH_SANDBOX_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_OAUTH_SANDBOX_API.md)
 - [PMS_PLAYLIST_IMPORT_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_PLAYLIST_IMPORT_API.md)
 - [PMS_WORKSPACE_BOOTSTRAP_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_WORKSPACE_BOOTSTRAP_API.md)
@@ -52,9 +60,14 @@
 | --- | --- | --- | --- | --- |
 | Platform Catalog API | `GET` | `/api/v1/platforms/catalog` | `services/api` | 공개 API |
 | Auth Register API | `POST` | `/api/v1/auth/register` | `services/api` | 공개 API |
+| Auth Login API | `POST` | `/api/v1/auth/login` | `services/api` | 공개 API |
 | Platform Connection Onboarding API | `GET` | `/api/v1/platforms/connections/bootstrap` | `services/api` | 공개 API |
 | Platform Connection Onboarding API | `POST` | `/api/v1/platforms/connections/connect` | `services/api` | 공개 API |
 | Platform Connection Onboarding API | `POST` | `/api/v1/platforms/connections/disconnect` | `services/api` | 공개 API |
+| Last.fm Signal Preview API | `GET` | `/api/v1/platforms/lastfm/preview` | `services/api` | 공개 API |
+| Last.fm Profile Connection API | `POST` | `/api/v1/platforms/lastfm/profile` | `services/api` | 공개 API |
+| Last.fm Scrobble Sync API | `GET` | `/api/v1/platforms/lastfm/scrobbles/bootstrap` | `services/api` | 공개 API |
+| Last.fm Scrobble Sync API | `POST` | `/api/v1/platforms/lastfm/scrobbles/sync` | `services/api` | 공개 API |
 | Platform OAuth Sandbox API | `POST` | `/api/v1/platforms/oauth/start` | `services/api` | 공개 API |
 | Platform OAuth Sandbox API | `POST` | `/api/v1/platforms/oauth/complete` | `services/api` | 공개 API |
 | PMS Playlist Import API | `GET` | `/api/v1/pms/import/bootstrap` | `services/api` | 공개 API |

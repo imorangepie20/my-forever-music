@@ -11,6 +11,8 @@
 
 핵심 서비스 원문 정의는 [PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md) 를 기준으로 봅니다.
 
+현재 실행 전략은 [architecture/MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md) 을 따른다. 즉, 먼저 MacBook 로컬에서 실서비스 기능을 구현하고 시험한 뒤 Ubuntu 서버로 이전한다.
+
 ## 1-1. 서비스 핵심 정의
 
 이 프로젝트가 만들려는 실제 서비스는 아래와 같습니다.
@@ -34,6 +36,8 @@
 - 마이그레이션은 `Flyway`
 - Windows 데스크탑 앱은 후속 단계에서 `Tauri 2`
 - API 계약 문서 기준은 `OpenAPI`
+- 현재 1차 구현과 시험 서비스 환경은 `MacBook 로컬`
+- Ubuntu 서버는 기능 안정화 후 이전하는 2차 단계
 
 ## 3. 왜 이렇게 정했는가
 
@@ -93,16 +97,17 @@ docs/
 1. [README.md](/Users/woosungjo/music-space/my-forever-music/README.md)
 2. [PROJECT_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_GUIDE.md)
 3. [PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md)
-4. [TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md)
-5. [DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md)
-6. [SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md)
-7. [HTTPS_DOMAIN_DEV_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/HTTPS_DOMAIN_DEV_SETUP.md)
-8. [ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
-9. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
-10. [docs/api/README.md](/Users/woosungjo/music-space/my-forever-music/docs/api/README.md)
-11. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
-12. [UBUNTU_SERVER_RUNBOOK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_RUNBOOK.md)
-13. [UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
+4. [MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md)
+5. [TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md)
+6. [DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md)
+7. [SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md)
+8. [HTTPS_DOMAIN_DEV_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/HTTPS_DOMAIN_DEV_SETUP.md)
+9. [ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
+10. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
+11. [docs/api/README.md](/Users/woosungjo/music-space/my-forever-music/docs/api/README.md)
+12. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
+13. [UBUNTU_SERVER_RUNBOOK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_RUNBOOK.md)
+14. [UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
 
 ## 7. 앞으로 문서를 갱신하는 규칙
 
@@ -113,11 +118,11 @@ docs/
 
 ## 8. 지금 시점의 우선순위
 
-1. Spotify access token refresh와 만료 복구 흐름 추가
-2. PMS import 결과를 영속 사용자/플레이리스트 데이터 모델로 확장
+1. MacBook 로컬에서 핵심 사용자 플로우를 끝까지 안정화
+2. PMS import 결과를 정식 사용자/플레이리스트 데이터 모델과 동기화
 3. Apple Music / TIDAL provider 확장 설계
-4. 사용자 행동 데이터와 EMS 수집 데이터를 어떤 이벤트 모델로 저장할지 정의
-5. 공통 타입과 API 계약 체계 정리
+4. Spotify refresh 실패 로그, 재시도 정책, 장기 세션 운영 정리
+5. 사용자 행동 데이터와 EMS 수집 데이터를 어떤 이벤트 모델로 저장할지 정의
 
 현재 참고 상태:
 
@@ -125,11 +130,23 @@ docs/
 - `services/api`의 `local` 프로필은 현재 `PostgreSQL` 없이 부팅 가능
 - `GET /api/v1/platforms/catalog` 응답 경로 추가 완료
 - `POST /api/v1/auth/register` 회원가입 경로 추가 완료
+- `POST /api/v1/auth/login` 로그인과 온보딩 복원 경로 추가 완료
 - `GET/POST /api/v1/platforms/connections/*` 온보딩 연결 경로 추가 완료
 - `POST /api/v1/platforms/oauth/*` sandbox/Spotify OAuth 시작/완료 경로 추가 완료
 - `GET/POST /api/v1/pms/import/*` PMS playlist import 경로 추가 완료
 - `services/api`에는 platform credential 저장소와 playlist provider 추상화가 추가되어 sandbox와 실제 Spotify import를 같은 흐름으로 처리함
 - `services/api`는 실제 Spotify playlist listing/item import와 audio-features fallback 보강까지 반영됨
+- `services/api`는 Spotify access token 만료 시 refresh token 기반 자동 갱신을 수행함
+- `services/api`와 `apps/web`는 refresh 실패 시 `reconnect_required` 상태와 재연결 UX까지 반영함
+- `services/api`는 DB 활성 프로필에서 PMS import 결과를 `pms_imported_*` 테이블에 영속 저장함
+- 플랫폼 카탈로그에는 `YouTube Music`과 `Last.fm`이 추가되었고, `Last.fm`은 현재 PMS import보다 분석 신호 플랫폼으로 분리됨
+- `GET /api/v1/platforms/lastfm/preview` 경로가 추가되어 공개 Last.fm 사용자명 기준 signal preview를 확인할 수 있음
+- `POST /api/v1/platforms/lastfm/profile` 경로가 추가되어 Last.fm 사용자명을 계정에 저장할 수 있음
+- `GET/POST /api/v1/platforms/lastfm/scrobbles/*` 경로가 추가되어 최근 scrobble snapshot을 저장하고 다시 `/platforms`에서 확인할 수 있음
+- `apps/web`의 `/platforms`는 Last.fm preview 결과를 읽고 top artist를 EMS seed로 복사하거나 계정에 저장할 수 있음
+- `apps/web`의 `/platforms`는 저장된 Last.fm profile 기준으로 recent scrobble sync와 snapshot 요약도 제공함
+- `POST /api/v1/ems/workspace/analysis`는 저장된 Last.fm scrobble snapshot의 artist recurrence를 우선 blend 하고, 비어 있으면 live top artist 조회로 fallback 함
+- `POST /api/v1/gms/recommendations/preview`도 저장된 Last.fm scrobble snapshot의 artist recurrence를 우선 seed artist에 blend 하고, 비어 있으면 live top artist 조회로 fallback 함
 - `GET /api/v1/pms/workspace/bootstrap` 응답 검증 완료
 - `POST /api/v1/ems/workspace/analysis` 응답 경로 추가 완료
 - `POST /api/v1/gms/recommendations/preview`는 `services/ai`와의 브리지까지 검증 완료
@@ -140,6 +157,7 @@ docs/
 - DB 활성 프로필에서는 PMS bootstrap이 실제 `pms_*` 테이블 기반으로 응답 가능
 - `apps/web`에는 `/platforms` route가 추가되어 preferred PMS source platform을 선택할 수 있음
 - `apps/web`에는 `/signup` route가 추가되어 회원가입과 기본 플랫폼 선택이 가능함
+- `apps/web`에는 `/login` route가 추가되어 기존 계정 재로그인과 현재 온보딩 단계 복원이 가능함
 - `apps/web`는 가입 후 세션을 로컬에 저장하고 `/platforms`에서 sandbox 연결/해제와 Spotify OAuth redirect를 처리할 수 있음
 - `apps/web`는 `/pms`에서 platform playlist import와 사용자별 workspace bootstrap을 사용할 수 있음
 - 현재 구현은 아직 `핵심 서비스 문서`의 전체 범위가 아니라, 그중 `PMS / EMS / GMS` 추천 흐름의 최소 검증 버전임

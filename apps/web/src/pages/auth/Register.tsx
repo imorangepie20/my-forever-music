@@ -16,17 +16,17 @@ import Button from '../../components/common/Button'
 import { useAuthSession } from '../../contexts/AuthSessionContext'
 import { useRecommendationWorkspace } from '../../contexts/RecommendationWorkspaceContext'
 import { ApiError, fetchPlatformCatalog, registerAccount } from '../../services/api'
-import type { AuthRegistrationResponse, PlatformCatalogResponse } from '../../types/api'
+import type { AuthRegistrationResponse, PlatformCatalogResponse, WorkspacePlatformId } from '../../types/api'
 
 const Register = () => {
-    const { setSessionFromRegistration } = useAuthSession()
+    const { setSessionFromAuthentication } = useAuthSession()
     const { updateWorkspace } = useRecommendationWorkspace()
     const [showPassword, setShowPassword] = useState(false)
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
-    const [preferredPlatformId, setPreferredPlatformId] = useState<'spotify' | 'apple-music' | 'tidal'>('spotify')
+    const [preferredPlatformId, setPreferredPlatformId] = useState<WorkspacePlatformId>('spotify')
     const [marketingOptIn, setMarketingOptIn] = useState(false)
     const [acceptedTerms, setAcceptedTerms] = useState(false)
     const [acceptedPrivacyPolicy, setAcceptedPrivacyPolicy] = useState(false)
@@ -76,7 +76,7 @@ const Register = () => {
                 accepted_privacy_policy: acceptedPrivacyPolicy,
             })
 
-            setSessionFromRegistration(response)
+            setSessionFromAuthentication(response)
             updateWorkspace({
                 userId: response.user.user_id,
                 preferredPlatformId: response.onboarding.preferred_platform_id,
@@ -148,7 +148,8 @@ const Register = () => {
                                     <p className="mt-1 text-sm text-hud-text-primary">
                                         {loadingPlatforms
                                             ? 'Loading platform catalog...'
-                                            : platforms.map((platform) => platform.display_name).join(' / ') || 'Spotify / Apple Music / TIDAL'}
+                                            : platforms.map((platform) => platform.display_name).join(' / ')
+                                                || 'Spotify / Apple Music / TIDAL / YouTube Music / Last.fm'}
                                     </p>
                                 </div>
                             </div>
@@ -304,6 +305,8 @@ const Register = () => {
                                             <option value="spotify">Spotify</option>
                                             <option value="apple-music">Apple Music</option>
                                             <option value="tidal">TIDAL</option>
+                                            <option value="youtube-music">YouTube Music</option>
+                                            <option value="last-fm">Last.fm</option>
                                         </>
                                     )}
                                 </select>

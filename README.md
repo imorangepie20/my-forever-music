@@ -6,6 +6,8 @@ MusicSpace 재구축용 새 프로젝트 루트입니다.
 
 핵심 서비스 정의 원문은 [docs/PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md) 에 정리되어 있습니다.
 
+현재 작업 전략은 [docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md) 을 기준으로 합니다. 우선 이 MacBook 로컬 시스템에서 실서비스 기능을 구현하고 시험한 뒤 Ubuntu 서버로 이전합니다.
+
 ## 서비스 한 줄 정의
 
 `my-forever-music`은 사용자가 구독 중인 음악 스트리밍 플랫폼의 플레이리스트를 가져와 음악 취향을 분석하고, 외부 트렌드 플레이리스트와 결합해 개인화된 추천 흐름을 만드는 서비스입니다.
@@ -75,18 +77,30 @@ my-forever-music/
 - 제품 목표는 `스트리밍 플랫폼 플레이리스트 수집 -> 오디오 특성 분석 -> 사용자 취향 모델 -> EMS/GMS 추천 루프` 구조로 정의됨
 - `apps/web`는 Vite 기반 최소 제품 셸과 `GMS preview` 테스트 화면까지 정리 완료
 - `apps/web`는 `/signup` 화면에서 회원가입과 기본 스트리밍 플랫폼 선택 가능
+- `apps/web`는 `/login` 화면에서 기존 계정 재로그인과 온보딩 복원 가능
 - `apps/web`는 `/platforms` 화면에서 스트리밍 플랫폼 카탈로그, 가입 사용자 세션, sandbox 연결/해제와 Spotify OAuth redirect 흐름을 제공
+- `apps/web`는 `/platforms` 화면에서 Last.fm 공개 사용자명 기준 signal preview와 EMS seed artist 반영을 제공
+- `apps/web`는 `/platforms` 화면에서 Last.fm username 저장, 최근 scrobble sync, 저장 snapshot 확인까지 제공
 - `apps/web`는 `/pms` 화면에서 사용자별 PMS bootstrap과 platform playlist import를 제공
 - `apps/web`는 `PMS import/bootstrap -> EMS workspace -> GMS preview` 흐름까지 반영 완료
 - `apps/web`의 `EMS` 화면은 Spring Boot `workspace analysis` 결과를 받아 추천값 적용 가능
 - `apps/desktop`는 향후 Windows 앱 개발을 위한 예약 구조 생성 완료
 - `services/api`는 `GET /api/v1/platforms/catalog` 엔드포인트로 플랫폼 역할과 온보딩 흐름 제공
+- 플랫폼 카탈로그에는 `YouTube Music`과 `Last.fm`까지 포함되며, `Last.fm`은 현재 분석 신호 중심 플랫폼으로 분리됨
+- `services/api`는 `GET /api/v1/platforms/lastfm/preview` 엔드포인트로 최근 scrobble, top artist, top track preview를 제공
+- `services/api`는 `POST /api/v1/platforms/lastfm/profile` 엔드포인트로 Last.fm signal profile 저장과 EMS 재사용 경로를 제공
+- `services/api`는 `GET/POST /api/v1/platforms/lastfm/scrobbles/*` 엔드포인트로 scrobble snapshot 저장과 bootstrap 조회를 제공
+- `services/api`는 저장된 Last.fm scrobble snapshot을 `EMS workspace analysis`와 `GMS recommendation preview`에 우선 반영하고, 없으면 live top artist 조회로 fallback 함
 - `services/api`는 `POST /api/v1/auth/register` 엔드포인트로 회원가입과 기본 플랫폼 선택 제공
+- `services/api`는 `POST /api/v1/auth/login` 엔드포인트로 기존 계정 로그인과 현재 온보딩 복원을 제공
 - `services/api`는 `GET/POST /api/v1/platforms/connections/*` 엔드포인트로 가입 직후 플랫폼 연결 온보딩 제공
 - `services/api`는 `GET/POST /api/v1/pms/import/*` 엔드포인트로 PMS playlist import 제공
 - `services/api`는 platform credential 저장과 playlist provider 추상화를 통해 sandbox와 실제 Spotify import를 같은 흐름에서 처리함
 - `services/api`는 Spotify PKCE draft 시작 URL, external callback, authorization code token exchange까지 반영됨
 - `services/api`는 실제 Spotify playlist 목록과 playlist item import 경로를 추가함
+- `services/api`는 Spotify access token 만료 시 refresh token 기반 자동 갱신을 지원함
+- `services/api`와 `apps/web`는 refresh 실패 시 `reconnect_required` 상태와 재연결 UX까지 반영함
+- `services/api`는 DB 활성 프로필에서 PMS import 결과를 `pms_imported_*` 테이블로 영속 저장함
 - `services/api`는 PMS workspace bootstrap과 `services/ai` preview 호출용 GMS 브리지 엔드포인트 생성 완료
 - `services/api`는 PMS seed 기반 `EMS workspace analysis` 엔드포인트 추가 완료
 - `services/api`는 `local` 프로필 기준으로 DB 없이 로컬 부팅 검증 완료
@@ -101,23 +115,25 @@ my-forever-music/
 - 불필요한 서브프로젝트, 빌드 결과물, 의존성 폴더는 제외
 - 새 프로젝트 전용 폴더 구조는 그대로 유지
 - 웹 우선 개발 후 데스크탑 확장을 전제로 문서화 시작
+- 현재 1차 구현/시험 서비스 환경은 `MacBook 로컬`, Ubuntu는 다음 이전 단계로 정리됨
 
 아직 미구현이거나 sandbox 단계인 핵심 서비스 문서의 목표:
 
-- Spotify access token refresh와 장기 세션 유지
-- Apple Music / TIDAL 실제 플랫폼 연동
-- PMS import 결과의 영속 사용자/플레이리스트 동기화
+- Spotify 장기 세션 운영 고도화와 refresh 실패 관측/운영 정책
+- Apple Music / TIDAL / YouTube Music 실제 PMS provider 연동
+- Last.fm scrobble 주기 동기화와 시계열 취향 변화 반영
+- PMS import 결과의 정식 사용자/플레이리스트 도메인 동기화
 - 사용자 행동 데이터 기반 개인화 모델 업데이트
 - EMS 외부 플레이리스트 수집, GMS 추천 통과, 사용자 평가의 PMS 환류
 - 페이지 이동 간 유지되는 공통 음악 플레이어
 
 ## 다음 추천 작업
 
-1. Spotify access token refresh와 만료 복구 흐름 추가
-2. PMS import 결과를 영속 사용자/플레이리스트 데이터 모델로 확장
+1. MacBook 로컬에서 핵심 사용자 플로우를 끝까지 안정화
+2. PMS import 결과를 정식 사용자/플레이리스트 데이터 모델과 동기화
 3. Apple Music / TIDAL 실제 플랫폼 provider 설계
-4. EMS 외부 플레이리스트 수집과 GMS 환류 구조 설계
-5. 공통 플레이어와 데스크탑 재사용을 고려한 프론트 구조 정리
+4. Spotify refresh 실패 로그, 재시도 정책, 장기 세션 운영 정리
+5. Last.fm 저장 신호를 GMS ranking과 장기 사용자 모델에 더 직접 연결
 
 ## 로컬 DB 참고
 
@@ -127,6 +143,7 @@ my-forever-music/
 ## 구현 기준 문서
 
 - [docs/PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md)
+- [docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md)
 - [docs/architecture/SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md)
 - [docs/api/README.md](/Users/woosungjo/music-space/my-forever-music/docs/api/README.md)
 - [docs/api/AUTH_REGISTER_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AUTH_REGISTER_API.md)

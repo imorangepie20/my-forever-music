@@ -58,6 +58,11 @@ app:
     base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
     recommendation-preview-path: ${AI_RECOMMENDATION_PREVIEW_PATH:/v1/recommendations/preview}
   platform:
+    lastfm:
+      enabled: ${LASTFM_ENABLED:false}
+      api-key: ${LASTFM_API_KEY:}
+      shared-secret: ${LASTFM_SHARED_SECRET:}
+      api-root: ${LASTFM_API_ROOT:https://ws.audioscrobbler.com/2.0/}
     oauth:
       spotify:
         enabled: ${SPOTIFY_OAUTH_ENABLED:false}

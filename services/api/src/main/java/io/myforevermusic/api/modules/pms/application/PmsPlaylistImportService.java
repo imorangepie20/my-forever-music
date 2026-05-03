@@ -5,11 +5,13 @@ import io.myforevermusic.api.modules.auth.application.AuthAccountStore;
 import io.myforevermusic.api.modules.auth.application.AuthRegisteredAccount;
 import io.myforevermusic.api.modules.platform.application.PlatformAccountCredential;
 import io.myforevermusic.api.modules.platform.application.PlatformCatalogService;
+import io.myforevermusic.api.modules.platform.application.PlatformCredentialResolution;
+import io.myforevermusic.api.modules.platform.application.PlatformCredentialService;
 import io.myforevermusic.api.modules.platform.application.PlatformConnectionState;
 import io.myforevermusic.api.modules.platform.application.PlatformConnectionStore;
-import io.myforevermusic.api.modules.platform.application.PlatformCredentialStore;
 import io.myforevermusic.api.modules.platform.application.PlatformPlaylistProvider;
 import io.myforevermusic.api.modules.platform.application.PlatformPlaylistProviderRegistry;
+import io.myforevermusic.api.modules.platform.application.PlatformReconnectRequiredException;
 import io.myforevermusic.api.modules.platform.presentation.PlatformCatalogResponse.PlatformOption;
 import io.myforevermusic.api.modules.pms.application.PmsPlaylistImportCatalogService.ImportCandidatePlaylist;
 import io.myforevermusic.api.modules.pms.presentation.PmsPlaylistImportBootstrapResponse;
@@ -31,7 +33,7 @@ public class PmsPlaylistImportService {
     private final AuthAccountStore authAccountStore;
     private final PlatformCatalogService platformCatalogService;
     private final PlatformConnectionStore platformConnectionStore;
-    private final PlatformCredentialStore platformCredentialStore;
+    private final PlatformCredentialService platformCredentialService;
     private final PlatformPlaylistProviderRegistry platformPlaylistProviderRegistry;
     private final PmsPlaylistImportStore pmsPlaylistImportStore;
 
@@ -39,14 +41,14 @@ public class PmsPlaylistImportService {
         AuthAccountStore authAccountStore,
         PlatformCatalogService platformCatalogService,
         PlatformConnectionStore platformConnectionStore,
-        PlatformCredentialStore platformCredentialStore,
+        PlatformCredentialService platformCredentialService,
         PlatformPlaylistProviderRegistry platformPlaylistProviderRegistry,
         PmsPlaylistImportStore pmsPlaylistImportStore
     ) {
         this.authAccountStore = authAccountStore;
         this.platformCatalogService = platformCatalogService;
         this.platformConnectionStore = platformConnectionStore;
-        this.platformCredentialStore = platformCredentialStore;
+        this.platformCredentialService = platformCredentialService;
         this.platformPlaylistProviderRegistry = platformPlaylistProviderRegistry;
         this.pmsPlaylistImportStore = pmsPlaylistImportStore;
     }
@@ -54,12 +56,19 @@ public class PmsPlaylistImportService {
     public PmsPlaylistImportBootstrapResponse getBootstrap(String userId) {
         AuthRegisteredAccount account = findAccount(userId);
         PlatformOption preferredPlatform = findPlatform(account.preferredPlatformId());
+        boolean pmsImportSupported = preferredPlatform.pmsImportSupported();
         PlatformConnectionState preferredConnection = findConnection(userId, preferredPlatform.platformId()).orElse(null);
-        PlatformAccountCredential preferredCredential = findCredential(userId, preferredPlatform.platformId()).orElse(null);
-        boolean preferredCredentialReady = preferredCredential != null && !preferredCredential.isExpired(Instant.now());
+        PlatformCredentialResolution preferredCredentialResolution = resolveCredential(
+            userId,
+            preferredPlatform.platformId()
+        );
+        boolean platformConnected = preferredConnection != null && preferredConnection.connected();
+        boolean reconnectRequired = pmsImportSupported && preferredCredentialResolution.needsReconnect(platformConnected);
+        PlatformAccountCredential preferredCredential = preferredCredentialResolution.usableCredential().orElse(null);
+        boolean preferredCredentialReady = preferredCredential != null;
 
         List<ImportCandidatePlaylist> availablePlaylists =
-            preferredConnection != null && preferredConnection.connected() && preferredCredentialReady
+            pmsImportSupported && platformConnected && preferredCredentialReady
                 ? getProvider(preferredPlatform.platformId(), preferredCredential).listImportablePlaylists(account, preferredCredential)
                 : List.of();
 
@@ -71,7 +80,7 @@ public class PmsPlaylistImportService {
             .map(PmsPlaylistImportStore.ImportedPlaylistState::externalPlaylistId)
             .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        boolean preferredConnected = preferredConnection != null && preferredConnection.connected() && preferredCredentialReady;
+        boolean preferredConnected = pmsImportSupported && platformConnected && preferredCredentialReady;
 
         return new PmsPlaylistImportBootstrapResponse(
             "api",
@@ -85,17 +94,21 @@ public class PmsPlaylistImportService {
             new PmsPlaylistImportBootstrapResponse.PreferredPlatformConnection(
                 preferredPlatform.platformId(),
                 preferredPlatform.displayName(),
-                preferredConnected,
+                pmsImportSupported,
+                platformConnected,
                 preferredConnection == null ? null : preferredConnection.connectionMode(),
                 preferredConnection == null ? null : preferredConnection.externalAccountLabel(),
-                preferredConnection != null && preferredConnection.syncReady()
+                preferredConnected,
+                preferredCredentialResolution.status(),
+                reconnectRequired
             ),
             new PmsPlaylistImportBootstrapResponse.ImportSummary(
                 preferredConnected,
+                reconnectRequired,
                 availablePlaylists.size(),
                 importedPlaylists.size(),
-                nextStepPath(preferredConnected, importedPlaylists.isEmpty()),
-                nextStepMessage(preferredConnected, importedPlaylists.isEmpty())
+                nextStepPath(pmsImportSupported, platformConnected, reconnectRequired, importedPlaylists.isEmpty()),
+                nextStepMessage(pmsImportSupported, platformConnected, reconnectRequired, importedPlaylists.isEmpty())
             ),
             availablePlaylists.stream()
                 .map(playlist -> new PmsPlaylistImportBootstrapResponse.AvailablePlaylist(
@@ -125,12 +138,25 @@ public class PmsPlaylistImportService {
     public PmsPlaylistImportResponse importPlaylists(PmsPlaylistImportRequest request) {
         AuthRegisteredAccount account = findAccount(request.userId());
         PlatformOption platform = findPlatform(request.platformId());
+        if (!platform.pmsImportSupported()) {
+            throw new IllegalArgumentException(
+                "%s does not support PMS playlist import yet. Use it as an analysis signal source instead."
+                    .formatted(platform.displayName())
+            );
+        }
         PlatformConnectionState connectionState = findConnection(request.userId(), request.platformId())
             .filter(PlatformConnectionState::connected)
             .orElseThrow(() -> new IllegalArgumentException("Connect the selected platform before importing playlists."));
         Instant now = Instant.now();
-        PlatformAccountCredential credential = findCredential(request.userId(), request.platformId())
-            .filter(savedCredential -> !savedCredential.isExpired(now))
+        PlatformCredentialResolution credentialResolution = resolveCredential(request.userId(), request.platformId());
+        if (credentialResolution.needsReconnect(true)) {
+            throw new PlatformReconnectRequiredException(
+                request.platformId(),
+                "Platform session expired or is missing a usable token. Reconnect %s and try again."
+                    .formatted(platform.displayName())
+            );
+        }
+        PlatformAccountCredential credential = credentialResolution.usableCredential()
             .orElseThrow(() -> new IllegalArgumentException("Platform credential is missing. Reconnect the platform and try again."));
         PlatformPlaylistProvider provider = getProvider(request.platformId(), credential);
 
@@ -245,29 +271,45 @@ public class PmsPlaylistImportService {
             .findFirst();
     }
 
-    private Optional<PlatformAccountCredential> findCredential(String userId, String platformId) {
-        return platformCredentialStore.findByUserIdAndPlatformId(userId, platformId);
+    private PlatformCredentialResolution resolveCredential(String userId, String platformId) {
+        return platformCredentialService.resolveCredential(userId, platformId);
     }
 
     private PlatformPlaylistProvider getProvider(String platformId, PlatformAccountCredential credential) {
         return platformPlaylistProviderRegistry.getRequiredProvider(platformId, credential);
     }
 
-    private String nextStepPath(boolean preferredConnected, boolean hasImportedPlaylists) {
-        if (!preferredConnected) {
+    private String nextStepPath(
+        boolean pmsImportSupported,
+        boolean platformConnected,
+        boolean reconnectRequired,
+        boolean importedPlaylistsEmpty
+    ) {
+        if (!pmsImportSupported || !platformConnected || reconnectRequired) {
             return "/platforms";
         }
-        if (!hasImportedPlaylists) {
+        if (importedPlaylistsEmpty) {
             return "/pms";
         }
         return "/ems";
     }
 
-    private String nextStepMessage(boolean preferredConnected, boolean hasImportedPlaylists) {
-        if (!preferredConnected) {
+    private String nextStepMessage(
+        boolean pmsImportSupported,
+        boolean platformConnected,
+        boolean reconnectRequired,
+        boolean importedPlaylistsEmpty
+    ) {
+        if (!pmsImportSupported) {
+            return "Preferred platform is connected for long-term listening signals, but PMS playlist import is not available yet.";
+        }
+        if (!platformConnected) {
             return "Connect the preferred platform first so PMS can import the user's playlists.";
         }
-        if (!hasImportedPlaylists) {
+        if (reconnectRequired) {
+            return "Reconnect the preferred platform first so PMS can import the user's playlists again.";
+        }
+        if (importedPlaylistsEmpty) {
             return "Choose connected platform playlists and import them into PMS.";
         }
         return "PMS now has imported playlists and is ready for EMS analysis.";

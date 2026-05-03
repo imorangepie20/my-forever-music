@@ -1,5 +1,8 @@
 import { Activity, ExternalLink, Globe, Menu, Sparkles } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import Button from '@/components/common/Button'
+import { useAuthSession } from '@/contexts/AuthSessionContext'
+import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
 import { getAiDocsUrl, getApiConnectionLabel, getApiDocsUrl } from '@/services/api'
 
 interface HeaderProps {
@@ -39,9 +42,18 @@ const pageCopy: Record<string, { title: string; subtitle: string }> = {
 
 const Header = ({ onMenuToggle }: HeaderProps) => {
     const location = useLocation()
+    const navigate = useNavigate()
+    const { session, clearSession } = useAuthSession()
+    const { resetWorkspace } = useRecommendationWorkspace()
     const currentPage = pageCopy[location.pathname] ?? {
         title: 'My Forever Music',
         subtitle: 'Music service rebuild workspace.',
+    }
+
+    const handleSignOut = () => {
+        clearSession()
+        resetWorkspace()
+        navigate('/login')
     }
 
     return (
@@ -75,6 +87,31 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
+                    {session ? (
+                        <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/80 px-4 py-3">
+                            <p className="text-xs uppercase tracking-[0.2em] text-hud-text-muted">
+                                Signed In
+                            </p>
+                            <p className="mt-1 text-sm font-medium text-hud-text-primary">
+                                {session.displayName}
+                            </p>
+                        </div>
+                    ) : (
+                        <Link to="/login">
+                            <Button type="button" variant="ghost">
+                                Sign In
+                            </Button>
+                        </Link>
+                    )}
+
+                    {!session && (
+                        <Link to="/signup">
+                            <Button type="button" variant="outline">
+                                Sign Up
+                            </Button>
+                        </Link>
+                    )}
+
                     <div className="hidden min-w-[220px] rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/80 px-4 py-3 md:block">
                         <div className="flex items-center gap-3">
                             <div className="rounded-xl bg-hud-accent-primary/10 p-2 text-hud-accent-primary">
@@ -112,6 +149,12 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
                         AI Docs
                         <ExternalLink size={14} />
                     </a>
+
+                    {session && (
+                        <Button type="button" variant="ghost" onClick={handleSignOut}>
+                            Sign Out
+                        </Button>
+                    )}
                 </div>
             </div>
         </header>

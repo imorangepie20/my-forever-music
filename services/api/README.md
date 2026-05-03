@@ -55,9 +55,13 @@ services/api/
 - OpenAPI 설정
 - 샘플 엔드포인트: `/api/v1/system/info`
 - 회원가입 엔드포인트: `POST /api/v1/auth/register`
+- 로그인 엔드포인트: `POST /api/v1/auth/login`
 - 플랫폼 카탈로그 엔드포인트: `GET /api/v1/platforms/catalog`
 - 플랫폼 연결 bootstrap 엔드포인트: `GET /api/v1/platforms/connections/bootstrap`
 - 플랫폼 연결 명령 엔드포인트: `POST /api/v1/platforms/connections/connect`, `POST /api/v1/platforms/connections/disconnect`
+- Last.fm signal preview 엔드포인트: `GET /api/v1/platforms/lastfm/preview`
+- Last.fm signal profile 저장 엔드포인트: `POST /api/v1/platforms/lastfm/profile`
+- Last.fm scrobble bootstrap/sync 엔드포인트: `GET /api/v1/platforms/lastfm/scrobbles/bootstrap`, `POST /api/v1/platforms/lastfm/scrobbles/sync`
 - 플랫폼 OAuth 엔드포인트: `POST /api/v1/platforms/oauth/start`, `POST /api/v1/platforms/oauth/complete`
 - PMS import bootstrap 엔드포인트: `GET /api/v1/pms/import/bootstrap`
 - PMS import 명령 엔드포인트: `POST /api/v1/pms/import/playlists`
@@ -73,6 +77,16 @@ services/api/
 
 현재는 여기에 `회원가입 -> 기본 플랫폼 선택 -> 플랫폼 연결 상태 조회 -> sandbox/Spotify OAuth 승인/callback -> PMS playlist import -> EMS 다음 단계 안내`까지 추가되어, 서비스 구현을 온보딩부터 순차적으로 확장할 수 있는 상태다.
 
+이제 `POST /api/v1/auth/login`도 추가되어, 로컬 시험 서비스 중 기존 계정으로 다시 로그인하고 현재 온보딩 단계(`/platforms` 또는 `/pms`)를 복원할 수 있다.
+
+또한 현재 `Last.fm`은 `PMS import` 플랫폼이 아니라 `장기 청취 신호 플랫폼`으로 다뤄진다. 그래서 `GET /api/v1/platforms/lastfm/preview`는 공개 사용자명 기준으로 recent scrobble, top artist, top track을 읽어와 `EMS/GMS` seed 보강용 preview를 제공한다.
+
+이제 `POST /api/v1/platforms/lastfm/profile`도 추가되어, preview에 사용한 공개 사용자명을 계정에 저장하고 `EMS analysis`가 이 저장값을 바탕으로 `top artist` affinity를 자동 blend 할 수 있다.
+
+이후 `GET/POST /api/v1/platforms/lastfm/scrobbles/*`도 추가되어, 최근 scrobble snapshot을 계정 단위로 저장하고 다시 `/platforms`에서 확인할 수 있다.
+
+같은 저장값은 `POST /api/v1/ems/workspace/analysis`와 `POST /api/v1/gms/recommendations/preview`에도 반영된다. 현재는 저장된 `Last.fm scrobble snapshot`이 있으면 그 최근 artist recurrence를 먼저 사용하고, snapshot이 비어 있으면 live `Last.fm top artist` 조회로 fallback 한다.
+
 현재 `pms_track`는 기본 메타데이터만이 아니라 `Spotify 오디오 특성 전체 스냅샷`을 저장할 수 있도록 확장되어 있다. 따라서 향후 플랫폼 playlist import는 트랙 저장 전에 오디오 특성 채움 과정을 반드시 거치는 것을 기본 전제로 한다.
 
 또한 현재는 `platform credential store`와 `platform playlist provider` 계층이 추가되어, sandbox와 실제 외부 플랫폼 연동을 같은 import 흐름 위에서 모드별로 처리할 수 있다.
@@ -80,6 +94,12 @@ services/api/
 추가로 `platform authorization code exchange client` 계층도 들어가 있어서, Spotify PKCE draft가 켜져 있으면 callback의 authorization code를 실제 token endpoint와 교환하고 그 결과를 credential로 저장한다.
 
 현재 `spotify` provider는 실제 사용자 token으로 `GET /me/playlists`, `GET /playlists/{playlist_id}/items`를 호출하고, 트랙별 오디오 특성은 공식 `GET /audio-features`를 우선 시도한 뒤 실패하거나 누락된 항목은 `fallback_generated` 완전 스냅샷으로 보강한다.
+
+또한 현재 `spotify` credential은 만료 60초 전부터 refresh token 기반 자동 갱신을 시도한다. Spotify refresh 응답에 새 refresh token이 없으면 기존 refresh token을 유지한다.
+
+refresh 이후에도 usable credential이 확보되지 않으면 `platform connection bootstrap`과 `pms import bootstrap`은 `reconnect_required` 상태를 내려준다. 이때 `POST /api/v1/pms/import/playlists`는 `409 conflict`와 `platform_reconnect_required` 코드로 응답하므로, 웹은 사용자를 `/platforms` 재연결 흐름으로 돌려보내면 된다.
+
+추가로 `PMS import` 저장소는 이제 프로필별로 나뉜다. `local`에서는 `InMemoryPmsPlaylistImportStore`를 사용하고, `!local`에서는 `JpaPmsPlaylistImportStore`가 `pms_imported_playlist`, `pms_imported_track`, `pms_imported_playlist_track` 테이블에 import 결과를 영속 저장한다.
 
 상세 저장 기준은 [PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md) 를 본다.
 
@@ -98,7 +118,7 @@ API 계약 문서 인덱스는 [docs/api/README.md](/Users/woosungjo/music-space
 
 이 상태에서도 `EMS workspace analysis`는 동작한다. 다만 `local`에서는 입력 텍스트 시드 중심으로 분석하고, `database` 프로필에서는 `PMS` 카탈로그 seed track도 함께 반영한다.
 
-반대로 `database` 같은 DB 활성 프로필로 실행하면 Flyway가 `pms_*` 테이블을 만들고 demo bootstrap 데이터를 적재한다.
+반대로 `database` 같은 DB 활성 프로필로 실행하면 Flyway가 `pms_*` demo bootstrap 테이블과 `pms_imported_*` import 영속 테이블을 함께 만들고, 가져온 플레이리스트를 DB에 유지한다.
 
 ## 참고 환경 변수
 
@@ -118,6 +138,10 @@ API 계약 문서 인덱스는 [docs/api/README.md](/Users/woosungjo/music-space
 - `SPOTIFY_AUTHORIZATION_URI`
 - `SPOTIFY_TOKEN_URI`
 - `SPOTIFY_API_BASE_URI`
+- `LASTFM_ENABLED`
+- `LASTFM_API_KEY`
+- `LASTFM_SHARED_SECRET`
+- `LASTFM_API_ROOT`
 
 ## 실행 예시
 
@@ -177,6 +201,27 @@ AI_SERVICE_BASE_URL=http://localhost:8000 ./gradlew bootRun
 이 설정이 있으면 `/api/v1/platforms/oauth/start`의 Spotify 응답은 internal sandbox approval 대신 external authorization URL을 내려준다. 이후 `/api/v1/pms/import/bootstrap`와 `/api/v1/pms/import/playlists`는 실제 Spotify playlist/provider 경로를 사용한다.
 
 프로젝트에 맞춘 상세 설정과 실행 스크립트는 [SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md) 를 본다.
+
+Last.fm public preview를 같이 확인하려면:
+
+```bash
+export LASTFM_ENABLED=true
+export LASTFM_API_KEY=your_lastfm_api_key
+AI_SERVICE_BASE_URL=http://localhost:8000 ./gradlew bootRun
+```
+
+이 설정이 있으면 `/api/v1/platforms/lastfm/preview?username=public-user-name&period=1month` 형태로 공개 청취 신호 preview를 확인할 수 있다.
+
+저장된 profile을 기반으로 scrobble snapshot까지 적재하려면:
+
+```bash
+curl -X POST http://127.0.0.1:8081/api/v1/platforms/lastfm/scrobbles/sync \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_id": "user-001",
+    "limit": 40
+  }'
+```
 
 예시 호출:
 

@@ -7,12 +7,13 @@
 1. [README.md](/Users/woosungjo/music-space/my-forever-music/README.md)
 2. [docs/PROJECT_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_GUIDE.md)
 3. [docs/PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md)
-4. [docs/architecture/TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md)
-5. [docs/architecture/DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md)
-6. [docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
-7. [docs/decisions/ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
-8. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
-9. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
+4. [docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md)
+5. [docs/architecture/TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md)
+6. [docs/architecture/DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md)
+7. [docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
+8. [docs/decisions/ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
+9. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
+10. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
 
 ## 현재 확정 사항
 
@@ -23,6 +24,7 @@
 - DB는 `PostgreSQL`, 마이그레이션은 `Flyway`
 - API 계약은 `OpenAPI`
 - 제품 핵심 정의는 `docs/PROJECT_KEY_SERVICE.md`를 기준으로 해석한다
+- 현재 1차 구현/시험 서비스 환경은 `MacBook 로컬`이고, Ubuntu는 검증 후 이전 단계다
 
 ## 작업 원칙
 

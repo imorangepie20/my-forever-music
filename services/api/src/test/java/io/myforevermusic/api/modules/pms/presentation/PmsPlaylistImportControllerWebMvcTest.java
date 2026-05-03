@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.myforevermusic.api.common.error.ApiExceptionHandler;
+import io.myforevermusic.api.modules.platform.application.PlatformReconnectRequiredException;
 import io.myforevermusic.api.modules.pms.application.PmsPlaylistImportService;
 import java.time.Instant;
 import java.util.List;
@@ -65,6 +66,25 @@ class PmsPlaylistImportControllerWebMvcTest {
             .andExpect(jsonPath("$.next_step.path").value("/ems"));
     }
 
+    @Test
+    void shouldReturnReconnectRequiredErrorWhenPlatformSessionExpired() throws Exception {
+        when(pmsPlaylistImportService.importPlaylists(any()))
+            .thenThrow(new PlatformReconnectRequiredException("spotify", "Reconnect Spotify and try again."));
+
+        PmsPlaylistImportRequest request = new PmsPlaylistImportRequest(
+            "user-001",
+            "spotify",
+            List.of("spotify-liked-night-drive")
+        );
+
+        mockMvc.perform(post("/api/v1/pms/import/playlists")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsBytes(request)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("platform_reconnect_required"))
+            .andExpect(jsonPath("$.message").value("Reconnect Spotify and try again."));
+    }
+
     private PmsPlaylistImportBootstrapResponse sampleBootstrapResponse() {
         return new PmsPlaylistImportBootstrapResponse(
             "api",
@@ -79,12 +99,16 @@ class PmsPlaylistImportControllerWebMvcTest {
                 "spotify",
                 "Spotify",
                 true,
+                true,
                 "sandbox-oauth",
                 "Forever Listener Spotify account",
-                true
+                true,
+                "ready",
+                false
             ),
             new PmsPlaylistImportBootstrapResponse.ImportSummary(
                 true,
+                false,
                 2,
                 1,
                 "/pms",

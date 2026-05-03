@@ -99,10 +99,12 @@
 
 - `local` 프로필에서는 DB 없이도 입력된 텍스트 시드만으로 분석합니다.
 - `database` 프로필에서는 `PMS` 카탈로그와 seed track 매칭을 시도하고, 매칭 성공 수를 `matched_catalog_track_count`로 돌려줍니다.
+- 계정에 저장된 `Last.fm profile`이 있으면, 먼저 저장된 `Last.fm scrobble snapshot`의 최근 artist recurrence를 `artist signal`에 blend 합니다.
+- 저장된 scrobble snapshot이 비어 있으면 live `Last.fm top artists` 조회로 fallback 합니다.
 - 아직 AI 서비스 호출은 하지 않습니다. 이 단계는 `EMS` 제어값을 안정적으로 정하는 서버 기준값을 만드는 목적입니다.
 
 ## 다음 연결 지점
 
 1. `services/ai`의 추천 보강 결과와 EMS 제어값 산출을 결합
-2. 사용자 행동 이벤트를 반영한 EMS bias 조정 규칙 추가
+2. 사용자 행동 이벤트와 저장된 scrobble 시계열을 반영한 EMS bias 조정 규칙 추가
 3. rule-based 분석기를 모델 기반 scorer로 단계적으로 교체

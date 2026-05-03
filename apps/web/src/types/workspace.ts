@@ -1,5 +1,5 @@
 export type WorkspaceMood = 'focus' | 'calm' | 'upbeat' | 'melancholy' | 'discovery'
-export type WorkspacePlatformId = 'spotify' | 'apple-music' | 'tidal'
+export type WorkspacePlatformId = 'spotify' | 'apple-music' | 'tidal' | 'youtube-music' | 'last-fm'
 
 export interface RecommendationWorkspaceState {
     preferredPlatformId: WorkspacePlatformId

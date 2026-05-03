@@ -8,4 +8,6 @@ public interface AuthUserAccountRepository extends JpaRepository<AuthUserAccount
     boolean existsByNormalizedEmail(String normalizedEmail);
 
     Optional<AuthUserAccountEntity> findByUserId(String userId);
+
+    Optional<AuthUserAccountEntity> findByNormalizedEmail(String normalizedEmail);
 }

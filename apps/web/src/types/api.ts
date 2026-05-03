@@ -1,3 +1,5 @@
+export type WorkspacePlatformId = 'spotify' | 'apple-music' | 'tidal' | 'youtube-music' | 'last-fm'
+
 export interface SystemInfoResponse {
     service: string
     status: string
@@ -9,7 +11,7 @@ export interface AuthRegistrationRequest {
     display_name: string
     email: string
     password: string
-    preferred_platform_id: 'spotify' | 'apple-music' | 'tidal'
+    preferred_platform_id: WorkspacePlatformId
     marketing_opt_in: boolean
     accepted_terms: boolean
     accepted_privacy_policy: boolean
@@ -27,14 +29,36 @@ export interface AuthRegistrationResponse {
     }
     onboarding: {
         stage: string
-        preferred_platform_id: 'spotify' | 'apple-music' | 'tidal'
+        preferred_platform_id: WorkspacePlatformId
         platform_connection_required: boolean
         next_step_path: string
         next_step_message: string
     }
 }
 
-export type WorkspacePlatformId = 'spotify' | 'apple-music' | 'tidal'
+export interface AuthLoginRequest {
+    email: string
+    password: string
+}
+
+export interface AuthLoginResponse {
+    service: string
+    status: string
+    authenticated_at: string
+    user: {
+        user_id: string
+        email: string
+        display_name: string
+        email_verified: boolean
+    }
+    onboarding: {
+        stage: string
+        preferred_platform_id: WorkspacePlatformId
+        platform_connection_required: boolean
+        next_step_path: string
+        next_step_message: string
+    }
+}
 
 export interface PlatformCatalogResponse {
     service: string
@@ -64,10 +88,13 @@ export interface PlatformConnectionBootstrapResponse {
         display_name: string
         email: string
         preferred_platform_id: WorkspacePlatformId
+        last_fm_username: string | null
+        last_fm_connected_at: string | null
     }
     summary: {
         connected_platform_count: number
         preferred_platform_connected: boolean
+        preferred_platform_reconnect_required: boolean
         onboarding_stage: string
         next_step_path: string
         next_step_message: string
@@ -81,6 +108,8 @@ export interface PlatformConnectionBootstrapResponse {
         connection_mode: string | null
         external_account_label: string | null
         sync_ready: boolean
+        credential_status: 'ready' | 'missing' | 'reconnect_required'
+        reconnect_required: boolean
         connected_at: string | null
         next_action_label: string
     }>
@@ -118,6 +147,11 @@ export interface PlatformConnectionCommandResponse {
         path: string
         message: string
     }
+}
+
+export interface LastFmProfileConnectRequest {
+    user_id: string
+    username: string
 }
 
 export interface PlatformAuthorizationStartRequest {
@@ -187,6 +221,126 @@ export interface PlatformAuthorizationCompleteResponse {
     }
 }
 
+export interface LastFmSignalPreviewResponse {
+    service: string
+    status: string
+    generated_at: string
+    request: {
+        username: string
+        period: 'overall' | '7day' | '1month' | '3month' | '6month' | '12month'
+        recent_limit: number
+        top_limit: number
+    }
+    user: {
+        username: string
+        real_name: string | null
+        country: string | null
+        playcount: number | null
+        profile_url: string | null
+        avatar_url: string | null
+        registered_at: string | null
+    }
+    summary: {
+        source: string
+        recent_track_count: number
+        top_artist_count: number
+        top_track_count: number
+        now_playing: boolean
+        distinct_recent_artist_count: number
+        next_step_message: string
+    }
+    insights: Array<{
+        insight_id: string
+        title: string
+        detail: string
+    }>
+    recent_tracks: Array<{
+        track_name: string | null
+        artist_name: string | null
+        album_name: string | null
+        track_url: string | null
+        image_url: string | null
+        now_playing: boolean
+        played_at: string | null
+        loved: boolean
+    }>
+    top_artists: Array<{
+        artist_name: string | null
+        rank: number | null
+        playcount: number | null
+        artist_url: string | null
+        image_url: string | null
+    }>
+    top_tracks: Array<{
+        track_name: string | null
+        artist_name: string | null
+        rank: number | null
+        playcount: number | null
+        track_url: string | null
+        artist_url: string | null
+        image_url: string | null
+    }>
+}
+
+export interface LastFmScrobbleBootstrapResponse {
+    service: string
+    status: string
+    generated_at: string
+    user: {
+        user_id: string
+        last_fm_username: string | null
+        last_fm_connected_at: string | null
+    }
+    summary: {
+        stored_scrobble_count: number
+        last_synced_at: string | null
+        returned_scrobble_count: number
+        next_step_message: string
+    }
+    recent_scrobbles: Array<{
+        track_name: string
+        artist_name: string
+        album_name: string | null
+        track_url: string | null
+        image_url: string | null
+        played_at: string
+        loved: boolean
+        synced_at: string
+    }>
+}
+
+export interface LastFmScrobbleSyncRequest {
+    user_id: string
+    limit?: number
+}
+
+export interface LastFmScrobbleSyncResponse {
+    service: string
+    status: string
+    processed_at: string
+    sync: {
+        user_id: string
+        last_fm_username: string
+        fetched_track_count: number
+        inserted_scrobble_count: number
+        duplicate_scrobble_count: number
+        skipped_now_playing_count: number
+        stored_scrobble_count: number
+        last_synced_at: string | null
+    }
+    recent_scrobbles: Array<{
+        track_name: string
+        artist_name: string
+        album_name: string | null
+        track_url: string | null
+        image_url: string | null
+        played_at: string
+        loved: boolean
+        synced_at: string
+    }>
+    notes: string[]
+}
+
 export interface PmsWorkspaceBootstrapResponse {
     service: string
     status: string
@@ -239,13 +393,17 @@ export interface PmsPlaylistImportBootstrapResponse {
     platform_connection: {
         platform_id: WorkspacePlatformId
         display_name: string
+        pms_import_supported: boolean
         connected: boolean
         connection_mode: string | null
         external_account_label: string | null
         sync_ready: boolean
+        credential_status: 'ready' | 'missing' | 'reconnect_required'
+        reconnect_required: boolean
     }
     summary: {
         preferred_platform_connected: boolean
+        reconnect_required: boolean
         available_playlist_count: number
         imported_playlist_count: number
         next_step_path: string

@@ -22,6 +22,7 @@
 - `email`
 - `password`
 - `preferred_platform_id`
+  - 현재 허용값: `spotify`, `apple-music`, `tidal`, `youtube-music`, `last-fm`
 - `marketing_opt_in`
 - `accepted_terms`
 - `accepted_privacy_policy`
@@ -90,6 +91,7 @@
 - 중복 이메일은 `409 Conflict`로 응답한다
 - 요청 validation 실패는 공통 에러 포맷으로 `400 Bad Request`를 돌려준다
 - 가입 성공 후 `/platforms`에서 사용할 수 있도록 `platform connection onboarding` 단계가 이어진다
+- `last-fm`을 preferred platform으로 선택할 수는 있지만, 현재 단계에서는 PMS playlist import보다 청취 이력/affinity 신호 수집용 플랫폼으로 간주한다
 
 ## 다음 연결 지점
 

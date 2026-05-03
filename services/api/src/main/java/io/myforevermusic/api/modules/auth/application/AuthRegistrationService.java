@@ -15,7 +15,9 @@ public class AuthRegistrationService {
     private static final Set<String> SUPPORTED_PLATFORM_IDS = Set.of(
         "spotify",
         "apple-music",
-        "tidal"
+        "tidal",
+        "youtube-music",
+        "last-fm"
     );
 
     private final AuthAccountStore authAccountStore;
@@ -67,7 +69,7 @@ public class AuthRegistrationService {
                 account.preferredPlatformId(),
                 true,
                 "/platforms",
-                "Connect your streaming service to start PMS import."
+                "Connect your music platform to continue onboarding."
             )
         );
     }

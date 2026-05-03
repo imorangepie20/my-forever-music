@@ -29,16 +29,20 @@ public record PmsPlaylistImportBootstrapResponse(
     public record PreferredPlatformConnection(
         String platformId,
         String displayName,
+        boolean pmsImportSupported,
         boolean connected,
         String connectionMode,
         String externalAccountLabel,
-        boolean syncReady
+        boolean syncReady,
+        String credentialStatus,
+        boolean reconnectRequired
     ) {
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record ImportSummary(
         boolean preferredPlatformConnected,
+        boolean reconnectRequired,
         int availablePlaylistCount,
         int importedPlaylistCount,
         String nextStepPath,

@@ -57,4 +57,24 @@ class AuthRegistrationServiceTest {
             .isInstanceOf(AuthEmailAlreadyRegisteredException.class)
             .hasMessageContaining("listener@example.com");
     }
+
+    @Test
+    void shouldAllowYoutubeMusicAsPreferredPlatform() {
+        AuthRegistrationService service = new AuthRegistrationService(
+            new InMemoryAuthAccountStore(),
+            new BCryptPasswordEncoder()
+        );
+
+        AuthRegistrationResponse response = service.register(new AuthRegistrationRequest(
+            "Forever Listener",
+            "ytm-listener@example.com",
+            "music2026",
+            "youtube-music",
+            false,
+            true,
+            true
+        ));
+
+        assertThat(response.onboarding().preferredPlatformId()).isEqualTo("youtube-music");
+    }
 }

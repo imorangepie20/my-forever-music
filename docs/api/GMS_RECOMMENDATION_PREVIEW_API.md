@@ -65,9 +65,11 @@
 
 ## 현재 구현 메모
 
-- `services/api`는 현재 AI 서비스 응답을 거의 변형 없이 브리지한다
+- `services/api`는 현재 AI 서비스 응답을 거의 그대로 브리지하지만, 저장된 `Last.fm profile`이 있으면 먼저 저장된 `scrobble snapshot`의 최근 artist recurrence를 `seed_artist_names`에 자동 blend 한다
+- 저장된 scrobble snapshot이 비어 있으면 live `Last.fm top artists` 조회로 fallback 한다
 - 내부 호출 대상은 `AI_SERVICE_BASE_URL`과 `AI_RECOMMENDATION_PREVIEW_PATH` 설정으로 바꿀 수 있다
 - `mode`가 비어 있으면 `gms`로 해석하는 사용 흐름을 전제로 한다
+- 이때 추가된 `Last.fm` artist는 AI 응답의 `input_summary.artist_seed_count`, `context.seed_basis`, `warnings`에도 반영될 수 있다
 
 ### 설정값
 
@@ -85,6 +87,6 @@
 
 ## 다음 연결 지점
 
-1. 인증된 사용자 컨텍스트와 저장된 PMS/EMS 상태를 이 요청에 자동 주입
+1. Last.fm 외에도 PMS import 히스토리, EMS session state를 함께 GMS 입력에 주입
 2. preview 결과를 실제 트랙 카탈로그와 연결
 3. GMS 평가 결과를 다시 PMS 학습 데이터로 환류

@@ -1,6 +1,8 @@
 package io.myforevermusic.api.common.error;
 
 import io.myforevermusic.api.modules.auth.application.AuthEmailAlreadyRegisteredException;
+import io.myforevermusic.api.modules.auth.application.AuthInvalidCredentialsException;
+import io.myforevermusic.api.modules.platform.application.PlatformReconnectRequiredException;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -16,12 +18,27 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(AuthEmailAlreadyRegisteredException.class)
     public ResponseEntity<ApiErrorResponse> handleEmailConflict(AuthEmailAlreadyRegisteredException exception) {
-        return buildResponse(HttpStatus.CONFLICT, exception.getMessage(), List.of());
+        return buildResponse(HttpStatus.CONFLICT, null, exception.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(AuthInvalidCredentialsException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidCredentials(AuthInvalidCredentialsException exception) {
+        return buildResponse(HttpStatus.UNAUTHORIZED, "invalid_credentials", exception.getMessage(), List.of());
     }
 
     @ExceptionHandler(ApiResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleNotFound(ApiResourceNotFoundException exception) {
-        return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), List.of());
+        return buildResponse(HttpStatus.NOT_FOUND, null, exception.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(PlatformReconnectRequiredException.class)
+    public ResponseEntity<ApiErrorResponse> handlePlatformReconnectRequired(PlatformReconnectRequiredException exception) {
+        return buildResponse(
+            HttpStatus.CONFLICT,
+            "platform_reconnect_required",
+            exception.getMessage(),
+            List.of()
+        );
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -36,17 +53,17 @@ public class ApiExceptionHandler {
             ? "Validation failed for request body."
             : issues.getFirst().message();
 
-        return buildResponse(HttpStatus.BAD_REQUEST, message, issues);
+        return buildResponse(HttpStatus.BAD_REQUEST, null, message, issues);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException exception) {
-        return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage(), List.of());
+        return buildResponse(HttpStatus.BAD_REQUEST, null, exception.getMessage(), List.of());
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleUnreadableBody(HttpMessageNotReadableException exception) {
-        return buildResponse(HttpStatus.BAD_REQUEST, "Request body could not be read.", List.of());
+        return buildResponse(HttpStatus.BAD_REQUEST, null, "Request body could not be read.", List.of());
     }
 
     private ApiErrorResponse.FieldIssue toFieldIssue(FieldError error) {
@@ -58,6 +75,7 @@ public class ApiExceptionHandler {
 
     private ResponseEntity<ApiErrorResponse> buildResponse(
         HttpStatus status,
+        String code,
         String message,
         List<ApiErrorResponse.FieldIssue> issues
     ) {
@@ -65,6 +83,7 @@ public class ApiExceptionHandler {
             new ApiErrorResponse(
                 "api",
                 "error",
+                code,
                 message,
                 Instant.now(),
                 issues.isEmpty() ? null : issues
