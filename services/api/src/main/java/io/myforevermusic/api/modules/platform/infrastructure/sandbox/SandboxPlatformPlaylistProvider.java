@@ -6,9 +6,11 @@ import io.myforevermusic.api.modules.platform.application.PlatformPlaylistProvid
 import io.myforevermusic.api.modules.pms.application.PmsPlaylistImportCatalogService;
 import io.myforevermusic.api.modules.pms.application.PmsPlaylistImportCatalogService.ImportCandidatePlaylist;
 import java.util.List;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile("sandbox")
 public class SandboxPlatformPlaylistProvider implements PlatformPlaylistProvider {
 
     private final PmsPlaylistImportCatalogService pmsPlaylistImportCatalogService;

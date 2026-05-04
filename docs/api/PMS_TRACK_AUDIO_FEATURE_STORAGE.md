@@ -10,7 +10,7 @@
 
 - `PMS`에 저장되는 트랙은 가능한 한 `Spotify Get Track's Audio Features` 기준의 전체 스냅샷을 가져야 합니다.
 - 부분 저장이 아니라 `전체 필드 채움`을 기본 원칙으로 합니다.
-- 직접 Spotify 매칭이 되지 않더라도 fallback 생성 과정을 거쳐 빈 칸 없이 저장하는 방향을 목표로 합니다.
+- 직접 Spotify 오디오 특성을 확보하지 못한 트랙은 가짜 값으로 채우지 않고 import를 중단하거나 사용자에게 재시도/제외 정책을 안내합니다.
 
 ## 적용 범위
 
@@ -28,8 +28,8 @@
 1. 플랫폼 원본 트랙 메타데이터를 확보합니다.
 2. Spotify track 매칭을 시도합니다.
 3. 매칭 성공 시 Spotify 오디오 특성을 가져옵니다.
-4. 매칭 실패 시 fallback 특성 생성 파이프라인으로 보강합니다.
-5. 최종적으로 `오디오 특성 전체 스냅샷`을 채운 뒤 `PMS`에 저장합니다.
+4. 매칭 또는 오디오 특성 조회 실패 시 `PMS`에 임의 값을 저장하지 않습니다.
+5. 최종적으로 `오디오 특성 전체 스냅샷`이 확보된 트랙만 `PMS`에 저장합니다.
 
 즉, 목표 상태에서는 `PMS 트랙 저장`과 `오디오 특성 채움`이 분리된 선택 단계가 아니라 하나의 import 파이프라인으로 동작해야 합니다.
 
@@ -72,8 +72,6 @@
   - Spotify API에서 직접 가져온 값
 - `spotify_match`
   - 타 플랫폼 트랙을 Spotify track에 매칭한 뒤 가져온 값
-- `fallback_generated`
-  - Spotify 직접 특성이 없어 fallback 생성 로직으로 만든 값
 - `unresolved`
   - 실제 import 목표 상태에서는 허용하지 않는 임시 상태
 
@@ -96,11 +94,11 @@
 - JPA 모델: [PmsTrackSpotifyAudioFeatures.java](/Users/woosungjo/music-space/my-forever-music/services/api/src/main/java/io/myforevermusic/api/modules/pms/infrastructure/persistence/PmsTrackSpotifyAudioFeatures.java)
 - 트랙 엔터티: [PmsCatalogTrackEntity.java](/Users/woosungjo/music-space/my-forever-music/services/api/src/main/java/io/myforevermusic/api/modules/pms/infrastructure/persistence/PmsCatalogTrackEntity.java)
 - PMS bootstrap 응답은 track별 `spotify_audio_features_filled`, `spotify_audio_feature_source`를 같이 보여줌
+- 실제 Spotify import provider는 `spotify_api` 응답이 누락되면 fallback 스냅샷을 만들지 않고 import를 실패시킴
 
 ## 다음 연결 지점
 
-1. 플랫폼 OAuth 연결과 실제 사용자 플레이리스트 import 구현
-2. Spotify track 매칭 로직 추가
-3. fallback 특성 생성 로직 추가
-4. import 시점의 `complete snapshot save` 검증 단계 추가
-5. 이 정책을 실제 플랫폼 import API 계약과 연결
+1. TIDAL provider에서 Spotify track 매칭을 실제 API 기반으로 추가
+2. Spotify 오디오 특성 조회 실패 시 재시도/부분 제외/사용자 안내 정책 결정
+3. import 시점의 `complete snapshot save` 검증 단계를 provider 공통 계약으로 강화
+4. 이 정책을 실제 플랫폼 import API 계약과 연결

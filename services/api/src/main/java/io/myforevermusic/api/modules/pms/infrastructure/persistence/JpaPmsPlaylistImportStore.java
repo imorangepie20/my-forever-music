@@ -83,6 +83,9 @@ public class JpaPmsPlaylistImportStore implements PmsPlaylistImportStore {
             playlistEntity.getSourcePlatform(),
             playlistEntity.getCurator(),
             playlistEntity.getHighlight(),
+            playlistEntity.getCoverImageUrl(),
+            playlistEntity.getPlatformExternalUrl(),
+            playlistEntity.getPlatformUri(),
             playlistEntity.getImportedAt(),
             tracks
         );
@@ -98,6 +101,11 @@ public class JpaPmsPlaylistImportStore implements PmsPlaylistImportStore {
             trackEntity.getArtistName(),
             trackEntity.getSourcePlatform(),
             trackEntity.getPrimaryGenre(),
+            trackEntity.getAlbumTitle(),
+            trackEntity.getAlbumImageUrl(),
+            trackEntity.getPlatformExternalUrl(),
+            trackEntity.getPlatformUri(),
+            trackEntity.getPreviewUrl(),
             playlistTrackEntity.getSortOrder(),
             playlistTrackEntity.isSeed(),
             trackEntity.getSpotifyAudioFeatures()

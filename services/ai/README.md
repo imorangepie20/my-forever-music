@@ -9,7 +9,7 @@ FastAPI 기반 AI/추천 서비스 폴더입니다.
 - AI 보강 API
 - `services/api`가 호출하는 AI 전용 백엔드 제공
 - Spotify 오디오 특성 기반 분석 데이터 보강
-- 오디오 특성을 확보하지 못한 트랙의 fallback 특성 생성
+- 오디오 특성을 확보하지 못한 트랙의 명시적 실패/재시도/제외 정책 지원
 - 사용자 플레이리스트와 행동 데이터를 반영한 개인화 모델 지원
 - EMS 외부 플레이리스트와 트렌딩 트랙 평가 지원
 
@@ -92,11 +92,11 @@ pytest
 
 ## 추천 API 초안
 
-현재는 `services/api`가 붙기 전 단계라, 실제 모델 추론 대신 계약과 응답 구조를 먼저 고정하는 preview 엔드포인트를 제공합니다.
+현재 preview 엔드포인트는 실제 개인화 모델 이전의 내부 계약 검증용입니다. 사용자-facing 추천은 PMS user library가 준비된 뒤 `services/api`에서 실제 playable track으로 재매핑되는 흐름을 기준으로 합니다.
 
 - 경로: `POST /v1/recommendations/preview`
 - 용도: PMS / EMS / GMS 추천 흐름에서 AI 서비스 응답 형태를 먼저 검증
-- 특성: 실제 음원 카탈로그 조회 없이 rule-based preview 응답 생성
+- 특성: 실제 개인화 모델 전 단계의 rule-based preview 응답 생성
 
 예시 요청:
 
@@ -104,15 +104,15 @@ pytest
 {
   "request_id": "preview-001",
   "user_id": "user-123",
-  "playlist_id": "playlist-001",
+  "playlist_id": "pms-spotify-{spotify_playlist_id}",
   "mode": "gms",
   "mood": "upbeat",
   "energy_level": 4,
   "familiarity_bias": 3,
   "limit": 5,
-  "seed_track_ids": ["track-alpha", "track-beta"],
-  "seed_artist_names": ["Artist One"],
-  "seed_genres": ["synth-pop"],
+  "seed_track_ids": ["pms-track-spotify-{spotify_track_id}"],
+  "seed_artist_names": ["Imported Artist"],
+  "seed_genres": ["imported-genre"],
   "include_explanations": true
 }
 ```
@@ -124,9 +124,11 @@ curl -X POST http://127.0.0.1:8000/v1/recommendations/preview \
   -H 'Content-Type: application/json' \
   -d '{
     "mode": "gms",
+    "user_id": "user-{uuid}",
+    "playlist_id": "pms-spotify-{spotify_playlist_id}",
     "mood": "upbeat",
     "limit": 3,
-    "seed_track_ids": ["track-alpha", "track-beta"]
+    "seed_track_ids": ["pms-track-spotify-{spotify_track_id}"]
   }'
 ```
 
@@ -135,14 +137,17 @@ curl -X POST http://127.0.0.1:8000/v1/recommendations/preview \
 장기적으로는 이 서비스가 아래 역할까지 확장됩니다.
 
 - Spotify 오디오 특성 적재
-- 미수집 트랙의 오디오 특성 fallback 생성
+- 미수집 트랙의 재시도/부분 제외/사용자 안내 정책
 - 사용자별 취향 모델 추가 학습
 - EMS 수집 트랙을 사용자 모델로 평가해 GMS 후보 생성
 - 사용자 행동 데이터 기반 재학습
 
+사용자별 음악 학습 모델은 플랫폼 연동과 PMS user library 저장이 먼저 안정화된 뒤 개발합니다. 모델 입력의 1차 기준은 `PMS user library`, Spotify audio feature snapshot, Last.fm scrobble snapshot, 사이트 내부 평가/재생 행동 이벤트입니다.
+
 ## 다음 구현 우선순위
 
-1. Spotify 오디오 특성 적재와 fallback 특성 생성 전략 정리
+1. Spotify 오디오 특성 적재 실패 시 재시도/부분 제외/사용자 안내 전략 정리
 2. `services/api` 호출용 내부 계약과 에러 코드 정리
-3. 실제 카탈로그/벡터 검색 기반 ranking 로직 연결
+3. 플랫폼 연동 이후 생성되는 `PMS user library` 기반 사용자 모델 입력 계약 설계
 4. 사용자별 추가 학습과 EMS 평가 파이프라인 설계
+5. 실제 카탈로그/벡터 검색 기반 ranking 로직 연결

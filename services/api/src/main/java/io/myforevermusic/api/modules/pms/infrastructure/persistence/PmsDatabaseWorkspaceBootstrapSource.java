@@ -36,20 +36,20 @@ public class PmsDatabaseWorkspaceBootstrapSource implements PmsWorkspaceBootstra
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<PmsWorkspaceBootstrapResponse> load(String userId) {
-        List<PmsCatalogPlaylistEntity> playlists = hasText(userId)
-            ? playlistRepository.findAllByOwnerUserIdOrderByDisplayOrderAscIdAsc(userId)
-            : playlistRepository.findAllByOrderByDisplayOrderAscIdAsc();
-
-        if (playlists.isEmpty() && hasText(userId)) {
-            playlists = playlistRepository.findAllByOrderByDisplayOrderAscIdAsc();
+    public Optional<PmsWorkspaceBootstrapResponse> load(String userId, String playlistId) {
+        if (!hasText(userId)) {
+            return Optional.empty();
         }
 
+        List<PmsCatalogPlaylistEntity> playlists = playlistRepository.findAllByOwnerUserIdOrderByDisplayOrderAscIdAsc(userId);
         if (playlists.isEmpty()) {
             return Optional.empty();
         }
 
-        PmsCatalogPlaylistEntity defaultPlaylist = playlists.getFirst();
+        PmsCatalogPlaylistEntity defaultPlaylist = playlists.stream()
+            .filter(playlist -> hasText(playlistId) && playlist.getId().equals(playlistId))
+            .findFirst()
+            .orElse(playlists.getFirst());
         List<PmsCatalogPlaylistTrackEntity> playlistTracks =
             playlistTrackRepository.findByPlaylist_IdOrderBySortOrderAscIdAsc(defaultPlaylist.getId());
 
@@ -101,7 +101,10 @@ public class PmsDatabaseWorkspaceBootstrapSource implements PmsWorkspaceBootstra
             playlist.getSourcePlatform(),
             playlist.getTrackCount(),
             playlist.getCurator(),
-            playlist.getHighlight()
+            playlist.getHighlight(),
+            null,
+            null,
+            null
         );
     }
 
@@ -113,6 +116,13 @@ public class PmsDatabaseWorkspaceBootstrapSource implements PmsWorkspaceBootstra
             track.getTitle(),
             track.getArtistName(),
             track.getSourcePlatform(),
+            null,
+            null,
+            null,
+            track.getSpotifyAudioFeatures().getSpotifyUri(),
+            null,
+            track.getSpotifyAudioFeatures().getDurationMs(),
+            playlistTrack.isSeed(),
             track.getSpotifyTrackId(),
             track.isSpotifyAudioFeaturesFilled(),
             track.getSpotifyAudioFeatureSource()

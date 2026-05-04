@@ -25,7 +25,10 @@ import type {
 } from '@/types/api'
 
 const stageLabel: Record<string, string> = {
-    'planned-pms-import': 'Planned PMS Import',
+    'planned-provider-not-enabled': 'Provider Not Enabled',
+    'planned-provider-next': 'Next Provider',
+    'planned-provider-after-tidal': 'After TIDAL',
+    'deferred-developer-account': 'Developer Account Deferred',
     'priority-analysis-source': 'Priority Analysis Source',
     'analysis-signal-source': 'Analysis Signal Source',
 }
@@ -467,6 +470,7 @@ const PlatformsPage = () => {
                                 const currentConnection = connectionBootstrap?.connections.find(
                                     (connection) => connection.platform_id === platform.platform_id,
                                 )
+                                const providerEnabled = platform.pms_import_supported || platform.platform_id === 'last-fm'
 
                                 return (
                                     <div
@@ -507,11 +511,14 @@ const PlatformsPage = () => {
                                             <Button
                                                 type="button"
                                                 variant={isPreferred ? 'primary' : 'outline'}
+                                                disabled={!providerEnabled}
                                                 onClick={() =>
                                                     updateWorkspace({ preferredPlatformId: platform.platform_id })
                                                 }
                                             >
-                                                {isPreferred ? (
+                                                {!providerEnabled ? (
+                                                    'Not Enabled'
+                                                ) : isPreferred ? (
                                                     <>
                                                         <CheckCircle2 size={16} />
                                                         Preferred
@@ -529,7 +536,7 @@ const PlatformsPage = () => {
                                                             ? 'secondary'
                                                             : 'ghost'
                                                 }
-                                                disabled={!session || isMutating === platform.platform_id}
+                                                disabled={!session || !providerEnabled || isMutating === platform.platform_id}
                                                 onClick={() =>
                                                     platform.platform_id === 'last-fm' && !(currentConnection?.connected ?? false)
                                                         ? handleSaveLastFmProfile()
@@ -542,9 +549,11 @@ const PlatformsPage = () => {
                                             >
                                                 {isMutating === platform.platform_id
                                                     ? 'Working...'
-                                                    : platform.platform_id === 'last-fm' && !(currentConnection?.connected ?? false)
+                                                    : !providerEnabled
+                                                        ? 'Provider Not Enabled'
+                                                        : platform.platform_id === 'last-fm' && !(currentConnection?.connected ?? false)
                                                         ? 'Save Signal Profile'
-                                                        : currentConnection?.next_action_label ?? 'Start OAuth Sandbox'}
+                                                        : currentConnection?.next_action_label ?? 'Connect'}
                                             </Button>
                                         </div>
 
@@ -569,10 +578,10 @@ const PlatformsPage = () => {
 
                                         <div className="mt-4 flex flex-wrap gap-2">
                                             <span className="rounded-full border border-hud-border-secondary px-3 py-1 text-xs text-hud-text-secondary">
-                                                PMS import {platform.pms_import_supported ? 'enabled later' : 'not planned'}
+                                                PMS import {platform.pms_import_supported ? 'available' : 'not enabled'}
                                             </span>
                                             <span className="rounded-full border border-hud-border-secondary px-3 py-1 text-xs text-hud-text-secondary">
-                                                EMS collect {platform.ems_collection_supported ? 'enabled later' : 'not planned'}
+                                                EMS collect {platform.ems_collection_supported ? 'available' : 'not enabled'}
                                             </span>
                                             <span className="rounded-full border border-hud-border-secondary px-3 py-1 text-xs text-hud-text-secondary">
                                                 {platform.audio_feature_strategy}

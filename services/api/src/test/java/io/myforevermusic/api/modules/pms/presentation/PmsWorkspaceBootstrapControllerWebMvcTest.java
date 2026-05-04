@@ -27,7 +27,7 @@ class PmsWorkspaceBootstrapControllerWebMvcTest {
 
     @Test
     void shouldReturnWorkspaceBootstrap() throws Exception {
-        when(pmsWorkspaceBootstrapService.getWorkspaceBootstrap(null)).thenReturn(sampleResponse());
+        when(pmsWorkspaceBootstrapService.getWorkspaceBootstrap(null, null)).thenReturn(sampleResponse());
 
         mockMvc.perform(get("/api/v1/pms/workspace/bootstrap"))
             .andExpect(status().isOk())
@@ -42,7 +42,7 @@ class PmsWorkspaceBootstrapControllerWebMvcTest {
 
     @Test
     void shouldPassUserIdToWorkspaceBootstrap() throws Exception {
-        when(pmsWorkspaceBootstrapService.getWorkspaceBootstrap("user-123")).thenReturn(sampleResponse());
+        when(pmsWorkspaceBootstrapService.getWorkspaceBootstrap("user-123", null)).thenReturn(sampleResponse());
 
         mockMvc.perform(get("/api/v1/pms/workspace/bootstrap").param("user_id", "user-123"))
             .andExpect(status().isOk())
@@ -68,7 +68,10 @@ class PmsWorkspaceBootstrapControllerWebMvcTest {
                     "spotify",
                     42,
                     "system",
-                    "High replay consistency and strong synth-pop overlap."
+                    "High replay consistency and strong synth-pop overlap.",
+                    null,
+                    "https://open.spotify.com/playlist/playlist-001",
+                    "spotify:playlist:playlist-001"
                 )
             ),
             List.of(
@@ -77,6 +80,13 @@ class PmsWorkspaceBootstrapControllerWebMvcTest {
                     "Track Alpha",
                     "Artist One",
                     "spotify",
+                    "Signal Bloom",
+                    null,
+                    "https://open.spotify.com/track/sp-track-alpha",
+                    "spotify:track:sp-track-alpha",
+                    null,
+                    214000,
+                    true,
                     "sp-track-alpha",
                     true,
                     "spotify_api"

@@ -1,5 +1,6 @@
 package io.myforevermusic.api.modules.platform.application;
 
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -7,13 +8,22 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class PlatformOAuthProperties {
 
     private Spotify spotify = new Spotify();
+    private Tidal tidal = new Tidal();
 
     public Spotify getSpotify() {
         return spotify;
     }
 
     public void setSpotify(Spotify spotify) {
-        this.spotify = spotify;
+        this.spotify = spotify == null ? new Spotify() : spotify;
+    }
+
+    public Tidal getTidal() {
+        return tidal;
+    }
+
+    public void setTidal(Tidal tidal) {
+        this.tidal = tidal == null ? new Tidal() : tidal;
     }
 
     public static class Spotify {
@@ -88,7 +98,7 @@ public class PlatformOAuthProperties {
         }
 
         public void setScopes(List<String> scopes) {
-            this.scopes = scopes == null ? List.of() : List.copyOf(scopes);
+            this.scopes = normalizeScopes(scopes);
         }
 
         public boolean isConfigured() {
@@ -96,7 +106,117 @@ public class PlatformOAuthProperties {
                 && !clientId.isBlank()
                 && !redirectUri.isBlank()
                 && !authorizationUri.isBlank()
+                && !tokenUri.isBlank()
                 && !apiBaseUri.isBlank();
         }
+    }
+
+    public static class Tidal {
+
+        private boolean enabled = false;
+        private String clientId = "";
+        private String clientSecret = "";
+        private String redirectUri = "http://localhost:5173/platforms/oauth/callback";
+        private String authorizationUri = "https://login.tidal.com/authorize";
+        private String tokenUri = "https://auth.tidal.com/v1/oauth2/token";
+        private String apiBaseUri = "https://openapi.tidal.com/v2";
+        private String countryCode = "US";
+        private List<String> scopes = List.of();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getClientId() {
+            return clientId;
+        }
+
+        public void setClientId(String clientId) {
+            this.clientId = clientId == null ? "" : clientId;
+        }
+
+        public String getClientSecret() {
+            return clientSecret;
+        }
+
+        public void setClientSecret(String clientSecret) {
+            this.clientSecret = clientSecret == null ? "" : clientSecret;
+        }
+
+        public String getRedirectUri() {
+            return redirectUri;
+        }
+
+        public void setRedirectUri(String redirectUri) {
+            this.redirectUri = redirectUri == null ? "" : redirectUri;
+        }
+
+        public String getAuthorizationUri() {
+            return authorizationUri;
+        }
+
+        public void setAuthorizationUri(String authorizationUri) {
+            this.authorizationUri = authorizationUri == null ? "" : authorizationUri;
+        }
+
+        public String getTokenUri() {
+            return tokenUri;
+        }
+
+        public void setTokenUri(String tokenUri) {
+            this.tokenUri = tokenUri == null ? "" : tokenUri;
+        }
+
+        public String getApiBaseUri() {
+            return apiBaseUri;
+        }
+
+        public void setApiBaseUri(String apiBaseUri) {
+            this.apiBaseUri = apiBaseUri == null ? "" : apiBaseUri;
+        }
+
+        public String getCountryCode() {
+            return countryCode;
+        }
+
+        public void setCountryCode(String countryCode) {
+            this.countryCode = countryCode == null ? "" : countryCode;
+        }
+
+        public List<String> getScopes() {
+            return scopes;
+        }
+
+        public void setScopes(List<String> scopes) {
+            this.scopes = normalizeScopes(scopes);
+        }
+
+        public boolean isConfigured() {
+            return enabled
+                && !clientId.isBlank()
+                && !redirectUri.isBlank()
+                && !authorizationUri.isBlank()
+                && !tokenUri.isBlank()
+                && !apiBaseUri.isBlank()
+                && !countryCode.isBlank()
+                && !scopes.isEmpty();
+        }
+    }
+
+    private static List<String> normalizeScopes(List<String> scopes) {
+        if (scopes == null) {
+            return List.of();
+        }
+
+        return scopes.stream()
+            .flatMap(scope -> Arrays.stream((scope == null ? "" : scope).split("[,\\s]+")))
+            .map(String::trim)
+            .filter(scope -> !scope.isBlank())
+            .distinct()
+            .toList();
     }
 }

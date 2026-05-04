@@ -46,7 +46,7 @@ class PlatformAuthorizationControllerWebMvcTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("authorization_pending"))
             .andExpect(jsonPath("$.authorization.state").value("oauth-test-state"))
-            .andExpect(jsonPath("$.authorization.approval_page_path").value("/platforms/oauth/authorize?state=oauth-test-state"));
+            .andExpect(jsonPath("$.authorization.external_authorization_url").value("https://accounts.spotify.com/authorize?state=oauth-test-state"));
     }
 
     @Test
@@ -57,8 +57,8 @@ class PlatformAuthorizationControllerWebMvcTest {
             "user-001",
             "spotify",
             "oauth-test-state",
-            "sandbox-approved",
-            null
+            null,
+            "spotify-auth-code"
         );
 
         mockMvc.perform(post("/api/v1/platforms/oauth/complete")
@@ -84,15 +84,15 @@ class PlatformAuthorizationControllerWebMvcTest {
                 "oauth-test-state",
                 "spotify",
                 "Spotify",
-                "sandbox-oauth",
-                "internal_approval_page",
-                List.of("playlist-read", "profile-read"),
+                "spotify-pkce-draft",
+                "external_browser_redirect",
+                List.of("user-read-email", "playlist-read-private"),
                 Instant.parse("2026-05-03T08:10:00Z"),
-                "/platforms/oauth/authorize?state=oauth-test-state",
-                "/platforms/oauth/callback?state=oauth-test-state&code=sandbox-approved",
-                "sandbox-approved",
                 null,
-                null
+                "http://localhost:5173/platforms/oauth/callback?state=oauth-test-state",
+                null,
+                "https://accounts.spotify.com/authorize?state=oauth-test-state",
+                "http://localhost:5173/platforms/oauth/callback"
             )
         );
     }
@@ -106,8 +106,8 @@ class PlatformAuthorizationControllerWebMvcTest {
                 "oauth-test-state",
                 "spotify",
                 "Spotify",
-                "sandbox-oauth",
-                List.of("playlist-read", "profile-read"),
+                "spotify-pkce-draft",
+                List.of("user-read-email", "playlist-read-private"),
                 Instant.parse("2026-05-03T08:01:00Z")
             ),
             new PlatformAuthorizationCompleteResponse.ConnectionResult(
@@ -115,9 +115,9 @@ class PlatformAuthorizationControllerWebMvcTest {
                 "spotify",
                 true,
                 "connected",
-                "sandbox-oauth",
+                "spotify-pkce-draft",
                 "Forever Listener Spotify account",
-                "playlist-read, profile-read",
+                "user-read-email, playlist-read-private",
                 true,
                 Instant.parse("2026-05-03T08:01:00Z")
             ),

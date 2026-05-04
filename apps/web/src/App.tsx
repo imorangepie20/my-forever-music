@@ -9,7 +9,6 @@ import PlatformsPage from './pages/PlatformsPage'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
 import PlatformOAuthCallbackPage from './pages/platforms/PlatformOAuthCallbackPage'
-import PlatformOAuthSandboxAuthorizePage from './pages/platforms/PlatformOAuthSandboxAuthorizePage'
 
 function App() {
     return (
@@ -18,7 +17,6 @@ function App() {
                 <Route path="/" element={<MainLayout />}>
                     <Route index element={<HomePage />} />
                     <Route path="platforms" element={<PlatformsPage />} />
-                    <Route path="platforms/oauth/authorize" element={<PlatformOAuthSandboxAuthorizePage />} />
                     <Route path="platforms/oauth/callback" element={<PlatformOAuthCallbackPage />} />
                     <Route path="pms" element={<PmsPage />} />
                     <Route path="ems" element={<EmsPage />} />

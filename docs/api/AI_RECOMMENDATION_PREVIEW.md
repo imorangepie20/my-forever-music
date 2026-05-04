@@ -39,16 +39,16 @@
 ```json
 {
   "request_id": "preview-001",
-  "user_id": "user-123",
-  "playlist_id": "playlist-001",
+  "user_id": "user-{uuid}",
+  "playlist_id": "pms-spotify-{spotify_playlist_id}",
   "mode": "gms",
   "mood": "upbeat",
   "energy_level": 4,
   "familiarity_bias": 3,
   "limit": 3,
-  "seed_track_ids": ["track-alpha", "track-beta"],
-  "seed_artist_names": ["Artist One"],
-  "seed_genres": ["synth-pop"],
+  "seed_track_ids": ["pms-track-spotify-{spotify_track_id}"],
+  "seed_artist_names": ["Imported Artist"],
+  "seed_genres": ["imported-genre"],
   "include_explanations": true
 }
 ```
@@ -69,7 +69,7 @@
 - `context.seed_basis`: 내부 생성에 사용된 정규화 seed 목록
 - `input_summary`: 입력 요약
 - `items`: 추천 후보 목록
-- `warnings`: fallback 동작 등 안내 메시지
+- `warnings`: 보강/재시도 안내 메시지
 
 ### 전략 값
 
@@ -92,12 +92,12 @@
     "mode": "gms",
     "mood": "upbeat",
     "energy_level": 4,
-    "seed_basis": ["track-alpha", "track-beta", "artist-one", "synth-pop"]
+    "seed_basis": ["pms-track-spotify-{spotify_track_id}", "imported-artist", "imported-genre"]
   },
   "input_summary": {
-    "user_id": "user-123",
-    "playlist_id": "playlist-001",
-    "track_seed_count": 2,
+    "user_id": "user-{uuid}",
+    "playlist_id": "pms-spotify-{spotify_playlist_id}",
+    "track_seed_count": 1,
     "artist_seed_count": 1,
     "genre_seed_count": 1,
     "familiarity_bias": 3,
@@ -106,13 +106,13 @@
   "items": [
     {
       "rank": 1,
-      "track_id": "rec-track-alpha-01",
-      "title": "Track Alpha Echo",
-      "artist_name": "The Track Alpha",
+      "track_id": "ai-preview-candidate-01",
+      "title": "AI Preview Candidate",
+      "artist_name": "Imported Artist",
       "score": 0.97,
       "source_space": "gms",
       "energy_level": 4,
-      "reason": "Track Alpha was selected by gms-hybrid-blend to support an upbeat listening flow and stays close to the supplied track seeds at rank 1."
+      "reason": "This preview candidate was selected by gms-hybrid-blend to support an upbeat listening flow and stays close to the supplied PMS seeds at rank 1."
     }
   ],
   "warnings": []
@@ -121,7 +121,7 @@
 
 ## 현재 구현 메모
 
-- 실제 음원 카탈로그 조회는 하지 않음
+- 실제 음원 카탈로그 조회는 하지 않으므로, 사용자-facing playable 추천은 `services/api`가 PMS user library로 재매핑한 결과를 기준으로 한다
 - 벡터 검색, 임베딩, 모델 추론이 아직 연결되지 않음
 - 점수는 preview 단계의 규칙 기반 값임
 - 현재 `services/api`의 `POST /api/v1/gms/recommendations/preview`가 이 계약을 내부적으로 호출한다

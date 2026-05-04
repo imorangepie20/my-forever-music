@@ -43,7 +43,7 @@ public class PlatformAuthorizationSessionEntity {
     @Column(name = "status", nullable = false, length = 50)
     private String status;
 
-    @Column(name = "approval_code", nullable = false, length = 80)
+    @Column(name = "approval_code", length = 80)
     private String approvalCode;
 
     @Column(name = "external_authorization_url", length = 1000)

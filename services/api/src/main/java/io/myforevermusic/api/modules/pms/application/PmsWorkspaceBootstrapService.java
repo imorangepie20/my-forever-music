@@ -14,9 +14,9 @@ public class PmsWorkspaceBootstrapService {
         this.sources = List.copyOf(sources);
     }
 
-    public PmsWorkspaceBootstrapResponse getWorkspaceBootstrap(String userId) {
+    public PmsWorkspaceBootstrapResponse getWorkspaceBootstrap(String userId, String playlistId) {
         return sources.stream()
-            .map(source -> source.load(userId))
+            .map(source -> source.load(userId, playlistId))
             .flatMap(Optional::stream)
             .findFirst()
             .orElseThrow(() -> new IllegalStateException("No PMS workspace bootstrap source is available."));

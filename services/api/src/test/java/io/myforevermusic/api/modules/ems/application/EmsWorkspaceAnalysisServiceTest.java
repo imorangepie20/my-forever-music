@@ -92,7 +92,7 @@ class EmsWorkspaceAnalysisServiceTest {
             "Forever Listener",
             "lastfm-ems@example.com",
             "music2026",
-            "last-fm",
+            "spotify",
             false,
             true,
             true
@@ -135,7 +135,7 @@ class EmsWorkspaceAnalysisServiceTest {
             "Forever Listener",
             "stored-lastfm-ems@example.com",
             "music2026",
-            "last-fm",
+            "spotify",
             false,
             true,
             true

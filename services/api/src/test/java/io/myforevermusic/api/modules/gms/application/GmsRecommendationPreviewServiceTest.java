@@ -13,6 +13,7 @@ import io.myforevermusic.api.modules.platform.application.LastFmProperties;
 import io.myforevermusic.api.modules.platform.application.LastFmScrobbleStore;
 import io.myforevermusic.api.modules.platform.infrastructure.lastfm.LastFmWebApiClient;
 import io.myforevermusic.api.modules.platform.infrastructure.local.InMemoryLastFmScrobbleStore;
+import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsUserLibraryStore;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -32,7 +33,7 @@ class GmsRecommendationPreviewServiceTest {
             "Forever Listener",
             "gms-lastfm@example.com",
             "music2026",
-            "last-fm",
+            "spotify",
             false,
             true,
             true
@@ -44,6 +45,7 @@ class GmsRecommendationPreviewServiceTest {
             aiClient,
             authAccountStore,
             new InMemoryLastFmScrobbleStore(),
+            new InMemoryPmsUserLibraryStore(),
             Optional.of(new FakeLastFmWebApiClient())
         );
 
@@ -80,7 +82,7 @@ class GmsRecommendationPreviewServiceTest {
             "Forever Listener",
             "gms-stored-lastfm@example.com",
             "music2026",
-            "last-fm",
+            "spotify",
             false,
             true,
             true
@@ -135,6 +137,7 @@ class GmsRecommendationPreviewServiceTest {
             aiClient,
             authAccountStore,
             scrobbleStore,
+            new InMemoryPmsUserLibraryStore(),
             Optional.of(new FakeLastFmWebApiClient())
         );
 

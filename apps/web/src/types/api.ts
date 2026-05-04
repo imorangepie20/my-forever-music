@@ -1,5 +1,20 @@
 export type WorkspacePlatformId = 'spotify' | 'apple-music' | 'tidal' | 'youtube-music' | 'last-fm'
 
+export interface RichPlaylistArtwork {
+    cover_image_url: string | null
+    platform_external_url: string | null
+    platform_uri: string | null
+}
+
+export interface RichTrackArtwork {
+    album_title: string | null
+    album_image_url: string | null
+    platform_external_url: string | null
+    platform_uri: string | null
+    preview_url: string | null
+    duration_ms: number | null
+}
+
 export interface SystemInfoResponse {
     service: string
     status: string
@@ -178,7 +193,7 @@ export interface PlatformAuthorizationStartResponse {
         expires_at: string
         approval_page_path: string | null
         callback_path: string
-        sandbox_approval_code: string | null
+        approval_code: string | null
         external_authorization_url: string | null
         redirect_uri: string | null
     }
@@ -352,7 +367,7 @@ export interface PmsWorkspaceBootstrapResponse {
         seed_artist_names: string[]
         seed_genres: string[]
     }
-    playlists: Array<{
+    playlists: Array<RichPlaylistArtwork & {
         playlist_id: string
         title: string
         source_platform: string
@@ -360,11 +375,12 @@ export interface PmsWorkspaceBootstrapResponse {
         curator: string
         highlight: string
     }>
-    suggested_tracks: Array<{
+    suggested_tracks: Array<RichTrackArtwork & {
         track_id: string
         title: string
         artist_name: string
         source_platform: string
+        seed: boolean
         spotify_track_id: string | null
         spotify_audio_features_filled: boolean
         spotify_audio_feature_source: string
@@ -409,7 +425,7 @@ export interface PmsPlaylistImportBootstrapResponse {
         next_step_path: string
         next_step_message: string
     }
-    available_playlists: Array<{
+    available_playlists: Array<RichPlaylistArtwork & {
         external_playlist_id: string
         title: string
         source_platform: string
@@ -419,7 +435,7 @@ export interface PmsPlaylistImportBootstrapResponse {
         already_imported: boolean
         audio_feature_policy: string
     }>
-    imported_playlists: Array<{
+    imported_playlists: Array<RichPlaylistArtwork & {
         playlist_id: string
         external_playlist_id: string
         title: string
@@ -447,6 +463,8 @@ export interface PmsPlaylistImportResponse {
         imported_track_count: number
         complete_spotify_audio_feature_track_count: number
         connection_mode: string
+        library_synced_playlist_count: number
+        library_synced_track_count: number
     }
     playlists: Array<{
         playlist_id: string
@@ -535,11 +553,15 @@ export interface GmsRecommendationPreviewResponse {
         familiarity_bias: number
         limit: number
     }
-    items: Array<{
+    items: Array<RichTrackArtwork & {
         rank: number
         track_id: string
         title: string
         artist_name: string
+        source_platform: string
+        source_playlist_id: string | null
+        source_playlist_title: string | null
+        spotify_track_id: string | null
         score: number
         source_space: string
         energy_level: number

@@ -1,0 +1,11 @@
+services:
+  domain-proxy:
+    image: nginx:1.27-alpine
+    container_name: my-forever-music-domain-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/macbook.domain.https.conf:/etc/nginx/nginx.conf:ro
+      - ../../../humamAppleTeamPreject001/ssl/config:/etc/nginx/ssl/config:ro

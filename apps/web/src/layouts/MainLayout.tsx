@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
+import PlaybackDock from '@/components/music/PlaybackDock'
 import Sidebar from '../components/layout/Sidebar'
 import Header from '../components/layout/Header'
 
@@ -23,10 +24,12 @@ const MainLayout = () => {
             >
                 <Header onMenuToggle={() => setSidebarOpen((current) => !current)} />
 
-                <main className="px-4 pb-8 pt-6 sm:px-6 lg:px-8">
+                <main className="px-4 pb-44 pt-6 sm:px-6 lg:px-8">
                     <Outlet />
                 </main>
             </div>
+
+            <PlaybackDock />
         </div>
     )
 }

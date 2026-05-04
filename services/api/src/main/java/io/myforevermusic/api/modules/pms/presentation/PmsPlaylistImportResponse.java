@@ -23,7 +23,9 @@ public record PmsPlaylistImportResponse(
         int importedPlaylistCount,
         int importedTrackCount,
         int completeSpotifyAudioFeatureTrackCount,
-        String connectionMode
+        String connectionMode,
+        int librarySyncedPlaylistCount,
+        int librarySyncedTrackCount
     ) {
     }
 

@@ -34,7 +34,7 @@ class PlatformCatalogControllerWebMvcTest {
             .andExpect(jsonPath("$.service").value("api"))
             .andExpect(jsonPath("$.primary_audio_feature_source").value("spotify"))
             .andExpect(jsonPath("$.platforms[0].platform_id").value("spotify"))
-            .andExpect(jsonPath("$.platforms[1].audio_feature_strategy").value("cross-platform-spotify-match"));
+            .andExpect(jsonPath("$.platforms[1].audio_feature_strategy").value("disabled-until-real-provider"));
     }
 
     private PlatformCatalogResponse sampleResponse() {
@@ -59,11 +59,11 @@ class PlatformCatalogControllerWebMvcTest {
                 new PlatformCatalogResponse.PlatformOption(
                     "apple-music",
                     "Apple Music",
-                    "planned-pms-import",
+                    "planned-provider-not-enabled",
+                    false,
                     true,
-                    true,
-                    "cross-platform-spotify-match",
-                    "PMS source",
+                    "disabled-until-real-provider",
+                    "PMS provider not enabled",
                     "EMS source",
                     List.of("note-2")
                 )

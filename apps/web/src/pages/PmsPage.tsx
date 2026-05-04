@@ -1,20 +1,15 @@
 import { startTransition, useEffect, useMemo, useState } from 'react'
-import { LibraryBig, ListMusic, RefreshCw, Sparkles, UserRound } from 'lucide-react'
+import { LibraryBig, RefreshCw, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
+import PlaylistFeatureCard from '@/components/music/PlaylistFeatureCard'
+import TrackFeatureCard from '@/components/music/TrackFeatureCard'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
+import { usePlayback } from '@/contexts/PlaybackContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
-import {
-    ApiError,
-    fetchPmsPlaylistImportBootstrap,
-    fetchPmsWorkspaceBootstrap,
-    importPmsPlaylists,
-} from '@/services/api'
-import type {
-    PmsPlaylistImportBootstrapResponse,
-    PmsWorkspaceBootstrapResponse,
-} from '@/types/api'
+import { ApiError, fetchPmsPlaylistImportBootstrap, fetchPmsWorkspaceBootstrap, importPmsPlaylists } from '@/services/api'
+import type { PmsPlaylistImportBootstrapResponse, PmsWorkspaceBootstrapResponse } from '@/types/api'
 
 const splitItems = (value: string) =>
     value
@@ -27,8 +22,17 @@ const mergeCsv = (current: string, nextValue: string) => {
     return Array.from(new Set(merged)).join(', ')
 }
 
+const openExternal = (url?: string | null) => {
+    if (!url) {
+        return
+    }
+
+    window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 const PmsPage = () => {
     const { session, updateSession } = useAuthSession()
+    const { playItem } = usePlayback()
     const {
         workspace,
         updateWorkspace,
@@ -66,7 +70,11 @@ const PmsPage = () => {
         const load = async () => {
             try {
                 const [workspaceResponse, importResponse] = await Promise.all([
-                    fetchPmsWorkspaceBootstrap(activeUserId, controller.signal),
+                    fetchPmsWorkspaceBootstrap(
+                        activeUserId,
+                        workspace.playlistId || undefined,
+                        controller.signal,
+                    ),
                     activeUserId
                         ? fetchPmsPlaylistImportBootstrap(activeUserId, controller.signal)
                         : Promise.resolve(null),
@@ -89,10 +97,10 @@ const PmsPage = () => {
                     setError(null)
                 })
 
+                hydrateWorkspaceFromBootstrap(workspaceResponse)
                 updateWorkspace({
                     userId: activeUserId ?? workspaceResponse.workspace_defaults.user_id,
-                    preferredPlatformId:
-                        session?.preferredPlatformId ?? workspace.preferredPlatformId,
+                    preferredPlatformId: session?.preferredPlatformId ?? workspace.preferredPlatformId,
                 })
             } catch (requestError: unknown) {
                 if (requestError instanceof DOMException && requestError.name === 'AbortError') {
@@ -102,7 +110,7 @@ const PmsPage = () => {
                 const message =
                     requestError instanceof ApiError
                         ? requestError.message
-                        : 'Unable to load PMS bootstrap data from the Spring Boot API.'
+                        : 'Unable to load PMS media shelves from the Spring Boot API.'
 
                 startTransition(() => {
                     setError(message)
@@ -115,12 +123,22 @@ const PmsPage = () => {
         void load()
 
         return () => controller.abort()
-    }, [activeUserId, session?.preferredPlatformId, updateWorkspace, workspace.preferredPlatformId])
+    }, [activeUserId, session?.preferredPlatformId, updateWorkspace, workspace.playlistId, workspace.preferredPlatformId])
+
+    const activePlaylist = useMemo(
+        () =>
+            bootstrap?.playlists.find((playlist) => playlist.playlist_id === workspace.playlistId) ??
+            bootstrap?.playlists[0] ??
+            null,
+        [bootstrap, workspace.playlistId],
+    )
 
     const importablePlaylists = useMemo(
         () => importBootstrap?.available_playlists.filter((playlist) => !playlist.already_imported) ?? [],
         [importBootstrap],
     )
+
+    const importedPlaylists = importBootstrap?.imported_playlists ?? []
     const reconnectRequired = importBootstrap?.platform_connection.reconnect_required ?? false
     const pmsImportSupported = importBootstrap?.platform_connection.pms_import_supported ?? true
 
@@ -132,9 +150,9 @@ const PmsPage = () => {
         )
     }
 
-    const reloadPmsData = async () => {
+    const reloadPmsData = async (playlistId?: string) => {
         const [workspaceResponse, importResponse] = await Promise.all([
-            fetchPmsWorkspaceBootstrap(activeUserId),
+            fetchPmsWorkspaceBootstrap(activeUserId, playlistId ?? workspace.playlistId ?? undefined),
             activeUserId ? fetchPmsPlaylistImportBootstrap(activeUserId) : Promise.resolve(null),
         ])
 
@@ -192,42 +210,72 @@ const PmsPage = () => {
         }
     }
 
-    const applyBootstrapDefaults = () => {
-        if (!bootstrap) {
-            return
-        }
-
-        hydrateWorkspaceFromBootstrap(bootstrap)
-    }
-
     return (
         <div className="space-y-6">
-            <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-                <HudCard title="PMS Seed Workspace" subtitle="Collect playlist and catalog seeds before recommendation">
-                    <div className="grid gap-5 md:grid-cols-2">
-                        <div>
-                            <label className="mb-2 block text-sm font-medium text-hud-text-secondary">User ID</label>
-                            <input
-                                value={workspace.userId}
-                                onChange={(event) => updateWorkspace({ userId: event.target.value })}
-                                className="w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-sm text-hud-text-primary outline-none transition-hud focus:border-hud-border-primary"
-                            />
+            <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+                <HudCard
+                    title="Selected PMS Playlist"
+                    subtitle="The active playlist drives the current track shelf, seed defaults, and later EMS analysis"
+                    action={
+                        isLoading ? (
+                            <span className="inline-flex items-center gap-2 text-xs text-hud-text-muted">
+                                <RefreshCw size={14} className="animate-spin" />
+                                Loading media
+                            </span>
+                        ) : null
+                    }
+                >
+                    {activePlaylist ? (
+                        <PlaylistFeatureCard
+                            title={activePlaylist.title}
+                            sourcePlatform={activePlaylist.source_platform}
+                            curator={activePlaylist.curator}
+                            trackCount={activePlaylist.track_count}
+                            description={activePlaylist.highlight}
+                            imageUrl={activePlaylist.cover_image_url}
+                            isActive
+                            actionLabel="Current Playlist"
+                            onPlay={() =>
+                                playItem({
+                                    id: `playlist:${activePlaylist.playlist_id}`,
+                                    kind: 'playlist',
+                                    title: activePlaylist.title,
+                                    subtitle: `${activePlaylist.curator} · ${activePlaylist.source_platform}`,
+                                    sourcePlatform: activePlaylist.source_platform,
+                                    imageUrl: activePlaylist.cover_image_url,
+                                    externalUrl: activePlaylist.platform_external_url,
+                                    platformUri: activePlaylist.platform_uri,
+                                    supportingText: activePlaylist.highlight,
+                                })
+                            }
+                            onOpenExternal={() => openExternal(activePlaylist.platform_external_url)}
+                        />
+                    ) : (
+                        <div className="rounded-[24px] border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">
+                            Choose or import a playlist to start the PMS media workspace.
                         </div>
-                        <div>
-                            <label className="mb-2 block text-sm font-medium text-hud-text-secondary">Playlist ID</label>
-                            <input
-                                value={workspace.playlistId}
-                                onChange={(event) => updateWorkspace({ playlistId: event.target.value })}
-                                className="w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-sm text-hud-text-primary outline-none transition-hud focus:border-hud-border-primary"
-                            />
+                    )}
+                </HudCard>
+
+                <HudCard title="Seed Workspace" subtitle="Editable seeds that flow forward to EMS and GMS">
+                    <div className="grid gap-4 sm:grid-cols-3">
+                        <div className="rounded-[24px] border border-hud-border-secondary bg-hud-bg-primary/75 p-4">
+                            <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Track Seeds</p>
+                            <p className="mt-2 text-3xl font-semibold text-hud-text-primary">{seedTrackCount}</p>
+                        </div>
+                        <div className="rounded-[24px] border border-hud-border-secondary bg-hud-bg-primary/75 p-4">
+                            <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Artist Seeds</p>
+                            <p className="mt-2 text-3xl font-semibold text-hud-text-primary">{seedArtistCount}</p>
+                        </div>
+                        <div className="rounded-[24px] border border-hud-border-secondary bg-hud-bg-primary/75 p-4">
+                            <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Genre Seeds</p>
+                            <p className="mt-2 text-3xl font-semibold text-hud-text-primary">{seedGenreCount}</p>
                         </div>
                     </div>
 
-                    <div className="mt-5 space-y-5">
+                    <div className="mt-5 space-y-4">
                         <div>
-                            <label className="mb-2 block text-sm font-medium text-hud-text-secondary">
-                                Seed Track IDs
-                            </label>
+                            <label className="mb-2 block text-sm font-medium text-hud-text-secondary">Seed Track IDs</label>
                             <textarea
                                 value={workspace.seedTrackIdsText}
                                 onChange={(event) => updateWorkspace({ seedTrackIdsText: event.target.value })}
@@ -237,9 +285,7 @@ const PmsPage = () => {
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-sm font-medium text-hud-text-secondary">
-                                Seed Artist Names
-                            </label>
+                            <label className="mb-2 block text-sm font-medium text-hud-text-secondary">Seed Artist Names</label>
                             <textarea
                                 value={workspace.seedArtistNamesText}
                                 onChange={(event) => updateWorkspace({ seedArtistNamesText: event.target.value })}
@@ -249,9 +295,7 @@ const PmsPage = () => {
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-sm font-medium text-hud-text-secondary">
-                                Seed Genres
-                            </label>
+                            <label className="mb-2 block text-sm font-medium text-hud-text-secondary">Seed Genres</label>
                             <textarea
                                 value={workspace.seedGenresText}
                                 onChange={(event) => updateWorkspace({ seedGenresText: event.target.value })}
@@ -262,9 +306,6 @@ const PmsPage = () => {
                     </div>
 
                     <div className="mt-6 flex flex-wrap gap-3">
-                        <Button type="button" variant="ghost" onClick={applyBootstrapDefaults} disabled={!bootstrap}>
-                            Use PMS Defaults
-                        </Button>
                         <Button type="button" variant="outline" onClick={resetWorkspace}>
                             Reset Workspace
                         </Button>
@@ -275,452 +316,250 @@ const PmsPage = () => {
                         </Link>
                     </div>
                 </HudCard>
+            </section>
 
-                <div className="space-y-6">
-                    <HudCard
-                        title="PMS Import Queue"
-                        subtitle="Bring connected platform playlists into the personal music space"
-                        action={
-                            isLoading ? (
-                                <span className="inline-flex items-center gap-2 text-xs text-hud-text-muted">
-                                    <RefreshCw size={14} className="animate-spin" />
-                                    Loading
-                                </span>
-                            ) : null
-                        }
-                    >
-                        {!session ? (
-                            <div className="space-y-4">
-                                <div className="rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-4 text-sm leading-6 text-hud-text-secondary">
-                                    Create an account and connect a preferred streaming platform first. The PMS import
-                                    step attaches imported playlists to a specific member.
+            <HudCard title="Playlist Shelf" subtitle="Every PMS page now keeps the actual playlist context visible">
+                {bootstrap?.playlists.length ? (
+                    <div className="grid gap-5 lg:grid-cols-2">
+                        {bootstrap.playlists.map((playlist) => (
+                            <PlaylistFeatureCard
+                                key={playlist.playlist_id}
+                                title={playlist.title}
+                                sourcePlatform={playlist.source_platform}
+                                curator={playlist.curator}
+                                trackCount={playlist.track_count}
+                                description={playlist.highlight}
+                                imageUrl={playlist.cover_image_url}
+                                isActive={playlist.playlist_id === workspace.playlistId}
+                                onSelect={() => updateWorkspace({ playlistId: playlist.playlist_id })}
+                                onPlay={() =>
+                                    playItem({
+                                        id: `playlist:${playlist.playlist_id}`,
+                                        kind: 'playlist',
+                                        title: playlist.title,
+                                        subtitle: `${playlist.curator} · ${playlist.source_platform}`,
+                                        sourcePlatform: playlist.source_platform,
+                                        imageUrl: playlist.cover_image_url,
+                                        externalUrl: playlist.platform_external_url,
+                                        platformUri: playlist.platform_uri,
+                                        supportingText: playlist.highlight,
+                                    })
+                                }
+                                onOpenExternal={() => openExternal(playlist.platform_external_url)}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="rounded-[24px] border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">
+                        Playlist cards will appear here once PMS bootstrap data is available.
+                    </div>
+                )}
+            </HudCard>
+
+            <HudCard title="Track Shelf" subtitle="Relevant album art, playable tracks, and one-click seed actions">
+                {bootstrap?.suggested_tracks.length ? (
+                    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                        {bootstrap.suggested_tracks.map((track) => (
+                            <TrackFeatureCard
+                                key={track.track_id}
+                                title={track.title}
+                                artistName={track.artist_name}
+                                sourcePlatform={track.source_platform}
+                                albumTitle={track.album_title}
+                                imageUrl={track.album_image_url}
+                                durationMs={track.duration_ms}
+                                badges={[
+                                    track.seed ? 'seed' : 'candidate',
+                                    track.spotify_audio_features_filled ? 'audio ready' : 'pending audio',
+                                ]}
+                                reason={`Audio features resolved by ${track.spotify_audio_feature_source}.`}
+                                onPlay={() =>
+                                    playItem({
+                                        id: `track:${track.track_id}`,
+                                        kind: 'track',
+                                        title: track.title,
+                                        subtitle: `${track.artist_name} · ${track.source_platform}`,
+                                        sourcePlatform: track.source_platform,
+                                        imageUrl: track.album_image_url,
+                                        albumTitle: track.album_title,
+                                        externalUrl: track.platform_external_url,
+                                        platformUri: track.platform_uri,
+                                        previewUrl: track.preview_url,
+                                        spotifyTrackId: track.spotify_track_id,
+                                        durationMs: track.duration_ms,
+                                        supportingText: activePlaylist?.title ?? null,
+                                    })
+                                }
+                                onUseAsSeed={() =>
+                                    updateWorkspace({
+                                        seedTrackIdsText: mergeCsv(workspace.seedTrackIdsText, track.track_id),
+                                        seedArtistNamesText: mergeCsv(workspace.seedArtistNamesText, track.artist_name),
+                                    })
+                                }
+                                onOpenExternal={() => openExternal(track.platform_external_url)}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="rounded-[24px] border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">
+                        Relevant tracks for the selected PMS playlist will appear here.
+                    </div>
+                )}
+            </HudCard>
+
+            <HudCard
+                title="Platform Import Queue"
+                subtitle="Connected platform playlists that can be pulled into the PMS library"
+                action={
+                    isImporting ? (
+                        <span className="inline-flex items-center gap-2 text-xs text-hud-text-muted">
+                            <RefreshCw size={14} className="animate-spin" />
+                            Importing
+                        </span>
+                    ) : null
+                }
+            >
+                <div className="space-y-5">
+                    {!session ? (
+                        <div className="rounded-[24px] border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">
+                            Create an account and connect a streaming platform first. PMS import attaches these
+                            playlists to a specific member profile.
+                        </div>
+                    ) : (
+                        <>
+                            <div className="rounded-[24px] border border-hud-border-secondary bg-hud-bg-primary/75 p-5">
+                                <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Preferred Platform</p>
+                                <h3 className="mt-3 text-xl font-semibold text-hud-text-primary">
+                                    {importBootstrap?.platform_connection.display_name ?? session.preferredPlatformId}
+                                </h3>
+                                <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
+                                    {importBootstrap?.summary.next_step_message ?? 'Connect a platform to import PMS playlists.'}
+                                </p>
+                            </div>
+
+                            {importMessage && (
+                                <div className="rounded-[24px] border border-hud-accent-primary/40 bg-hud-accent-primary/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                                    {importMessage}
                                 </div>
-                                <Link to="/signup">
-                                    <Button type="button" variant="primary" glow>
-                                        Start Signup
+                            )}
+
+                            {reconnectRequired && (
+                                <div className="rounded-[24px] border border-hud-accent-warning/40 bg-hud-accent-warning/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                                    Reconnect the preferred platform first so PMS can keep importing playable library
+                                    content.
+                                </div>
+                            )}
+
+                            {!pmsImportSupported && (
+                                <div className="rounded-[24px] border border-hud-accent-info/40 bg-hud-accent-info/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                                    This preferred platform is useful for long-term analysis signals, but PMS playlist
+                                    import is not ready yet.
+                                </div>
+                            )}
+
+                            {importablePlaylists.length > 0 && (
+                                <div className="grid gap-5 lg:grid-cols-2">
+                                    {importablePlaylists.map((playlist) => {
+                                        const selected = selectedExternalPlaylistIds.includes(playlist.external_playlist_id)
+                                        return (
+                                            <PlaylistFeatureCard
+                                                key={playlist.external_playlist_id}
+                                                title={playlist.title}
+                                                sourcePlatform={playlist.source_platform}
+                                                curator={playlist.curator}
+                                                trackCount={playlist.track_count}
+                                                description={playlist.description}
+                                                imageUrl={playlist.cover_image_url}
+                                                isActive={selected}
+                                                actionLabel={selected ? 'Queued for Import' : 'Queue for Import'}
+                                                onSelect={() => togglePlaylistSelection(playlist.external_playlist_id)}
+                                                onPlay={() =>
+                                                    playItem({
+                                                        id: `import-playlist:${playlist.external_playlist_id}`,
+                                                        kind: 'playlist',
+                                                        title: playlist.title,
+                                                        subtitle: `${playlist.curator} · ${playlist.source_platform}`,
+                                                        sourcePlatform: playlist.source_platform,
+                                                        imageUrl: playlist.cover_image_url,
+                                                        externalUrl: playlist.platform_external_url,
+                                                        platformUri: playlist.platform_uri,
+                                                        supportingText: playlist.description,
+                                                    })
+                                                }
+                                                onOpenExternal={() => openExternal(playlist.platform_external_url)}
+                                            />
+                                        )
+                                    })}
+                                </div>
+                            )}
+
+                            {importedPlaylists.length > 0 && (
+                                <div className="space-y-3">
+                                    <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Already Imported</p>
+                                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                        {importedPlaylists.map((playlist) => (
+                                            <PlaylistFeatureCard
+                                                key={playlist.playlist_id}
+                                                title={playlist.title}
+                                                sourcePlatform={playlist.source_platform}
+                                                curator="pms library"
+                                                trackCount={playlist.track_count}
+                                                description={`Imported ${new Date(playlist.imported_at).toLocaleString()}`}
+                                                imageUrl={playlist.cover_image_url}
+                                                onSelect={() => updateWorkspace({ playlistId: playlist.playlist_id })}
+                                                onPlay={() =>
+                                                    playItem({
+                                                        id: `library-playlist:${playlist.playlist_id}`,
+                                                        kind: 'playlist',
+                                                        title: playlist.title,
+                                                        subtitle: `${playlist.source_platform} · PMS library`,
+                                                        sourcePlatform: playlist.source_platform,
+                                                        imageUrl: playlist.cover_image_url,
+                                                        externalUrl: playlist.platform_external_url,
+                                                        platformUri: playlist.platform_uri,
+                                                        supportingText: `Imported ${new Date(playlist.imported_at).toLocaleString()}`,
+                                                    })
+                                                }
+                                                onOpenExternal={() => openExternal(playlist.platform_external_url)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex flex-wrap gap-3">
+                                <Button
+                                    type="button"
+                                    variant="primary"
+                                    glow
+                                    disabled={isImporting || selectedExternalPlaylistIds.length === 0 || reconnectRequired}
+                                    onClick={handleImportPlaylists}
+                                >
+                                    <LibraryBig size={18} />
+                                    Import Selected Playlists
+                                </Button>
+                                <Link to="/platforms">
+                                    <Button type="button" variant="outline">
+                                        Manage Platform Connections
+                                    </Button>
+                                </Link>
+                                <Link to="/ems">
+                                    <Button type="button" variant="ghost">
+                                        <Sparkles size={18} />
+                                        Continue to EMS
                                     </Button>
                                 </Link>
                             </div>
-                        ) : importBootstrap ? (
-                            <div className="space-y-4">
-                                <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
-                                    <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
-                                        Preferred Platform
-                                    </p>
-                                    <p className="mt-2 text-lg font-semibold text-hud-text-primary">
-                                        {importBootstrap.platform_connection.display_name}
-                                    </p>
-                                    <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
-                                        {importBootstrap.summary.next_step_message}
-                                    </p>
-                                </div>
+                        </>
+                    )}
 
-                                {importMessage && (
-                                    <div className="rounded-2xl border border-hud-accent-primary/40 bg-hud-accent-primary/10 p-4 text-sm leading-6 text-hud-text-secondary">
-                                        {importMessage}
-                                    </div>
-                                )}
-
-                                {reconnectRequired && (
-                                    <div className="rounded-2xl border border-hud-accent-warning/40 bg-hud-accent-warning/10 p-4">
-                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-accent-warning">
-                                            Reconnect Required
-                                        </p>
-                                        <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
-                                            {importBootstrap.platform_connection.display_name} is still marked as the
-                                            preferred import source, but its saved session is no longer usable. Reconnect
-                                            the platform before importing playlists into PMS.
-                                        </p>
-                                        <div className="mt-4">
-                                            <Link to="/platforms">
-                                                <Button type="button" variant="outline">
-                                                    Reconnect {importBootstrap.platform_connection.display_name}
-                                                </Button>
-                                            </Link>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {!pmsImportSupported && (
-                                    <div className="rounded-2xl border border-hud-accent-info/40 bg-hud-accent-info/10 p-4">
-                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-accent-info">
-                                            Analysis Signal Source
-                                        </p>
-                                        <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
-                                            {importBootstrap.platform_connection.display_name} is available for long-term
-                                            listening and affinity analysis, but PMS playlist import is not supported yet.
-                                            Choose Spotify, YouTube Music, Apple Music, or TIDAL on the Platforms screen
-                                            if you want playlist-based PMS seeds.
-                                        </p>
-                                        <div className="mt-4">
-                                            <Link to="/platforms">
-                                                <Button type="button" variant="outline">
-                                                    Choose PMS Source
-                                                </Button>
-                                            </Link>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {importBootstrap.summary.preferred_platform_connected ? (
-                                    <>
-                                        <div className="space-y-3">
-                                            {importBootstrap.available_playlists.map((playlist) => {
-                                                const isSelected = selectedExternalPlaylistIds.includes(
-                                                    playlist.external_playlist_id,
-                                                )
-
-                                                return (
-                                                    <button
-                                                        key={playlist.external_playlist_id}
-                                                        type="button"
-                                                        disabled={playlist.already_imported}
-                                                        onClick={() => togglePlaylistSelection(playlist.external_playlist_id)}
-                                                        className={`w-full rounded-2xl border p-4 text-left transition-hud ${
-                                                            playlist.already_imported
-                                                                ? 'cursor-not-allowed border-hud-border-secondary bg-hud-bg-primary/60 opacity-70'
-                                                                : isSelected
-                                                                    ? 'border-hud-border-primary bg-hud-accent-primary/10'
-                                                                    : 'border-hud-border-secondary bg-hud-bg-primary/70 hover:border-hud-border-primary'
-                                                        }`}
-                                                    >
-                                                        <div className="flex flex-wrap items-center justify-between gap-3">
-                                                            <div>
-                                                                <p className="text-sm font-semibold text-hud-text-primary">
-                                                                    {playlist.title}
-                                                                </p>
-                                                                <p className="mt-1 text-xs uppercase tracking-[0.2em] text-hud-text-muted">
-                                                                    {playlist.source_platform} · {playlist.track_count} tracks · {playlist.curator}
-                                                                </p>
-                                                            </div>
-                                                            <span className="rounded-full border border-hud-border-secondary px-3 py-1 text-xs text-hud-text-secondary">
-                                                                {playlist.already_imported ? 'Imported' : 'Ready to Import'}
-                                                            </span>
-                                                        </div>
-                                                        <p className="mt-3 text-sm leading-6 text-hud-text-secondary">
-                                                            {playlist.description}
-                                                        </p>
-                                                        <p className="mt-3 text-[11px] uppercase tracking-[0.2em] text-hud-text-muted">
-                                                            {playlist.audio_feature_policy.replace(/_/g, ' ')}
-                                                        </p>
-                                                    </button>
-                                                )
-                                            })}
-                                        </div>
-
-                                        <div className="flex flex-wrap gap-3">
-                                            <Button
-                                                type="button"
-                                                variant="primary"
-                                                glow
-                                                onClick={handleImportPlaylists}
-                                                disabled={
-                                                    isImporting
-                                                    || reconnectRequired
-                                                    || !pmsImportSupported
-                                                    || importablePlaylists.length === 0
-                                                }
-                                            >
-                                                {isImporting ? 'Importing to PMS...' : 'Import Selected Playlists'}
-                                            </Button>
-                                            <Link to="/platforms">
-                                                <Button type="button" variant="outline">
-                                                    Back to Platforms
-                                                </Button>
-                                            </Link>
-                                        </div>
-
-                                        {importBootstrap.imported_playlists.length > 0 && (
-                                            <div>
-                                                <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-hud-text-muted">
-                                                    Imported PMS Playlists
-                                                </p>
-                                                <div className="space-y-2">
-                                                    {importBootstrap.imported_playlists.map((playlist) => (
-                                                        <div
-                                                            key={playlist.playlist_id}
-                                                            className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 px-4 py-3"
-                                                        >
-                                                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                                                <p className="text-sm font-medium text-hud-text-primary">
-                                                                    {playlist.title}
-                                                                </p>
-                                                                <span className="text-xs text-hud-text-muted">
-                                                                    {playlist.track_count} tracks
-                                                                </span>
-                                                            </div>
-                                                            <p className="mt-2 text-sm text-hud-text-secondary">
-                                                                Imported {new Date(playlist.imported_at).toLocaleString()}
-                                                            </p>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </>
-                                ) : (
-                                    <Link to="/platforms">
-                                        <Button type="button" variant="primary" glow>
-                                            {reconnectRequired
-                                                ? 'Reconnect Preferred Platform'
-                                                : !pmsImportSupported
-                                                    ? 'Choose PMS Source'
-                                                    : 'Connect Preferred Platform'}
-                                        </Button>
-                                    </Link>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-4 text-sm leading-6 text-hud-text-secondary">
-                                Waiting for PMS import bootstrap data from the API.
-                            </div>
-                        )}
-                    </HudCard>
-
-                    <HudCard title="Seed Summary" subtitle="What will feed the recommendation pipeline">
-                        <div className="space-y-4">
-                            <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
-                                <div className="flex items-center gap-3">
-                                    <span className="rounded-xl bg-hud-accent-primary/10 p-2 text-hud-accent-primary">
-                                        <ListMusic size={18} />
-                                    </span>
-                                    <div>
-                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
-                                            Track Seeds
-                                        </p>
-                                        <p className="mt-1 text-2xl font-semibold text-hud-text-primary">
-                                            {seedTrackCount}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
-                                <div className="flex items-center gap-3">
-                                    <span className="rounded-xl bg-hud-accent-info/10 p-2 text-hud-accent-info">
-                                        <UserRound size={18} />
-                                    </span>
-                                    <div>
-                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
-                                            Artist Seeds
-                                        </p>
-                                        <p className="mt-1 text-2xl font-semibold text-hud-text-primary">
-                                            {seedArtistCount}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
-                                <div className="flex items-center gap-3">
-                                    <span className="rounded-xl bg-hud-accent-secondary/10 p-2 text-hud-accent-secondary">
-                                        <Sparkles size={18} />
-                                    </span>
-                                    <div>
-                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
-                                            Genre Seeds
-                                        </p>
-                                        <p className="mt-1 text-2xl font-semibold text-hud-text-primary">
-                                            {seedGenreCount}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
+                    {error && (
+                        <div className="rounded-[24px] border border-hud-accent-danger/40 bg-hud-accent-danger/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                            {error}
                         </div>
-                    </HudCard>
-
-                    <HudCard
-                        title="PMS Bootstrap Feed"
-                        subtitle="Spring Boot workspace suggestions"
-                        action={
-                            isLoading ? (
-                                <span className="inline-flex items-center gap-2 text-xs text-hud-text-muted">
-                                    <RefreshCw size={14} className="animate-spin" />
-                                    Loading
-                                </span>
-                            ) : null
-                        }
-                    >
-                        {error ? (
-                            <div className="rounded-2xl border border-hud-accent-danger/40 bg-hud-accent-danger/10 p-4 text-sm leading-6 text-hud-text-secondary">
-                                {error}
-                            </div>
-                        ) : bootstrap ? (
-                            <div className="space-y-4">
-                                <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
-                                    <div className="flex items-center gap-3">
-                                        <span className="rounded-xl bg-hud-accent-primary/10 p-2 text-hud-accent-primary">
-                                            <LibraryBig size={18} />
-                                        </span>
-                                        <div>
-                                            <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
-                                                Bootstrap Generated
-                                            </p>
-                                            <p className="mt-1 text-sm text-hud-text-primary">
-                                                {new Date(bootstrap.generated_at).toLocaleString()}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-hud-text-muted">
-                                        Playlist Options
-                                    </p>
-                                    <div className="space-y-3">
-                                        {bootstrap.playlists.map((playlist) => (
-                                            <button
-                                                key={playlist.playlist_id}
-                                                type="button"
-                                                onClick={() => updateWorkspace({ playlistId: playlist.playlist_id })}
-                                                className={`w-full rounded-2xl border p-4 text-left transition-hud ${
-                                                    workspace.playlistId === playlist.playlist_id
-                                                        ? 'border-hud-border-primary bg-hud-accent-primary/10'
-                                                        : 'border-hud-border-secondary bg-hud-bg-primary/70 hover:border-hud-border-primary'
-                                                }`}
-                                            >
-                                                <div className="flex flex-wrap items-center justify-between gap-3">
-                                                    <div>
-                                                        <p className="text-sm font-semibold text-hud-text-primary">
-                                                            {playlist.title}
-                                                        </p>
-                                                        <p className="mt-1 text-xs uppercase tracking-[0.2em] text-hud-text-muted">
-                                                            {playlist.source_platform} · {playlist.track_count} tracks · {playlist.curator}
-                                                        </p>
-                                                    </div>
-                                                    <span className="rounded-full border border-hud-border-secondary px-3 py-1 text-xs text-hud-text-secondary">
-                                                        {playlist.playlist_id}
-                                                    </span>
-                                                </div>
-                                                <p className="mt-3 text-sm leading-6 text-hud-text-secondary">
-                                                    {playlist.highlight}
-                                                </p>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-hud-text-muted">
-                                        Suggested Tracks
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {bootstrap.suggested_tracks.map((track) => (
-                                            <button
-                                                key={track.track_id}
-                                                type="button"
-                                                onClick={() =>
-                                                    updateWorkspace({
-                                                        seedTrackIdsText: mergeCsv(
-                                                            workspace.seedTrackIdsText,
-                                                            track.track_id,
-                                                        ),
-                                                    })
-                                                }
-                                                className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 px-3 py-2.5 text-left text-xs text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
-                                            >
-                                                <span className="block text-hud-text-primary">
-                                                    {track.title} · {track.artist_name}
-                                                </span>
-                                                <span className="mt-1 block text-[11px] uppercase tracking-[0.18em] text-hud-text-muted">
-                                                    {track.spotify_audio_features_filled
-                                                        ? `spotify features ready · ${track.spotify_audio_feature_source}`
-                                                        : 'spotify features pending'}
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-hud-text-muted">
-                                        Suggested Artists
-                                    </p>
-                                    <div className="space-y-2">
-                                        {bootstrap.suggested_artists.map((artist) => (
-                                            <button
-                                                key={artist.artist_name}
-                                                type="button"
-                                                onClick={() =>
-                                                    updateWorkspace({
-                                                        seedArtistNamesText: mergeCsv(
-                                                            workspace.seedArtistNamesText,
-                                                            artist.artist_name,
-                                                        ),
-                                                    })
-                                                }
-                                                className="w-full rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 px-4 py-3 text-left transition-hud hover:border-hud-border-primary"
-                                            >
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <p className="text-sm font-medium text-hud-text-primary">
-                                                        {artist.artist_name}
-                                                    </p>
-                                                    <span className="text-xs text-hud-text-muted">
-                                                        affinity {artist.affinity_score.toFixed(2)}
-                                                    </span>
-                                                </div>
-                                                <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
-                                                    {artist.reason}
-                                                </p>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-hud-text-muted">
-                                        Suggested Genres
-                                    </p>
-                                    <div className="space-y-2">
-                                        {bootstrap.suggested_genres.map((genre) => (
-                                            <button
-                                                key={genre.genre}
-                                                type="button"
-                                                onClick={() =>
-                                                    updateWorkspace({
-                                                        seedGenresText: mergeCsv(
-                                                            workspace.seedGenresText,
-                                                            genre.genre,
-                                                        ),
-                                                    })
-                                                }
-                                                className="w-full rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 px-4 py-3 text-left transition-hud hover:border-hud-border-primary"
-                                            >
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <p className="text-sm font-medium text-hud-text-primary">
-                                                        {genre.genre}
-                                                    </p>
-                                                    <span className="text-xs text-hud-text-muted">
-                                                        weight {genre.weight.toFixed(2)}
-                                                    </span>
-                                                </div>
-                                                <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
-                                                    {genre.reason}
-                                                </p>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-4 text-sm leading-6 text-hud-text-secondary">
-                                Waiting for PMS bootstrap data from the API.
-                            </div>
-                        )}
-                    </HudCard>
-
-                    <HudCard title="PMS Notes" subtitle="What this screen is responsible for">
-                        <div className="space-y-3 text-sm leading-6 text-hud-text-secondary">
-                            <p>
-                                PMS is where imported playlists, explicit track seeds, artist affinity, and genre
-                                direction start to become a user-specific recommendation workspace.
-                            </p>
-                            <p>
-                                The current slice now supports sandbox platform playlist import with complete Spotify
-                                audio feature snapshots before the EMS analysis step.
-                            </p>
-                        </div>
-                    </HudCard>
+                    )}
                 </div>
-            </section>
+            </HudCard>
         </div>
     )
 }

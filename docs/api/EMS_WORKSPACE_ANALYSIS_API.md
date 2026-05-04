@@ -28,11 +28,11 @@
 
 ```json
 {
-  "user_id": "user-001",
-  "playlist_id": "playlist-001",
-  "seed_track_ids": ["track-alpha", "track-beta"],
-  "seed_artist_names": ["Artist One"],
-  "seed_genres": ["synth-pop", "dream-pop"]
+  "user_id": "user-{uuid}",
+  "playlist_id": "pms-spotify-{spotify_playlist_id}",
+  "seed_track_ids": ["pms-track-spotify-{spotify_track_id}"],
+  "seed_artist_names": ["Imported Artist"],
+  "seed_genres": ["imported-genre"]
 }
 ```
 
@@ -68,11 +68,11 @@
   "generated_at": "2026-05-02T09:00:00Z",
   "context": {
     "strategy": "catalog-signal-analysis-v1",
-    "playlist_id": "playlist-001",
-    "track_seed_count": 2,
+    "playlist_id": "pms-spotify-{spotify_playlist_id}",
+    "track_seed_count": 1,
     "artist_seed_count": 1,
-    "genre_seed_count": 2,
-    "matched_catalog_track_count": 2
+    "genre_seed_count": 1,
+    "matched_catalog_track_count": 1
   },
   "workspace_recommendation": {
     "mood": "upbeat",

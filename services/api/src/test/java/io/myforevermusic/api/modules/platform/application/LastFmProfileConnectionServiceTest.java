@@ -26,7 +26,7 @@ class LastFmProfileConnectionServiceTest {
             "Forever Listener",
             "listener-lastfm@example.com",
             "music2026",
-            "last-fm",
+            "spotify",
             false,
             true,
             true

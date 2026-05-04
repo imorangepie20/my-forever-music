@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -27,6 +28,7 @@ public class SpotifyWebApiClient {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
+    @Autowired
     public SpotifyWebApiClient(
         PlatformOAuthProperties platformOAuthProperties,
         ObjectMapper objectMapper
@@ -76,7 +78,10 @@ public class SpotifyWebApiClient {
                         ? "Spotify"
                         : item.owner().displayName(),
                     item.collaborative() != null && item.collaborative(),
-                    item.tracks() == null || item.tracks().total() == null ? 0 : item.tracks().total()
+                    item.tracks() == null || item.tracks().total() == null ? 0 : item.tracks().total(),
+                    firstImageUrl(item.images()),
+                    spotifyExternalUrl(item.externalUrls()),
+                    item.uri()
                 ))
                 .forEach(playlists::add);
             nextUri = payload.next();
@@ -105,8 +110,12 @@ public class SpotifyWebApiClient {
                     track.id(),
                     track.name() == null || track.name().isBlank() ? "Untitled Spotify Track" : track.name(),
                     firstArtistName(track.artists()),
+                    track.album() == null ? null : track.album().name(),
+                    firstImageUrl(track.album() == null ? null : track.album().images()),
                     track.href(),
+                    spotifyExternalUrl(track.externalUrls()),
                     track.uri(),
+                    track.previewUrl(),
                     track.durationMs()
                 ))
                 .forEach(tracks::add);
@@ -220,6 +229,23 @@ public class SpotifyWebApiClient {
             .orElse("Unknown Artist");
     }
 
+    private String firstImageUrl(List<SpotifyImageResponse> images) {
+        return Optional.ofNullable(images)
+            .orElse(List.of())
+            .stream()
+            .map(SpotifyImageResponse::url)
+            .filter(url -> url != null && !url.isBlank())
+            .findFirst()
+            .orElse(null);
+    }
+
+    private String spotifyExternalUrl(SpotifyExternalUrlsResponse externalUrls) {
+        if (externalUrls == null || externalUrls.spotify() == null || externalUrls.spotify().isBlank()) {
+            return null;
+        }
+        return externalUrls.spotify();
+    }
+
     private String readErrorMessage(int statusCode, String body) {
         if (statusCode == 401) {
             return "Spotify access token is invalid or expired. Reconnect Spotify and try again.";
@@ -253,7 +279,10 @@ public class SpotifyWebApiClient {
         String ownerId,
         String ownerDisplayName,
         boolean collaborative,
-        int trackCount
+        int trackCount,
+        String coverImageUrl,
+        String externalUrl,
+        String spotifyUri
     ) {
     }
 
@@ -261,8 +290,12 @@ public class SpotifyWebApiClient {
         String spotifyTrackId,
         String title,
         String artistName,
+        String albumTitle,
+        String albumImageUrl,
         String trackHref,
+        String externalUrl,
         String spotifyUri,
+        String previewUrl,
         Integer durationMs
     ) {
     }
@@ -311,6 +344,9 @@ public class SpotifyWebApiClient {
         String name,
         String description,
         Boolean collaborative,
+        String uri,
+        @JsonProperty("external_urls") SpotifyExternalUrlsResponse externalUrls,
+        List<SpotifyImageResponse> images,
         SpotifyPlaylistOwnerResponse owner,
         SpotifyPlaylistTracksSummaryResponse tracks
     ) {
@@ -348,8 +384,11 @@ public class SpotifyWebApiClient {
         String name,
         String href,
         String uri,
+        @JsonProperty("external_urls") SpotifyExternalUrlsResponse externalUrls,
+        @JsonProperty("preview_url") String previewUrl,
         @JsonProperty("duration_ms") Integer durationMs,
         @JsonProperty("is_local") Boolean isLocal,
+        SpotifyAlbumResponse album,
         List<SpotifyArtistResponse> artists
     ) {
     }
@@ -357,6 +396,27 @@ public class SpotifyWebApiClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     record SpotifyArtistResponse(
         String name
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SpotifyAlbumResponse(
+        String name,
+        List<SpotifyImageResponse> images
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SpotifyImageResponse(
+        String url,
+        Integer height,
+        Integer width
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SpotifyExternalUrlsResponse(
+        String spotify
     ) {
     }
 

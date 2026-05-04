@@ -22,8 +22,9 @@ import io.myforevermusic.api.modules.platform.infrastructure.sandbox.SandboxPlat
 import io.myforevermusic.api.modules.platform.presentation.PlatformConnectRequest;
 import io.myforevermusic.api.modules.pms.application.PmsPlaylistImportCatalogService.ImportCandidatePlaylist;
 import io.myforevermusic.api.modules.pms.application.PmsPlaylistImportCatalogService.ImportCandidateTrack;
-import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackSpotifyAudioFeatures;
+import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsPlaylistImportStore;
+import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackSpotifyAudioFeatures;
 import io.myforevermusic.api.modules.pms.presentation.PmsPlaylistImportRequest;
 import io.myforevermusic.api.modules.pms.presentation.PmsWorkspaceBootstrapResponse;
 import java.time.Instant;
@@ -62,9 +63,10 @@ class PmsPlaylistImportServiceTest {
                 new PlatformTokenRefreshRegistry(List.of())
             )
         );
-        connectionService.connect(new PlatformConnectRequest(userId, "spotify", "sandbox-oauth", null));
+        connectionService.connectSandboxForTests(new PlatformConnectRequest(userId, "spotify", "sandbox-oauth", null));
 
         InMemoryPmsPlaylistImportStore importStore = new InMemoryPmsPlaylistImportStore();
+        InMemoryPmsUserLibraryStore userLibraryStore = new InMemoryPmsUserLibraryStore();
         PmsPlaylistImportService importService = new PmsPlaylistImportService(
             authAccountStore,
             new PlatformCatalogService(),
@@ -76,7 +78,8 @@ class PmsPlaylistImportServiceTest {
             new PlatformPlaylistProviderRegistry(
                 List.of(new SandboxPlatformPlaylistProvider(new PmsPlaylistImportCatalogService()))
             ),
-            importStore
+            importStore,
+            new PmsUserLibrarySyncService(userLibraryStore)
         );
 
         var bootstrapBeforeImport = importService.getBootstrap(userId);
@@ -87,19 +90,23 @@ class PmsPlaylistImportServiceTest {
                 List.of("spotify-liked-night-drive", "spotify-chill-focus-stack")
             )
         );
-        var workspaceBootstrap = new PmsImportedWorkspaceBootstrapSource(importStore).load(userId).orElseThrow();
+        var userLibraryBootstrap = new PmsUserLibraryWorkspaceBootstrapSource(userLibraryStore).load(userId, null).orElseThrow();
+        var importedWorkspaceBootstrap = new PmsImportedWorkspaceBootstrapSource(importStore).load(userId, null).orElseThrow();
 
         assertThat(bootstrapBeforeImport.summary().preferredPlatformConnected()).isTrue();
         assertThat(bootstrapBeforeImport.availablePlaylists()).hasSize(2);
         assertThat(importResponse.status()).isEqualTo("playlists_imported");
         assertThat(importResponse.importResult().importedPlaylistCount()).isEqualTo(2);
+        assertThat(importResponse.importResult().librarySyncedPlaylistCount()).isEqualTo(2);
+        assertThat(importResponse.importResult().librarySyncedTrackCount()).isEqualTo(6);
         assertThat(importResponse.importResult().completeSpotifyAudioFeatureTrackCount()).isEqualTo(6);
         assertThat(importResponse.nextStep().path()).isEqualTo("/ems");
-        assertThat(workspaceBootstrap.playlists()).hasSize(2);
-        assertThat(workspaceBootstrap.workspaceDefaults().userId()).isEqualTo(userId);
-        assertThat(workspaceBootstrap.suggestedTracks()).allMatch(
+        assertThat(userLibraryBootstrap.playlists()).hasSize(2);
+        assertThat(userLibraryBootstrap.workspaceDefaults().userId()).isEqualTo(userId);
+        assertThat(userLibraryBootstrap.suggestedTracks()).allMatch(
             PmsWorkspaceBootstrapResponse.TrackSeedSuggestion::spotifyAudioFeaturesFilled
         );
+        assertThat(importedWorkspaceBootstrap.playlists()).hasSize(2);
     }
 
     @Test
@@ -169,6 +176,7 @@ class PmsPlaylistImportServiceTest {
             new PlatformTokenRefreshRegistry(List.of(refreshClient))
         );
         InMemoryPmsPlaylistImportStore importStore = new InMemoryPmsPlaylistImportStore();
+        InMemoryPmsUserLibraryStore userLibraryStore = new InMemoryPmsUserLibraryStore();
         PmsPlaylistImportService importService = new PmsPlaylistImportService(
             authAccountStore,
             new PlatformCatalogService(),
@@ -193,6 +201,9 @@ class PmsPlaylistImportServiceTest {
                             "spotify",
                             "Forever Listener",
                             "Loaded after refresh.",
+                            null,
+                            "https://open.spotify.com/playlist/spotify-owned-001",
+                            "spotify:playlist:spotify-owned-001",
                             1,
                             List.of()
                         )
@@ -212,6 +223,9 @@ class PmsPlaylistImportServiceTest {
                             "spotify",
                             "Forever Listener",
                             "Loaded after refresh.",
+                            null,
+                            "https://open.spotify.com/playlist/spotify-owned-001",
+                            "spotify:playlist:spotify-owned-001",
                             1,
                             List.of(
                                 new ImportCandidateTrack(
@@ -219,6 +233,11 @@ class PmsPlaylistImportServiceTest {
                                     "Midnight Receiver",
                                     "Neon Bloom",
                                     "synth-pop",
+                                    "Signal Bloom",
+                                    null,
+                                    "https://open.spotify.com/track/track-001",
+                                    "spotify:track:track-001",
+                                    null,
                                     true,
                                     new PmsTrackSpotifyAudioFeatures(
                                         "track-001",
@@ -249,7 +268,8 @@ class PmsPlaylistImportServiceTest {
                     );
                 }
             })),
-            importStore
+            importStore,
+            new PmsUserLibrarySyncService(userLibraryStore)
         );
 
         var bootstrap = importService.getBootstrap(userId);
@@ -263,6 +283,8 @@ class PmsPlaylistImportServiceTest {
         assertThat(bootstrap.summary().preferredPlatformConnected()).isTrue();
         assertThat(bootstrap.availablePlaylists()).hasSize(1);
         assertThat(importResponse.importResult().importedPlaylistCount()).isEqualTo(1);
+        assertThat(importResponse.importResult().librarySyncedPlaylistCount()).isEqualTo(1);
+        assertThat(importResponse.importResult().librarySyncedTrackCount()).isEqualTo(1);
         assertThat(savedCredential.accessToken()).isEqualTo("refreshed-access-token");
         assertThat(savedCredential.refreshToken()).isEqualTo("spotify-refresh-token");
     }
@@ -296,7 +318,7 @@ class PmsPlaylistImportServiceTest {
                 new PlatformTokenRefreshRegistry(List.of())
             )
         );
-        connectionService.connect(new PlatformConnectRequest(userId, "spotify", "spotify-pkce-draft", null));
+        connectionService.connectSandboxForTests(new PlatformConnectRequest(userId, "spotify", "spotify-pkce-draft", null));
         platformCredentialStore.save(new PlatformAccountCredential(
             userId,
             "spotify",
@@ -313,6 +335,7 @@ class PmsPlaylistImportServiceTest {
         ));
 
         InMemoryPmsPlaylistImportStore importStore = new InMemoryPmsPlaylistImportStore();
+        InMemoryPmsUserLibraryStore userLibraryStore = new InMemoryPmsUserLibraryStore();
         PmsPlaylistImportService importService = new PmsPlaylistImportService(
             authAccountStore,
             new PlatformCatalogService(),
@@ -324,7 +347,8 @@ class PmsPlaylistImportServiceTest {
             new PlatformPlaylistProviderRegistry(
                 List.of(new SandboxPlatformPlaylistProvider(new PmsPlaylistImportCatalogService()))
             ),
-            importStore
+            importStore,
+            new PmsUserLibrarySyncService(userLibraryStore)
         );
 
         var bootstrap = importService.getBootstrap(userId);

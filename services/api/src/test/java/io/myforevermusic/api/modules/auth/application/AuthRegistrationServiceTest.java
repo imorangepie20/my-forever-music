@@ -59,22 +59,46 @@ class AuthRegistrationServiceTest {
     }
 
     @Test
-    void shouldAllowYoutubeMusicAsPreferredPlatform() {
+    void shouldRejectTidalUntilRealProviderIsImplemented() {
         AuthRegistrationService service = new AuthRegistrationService(
             new InMemoryAuthAccountStore(),
             new BCryptPasswordEncoder()
         );
 
-        AuthRegistrationResponse response = service.register(new AuthRegistrationRequest(
+        AuthRegistrationRequest request = new AuthRegistrationRequest(
             "Forever Listener",
-            "ytm-listener@example.com",
+            "tidal-listener@example.com",
             "music2026",
-            "youtube-music",
+            "tidal",
             false,
             true,
             true
-        ));
+        );
 
-        assertThat(response.onboarding().preferredPlatformId()).isEqualTo("youtube-music");
+        assertThatThrownBy(() -> service.register(request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("real PMS playlist import");
+    }
+
+    @Test
+    void shouldRejectLastFmAsPrimaryStreamingPlatform() {
+        AuthRegistrationService service = new AuthRegistrationService(
+            new InMemoryAuthAccountStore(),
+            new BCryptPasswordEncoder()
+        );
+
+        AuthRegistrationRequest request = new AuthRegistrationRequest(
+            "Forever Listener",
+            "lastfm-primary@example.com",
+            "music2026",
+            "last-fm",
+            false,
+            true,
+            true
+        );
+
+        assertThatThrownBy(() -> service.register(request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("real PMS playlist import");
     }
 }

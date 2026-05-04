@@ -76,6 +76,16 @@ app:
           - user-read-email
           - playlist-read-private
           - playlist-read-collaborative
+      tidal:
+        enabled: ${TIDAL_OAUTH_ENABLED:false}
+        client-id: ${TIDAL_CLIENT_ID:}
+        client-secret: ${TIDAL_CLIENT_SECRET:}
+        redirect-uri: ${TIDAL_REDIRECT_URI:http://localhost:5173/platforms/oauth/callback}
+        authorization-uri: ${TIDAL_AUTHORIZATION_URI:https://login.tidal.com/authorize}
+        token-uri: ${TIDAL_TOKEN_URI:https://auth.tidal.com/v1/oauth2/token}
+        api-base-uri: ${TIDAL_API_BASE_URI:https://openapi.tidal.com/v2}
+        country-code: ${TIDAL_COUNTRY_CODE:US}
+        scopes: ${TIDAL_SCOPES:}
 
 logging:
   level:

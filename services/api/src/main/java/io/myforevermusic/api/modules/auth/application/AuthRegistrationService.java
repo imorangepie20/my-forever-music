@@ -12,12 +12,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class AuthRegistrationService {
 
-    private static final Set<String> SUPPORTED_PLATFORM_IDS = Set.of(
-        "spotify",
-        "apple-music",
-        "tidal",
-        "youtube-music",
-        "last-fm"
+    private static final Set<String> SUPPORTED_PRIMARY_STREAMING_PLATFORM_IDS = Set.of(
+        "spotify"
     );
 
     private final AuthAccountStore authAccountStore;
@@ -33,8 +29,10 @@ public class AuthRegistrationService {
         String displayName = normalizeDisplayName(request.displayName());
         String preferredPlatformId = normalizePlatformId(request.preferredPlatformId());
 
-        if (!SUPPORTED_PLATFORM_IDS.contains(preferredPlatformId)) {
-            throw new IllegalArgumentException("Preferred platform is not supported yet.");
+        if (!SUPPORTED_PRIMARY_STREAMING_PLATFORM_IDS.contains(preferredPlatformId)) {
+            throw new IllegalArgumentException(
+                "Preferred platform must be a fully implemented streaming source that supports real PMS playlist import."
+            );
         }
 
         Instant now = Instant.now();
@@ -69,7 +67,7 @@ public class AuthRegistrationService {
                 account.preferredPlatformId(),
                 true,
                 "/platforms",
-                "Connect your music platform to continue onboarding."
+                "Connect your streaming platform so PMS can preserve your playlists and taste library."
             )
         );
     }

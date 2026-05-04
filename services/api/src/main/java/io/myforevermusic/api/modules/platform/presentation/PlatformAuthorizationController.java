@@ -18,13 +18,13 @@ public class PlatformAuthorizationController {
         this.platformAuthorizationService = platformAuthorizationService;
     }
 
-    @Operation(summary = "Start a sandbox OAuth authorization flow for a platform")
+    @Operation(summary = "Start a real provider OAuth authorization flow for a platform")
     @PostMapping("/start")
     public PlatformAuthorizationStartResponse start(@Valid @RequestBody PlatformAuthorizationStartRequest request) {
         return platformAuthorizationService.startAuthorization(request);
     }
 
-    @Operation(summary = "Complete a sandbox OAuth authorization flow for a platform")
+    @Operation(summary = "Complete a real provider OAuth authorization flow for a platform")
     @PostMapping("/complete")
     public PlatformAuthorizationCompleteResponse complete(@Valid @RequestBody PlatformAuthorizationCompleteRequest request) {
         return platformAuthorizationService.completeAuthorization(request);

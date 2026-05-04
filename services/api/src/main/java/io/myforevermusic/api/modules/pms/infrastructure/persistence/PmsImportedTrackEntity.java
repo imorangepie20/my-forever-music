@@ -30,6 +30,21 @@ public class PmsImportedTrackEntity {
     @Column(name = "primary_genre", length = 100)
     private String primaryGenre;
 
+    @Column(name = "album_title", length = 200)
+    private String albumTitle;
+
+    @Column(name = "album_image_url", length = 500)
+    private String albumImageUrl;
+
+    @Column(name = "platform_external_url", length = 500)
+    private String platformExternalUrl;
+
+    @Column(name = "platform_uri", length = 200)
+    private String platformUri;
+
+    @Column(name = "preview_url", length = 500)
+    private String previewUrl;
+
     @Embedded
     private PmsTrackSpotifyAudioFeatures spotifyAudioFeatures;
 
@@ -47,6 +62,11 @@ public class PmsImportedTrackEntity {
         this.artistName = state.artistName();
         this.sourcePlatform = state.sourcePlatform();
         this.primaryGenre = state.primaryGenre();
+        this.albumTitle = state.albumTitle();
+        this.albumImageUrl = state.albumImageUrl();
+        this.platformExternalUrl = state.platformExternalUrl();
+        this.platformUri = state.platformUri();
+        this.previewUrl = state.previewUrl();
         this.spotifyAudioFeatures = state.spotifyAudioFeatures() == null
             ? PmsTrackSpotifyAudioFeatures.unresolved()
             : state.spotifyAudioFeatures();
@@ -74,6 +94,26 @@ public class PmsImportedTrackEntity {
 
     public String getPrimaryGenre() {
         return primaryGenre;
+    }
+
+    public String getAlbumTitle() {
+        return albumTitle;
+    }
+
+    public String getAlbumImageUrl() {
+        return albumImageUrl;
+    }
+
+    public String getPlatformExternalUrl() {
+        return platformExternalUrl;
+    }
+
+    public String getPlatformUri() {
+        return platformUri;
+    }
+
+    public String getPreviewUrl() {
+        return previewUrl;
     }
 
     public PmsTrackSpotifyAudioFeatures getSpotifyAudioFeatures() {

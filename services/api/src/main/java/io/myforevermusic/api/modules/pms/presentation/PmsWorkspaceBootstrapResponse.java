@@ -34,7 +34,10 @@ public record PmsWorkspaceBootstrapResponse(
         String sourcePlatform,
         Integer trackCount,
         String curator,
-        String highlight
+        String highlight,
+        String coverImageUrl,
+        String platformExternalUrl,
+        String platformUri
     ) {
     }
 
@@ -44,6 +47,13 @@ public record PmsWorkspaceBootstrapResponse(
         String title,
         String artistName,
         String sourcePlatform,
+        String albumTitle,
+        String albumImageUrl,
+        String platformExternalUrl,
+        String platformUri,
+        String previewUrl,
+        Integer durationMs,
+        boolean seed,
         String spotifyTrackId,
         boolean spotifyAudioFeaturesFilled,
         String spotifyAudioFeatureSource

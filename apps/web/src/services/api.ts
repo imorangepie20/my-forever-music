@@ -215,13 +215,24 @@ export const syncLastFmScrobbles = (payload: LastFmScrobbleSyncRequest) =>
         body: JSON.stringify(payload),
     })
 
-export const fetchPmsWorkspaceBootstrap = (userId?: string, signal?: AbortSignal) =>
-    requestJson<PmsWorkspaceBootstrapResponse>(
-        userId
-            ? `/api/v1/pms/workspace/bootstrap?user_id=${encodeURIComponent(userId)}`
-            : '/api/v1/pms/workspace/bootstrap',
-        { signal },
-    )
+export const fetchPmsWorkspaceBootstrap = (
+    userId?: string,
+    playlistId?: string,
+    signal?: AbortSignal,
+) => {
+    const searchParams = new URLSearchParams()
+
+    if (userId) {
+        searchParams.set('user_id', userId)
+    }
+
+    if (playlistId) {
+        searchParams.set('playlist_id', playlistId)
+    }
+
+    const suffix = searchParams.size > 0 ? `?${searchParams.toString()}` : ''
+    return requestJson<PmsWorkspaceBootstrapResponse>(`/api/v1/pms/workspace/bootstrap${suffix}`, { signal })
+}
 
 export const fetchPmsPlaylistImportBootstrap = (userId: string, signal?: AbortSignal) =>
     requestJson<PmsPlaylistImportBootstrapResponse>(

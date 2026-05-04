@@ -20,7 +20,7 @@ public class PmsPlaylistImportController {
         this.pmsPlaylistImportService = pmsPlaylistImportService;
     }
 
-    @Operation(summary = "Get sandbox playlist import bootstrap data for PMS")
+    @Operation(summary = "Get real provider playlist import bootstrap data for PMS")
     @GetMapping("/bootstrap")
     public PmsPlaylistImportBootstrapResponse getImportBootstrap(
         @RequestParam(name = "user_id") String userId
@@ -28,7 +28,7 @@ public class PmsPlaylistImportController {
         return pmsPlaylistImportService.getBootstrap(userId);
     }
 
-    @Operation(summary = "Import selected sandbox platform playlists into PMS")
+    @Operation(summary = "Import selected provider playlists into PMS")
     @PostMapping("/playlists")
     public PmsPlaylistImportResponse importPlaylists(@Valid @RequestBody PmsPlaylistImportRequest request) {
         return pmsPlaylistImportService.importPlaylists(request);

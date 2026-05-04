@@ -5,9 +5,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 @Service
+@Profile("sandbox")
 public class PmsPlaylistImportCatalogService {
 
     private static final Instant RESOLVED_AT = Instant.parse("2026-05-03T00:00:00Z");
@@ -291,6 +293,9 @@ public class PmsPlaylistImportCatalogService {
         String sourcePlatform,
         String curator,
         String description,
+        String coverImageUrl,
+        String platformExternalUrl,
+        String platformUri,
         int trackCount,
         List<ImportCandidateTrack> tracks
     ) {
@@ -312,6 +317,9 @@ public class PmsPlaylistImportCatalogService {
                 sourcePlatform,
                 curator,
                 description,
+                coverImageUrl,
+                platformExternalUrl,
+                platformUri,
                 trackCount,
                 List.of()
             );
@@ -323,6 +331,11 @@ public class PmsPlaylistImportCatalogService {
         String title,
         String artistName,
         String primaryGenre,
+        String albumTitle,
+        String albumImageUrl,
+        String platformExternalUrl,
+        String platformUri,
+        String previewUrl,
         boolean seed,
         PmsTrackSpotifyAudioFeatures spotifyAudioFeatures
     ) {
@@ -342,6 +355,9 @@ public class PmsPlaylistImportCatalogService {
             sourcePlatform,
             curator,
             description,
+            null,
+            null,
+            null,
             tracks.length,
             List.of(tracks)
         );
@@ -360,6 +376,11 @@ public class PmsPlaylistImportCatalogService {
             title,
             artistName,
             primaryGenre,
+            null,
+            null,
+            null,
+            null,
+            null,
             seed,
             spotifyAudioFeatures
         );

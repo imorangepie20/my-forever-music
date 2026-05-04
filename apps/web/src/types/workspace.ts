@@ -17,11 +17,11 @@ export interface RecommendationWorkspaceState {
 
 export const defaultRecommendationWorkspace: RecommendationWorkspaceState = {
     preferredPlatformId: 'spotify',
-    userId: 'user-001',
-    playlistId: 'playlist-001',
-    seedTrackIdsText: 'track-alpha, track-beta',
-    seedArtistNamesText: 'Artist One',
-    seedGenresText: 'synth-pop, dream-pop',
+    userId: '',
+    playlistId: '',
+    seedTrackIdsText: '',
+    seedArtistNamesText: '',
+    seedGenresText: '',
     mood: 'upbeat',
     energyLevel: 4,
     familiarityBias: 3,

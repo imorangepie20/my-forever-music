@@ -58,6 +58,9 @@ public record PmsPlaylistImportBootstrapResponse(
         int trackCount,
         String curator,
         String description,
+        String coverImageUrl,
+        String platformExternalUrl,
+        String platformUri,
         boolean alreadyImported,
         String audioFeaturePolicy
     ) {
@@ -69,6 +72,9 @@ public record PmsPlaylistImportBootstrapResponse(
         String externalPlaylistId,
         String title,
         String sourcePlatform,
+        String coverImageUrl,
+        String platformExternalUrl,
+        String platformUri,
         int trackCount,
         Instant importedAt
     ) {

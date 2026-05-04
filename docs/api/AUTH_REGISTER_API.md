@@ -22,7 +22,13 @@
 - `email`
 - `password`
 - `preferred_platform_id`
-  - 현재 허용값: `spotify`, `apple-music`, `tidal`, `youtube-music`, `last-fm`
+  - 현재 허용값: `spotify`
+  - 이 값은 PMS playlist import를 시작할 기본 구독 스트리밍 플랫폼입니다.
+  - 플랫폼 확장 순서는 `spotify -> tidal -> youtube-music`입니다.
+  - `tidal`은 다음 구현 대상이지만 실제 PMS provider와 검증이 끝난 뒤에만 허용합니다.
+  - `youtube-music`은 TIDAL 안정화 이후 허용합니다.
+  - `apple-music`은 Apple Developer 계정 준비 전까지 보류합니다.
+  - `last-fm`은 회원가입 기본 플랫폼이 아니라 가입 후 연결하는 청취 신호 플랫폼입니다.
 - `marketing_opt_in`
 - `accepted_terms`
 - `accepted_privacy_policy`
@@ -78,7 +84,7 @@
     "preferred_platform_id": "spotify",
     "platform_connection_required": true,
     "next_step_path": "/platforms",
-    "next_step_message": "Connect your streaming service to start PMS import."
+    "next_step_message": "Connect your streaming platform so PMS can preserve your playlists and taste library."
   }
 }
 ```
@@ -91,11 +97,13 @@
 - 중복 이메일은 `409 Conflict`로 응답한다
 - 요청 validation 실패는 공통 에러 포맷으로 `400 Bad Request`를 돌려준다
 - 가입 성공 후 `/platforms`에서 사용할 수 있도록 `platform connection onboarding` 단계가 이어진다
-- `last-fm`을 preferred platform으로 선택할 수는 있지만, 현재 단계에서는 PMS playlist import보다 청취 이력/affinity 신호 수집용 플랫폼으로 간주한다
+- `preferred_platform_id`는 PMS playlist import를 지원하는 스트리밍 플랫폼만 허용한다
+- `Last.fm`은 가입 이후 `/platforms`에서 별도 listening signal profile로 연결한다
 
 ## 다음 연결 지점
 
-1. 가입 직후 실제 플랫폼 OAuth 연결 시작 API 추가
+1. 가입 직후 실제 플랫폼 OAuth 연결 시작 API 안정화
 2. 이메일 인증 또는 세션/토큰 발급 단계 추가
 3. 사용자 설정과 PMS owner를 동일 사용자 엔터티로 연결
-4. 상세 연결 흐름은 [PLATFORM_CONNECTION_ONBOARDING_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_CONNECTION_ONBOARDING_API.md) 를 따른다
+4. 플랫폼 연동과 PMS user library 저장 이후 사용자별 음악 학습 모델 입력 계약 정의
+5. 상세 연결 흐름은 [PLATFORM_CONNECTION_ONBOARDING_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_CONNECTION_ONBOARDING_API.md) 를 따른다

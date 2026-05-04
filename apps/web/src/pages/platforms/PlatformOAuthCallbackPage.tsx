@@ -46,7 +46,7 @@ const PlatformOAuthCallbackPage = () => {
 
     useEffect(() => {
         if (!state || !pending) {
-            setError('No pending sandbox authorization callback was found.')
+            setError('No pending platform authorization callback was found.')
             return
         }
 
@@ -111,7 +111,7 @@ const PlatformOAuthCallbackPage = () => {
 
     if (!state || !pending) {
         return (
-            <HudCard title="Sandbox Callback Missing" subtitle="The authorization callback could not be reconstructed">
+            <HudCard title="OAuth Callback Missing" subtitle="The authorization callback could not be reconstructed">
                 <p className="text-sm leading-6 text-hud-text-secondary">
                     Return to the platforms page and start the platform authorization again.
                 </p>

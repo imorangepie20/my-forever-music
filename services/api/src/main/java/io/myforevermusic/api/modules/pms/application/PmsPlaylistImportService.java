@@ -36,6 +36,7 @@ public class PmsPlaylistImportService {
     private final PlatformCredentialService platformCredentialService;
     private final PlatformPlaylistProviderRegistry platformPlaylistProviderRegistry;
     private final PmsPlaylistImportStore pmsPlaylistImportStore;
+    private final PmsUserLibrarySyncService pmsUserLibrarySyncService;
 
     public PmsPlaylistImportService(
         AuthAccountStore authAccountStore,
@@ -43,7 +44,8 @@ public class PmsPlaylistImportService {
         PlatformConnectionStore platformConnectionStore,
         PlatformCredentialService platformCredentialService,
         PlatformPlaylistProviderRegistry platformPlaylistProviderRegistry,
-        PmsPlaylistImportStore pmsPlaylistImportStore
+        PmsPlaylistImportStore pmsPlaylistImportStore,
+        PmsUserLibrarySyncService pmsUserLibrarySyncService
     ) {
         this.authAccountStore = authAccountStore;
         this.platformCatalogService = platformCatalogService;
@@ -51,6 +53,7 @@ public class PmsPlaylistImportService {
         this.platformCredentialService = platformCredentialService;
         this.platformPlaylistProviderRegistry = platformPlaylistProviderRegistry;
         this.pmsPlaylistImportStore = pmsPlaylistImportStore;
+        this.pmsUserLibrarySyncService = pmsUserLibrarySyncService;
     }
 
     public PmsPlaylistImportBootstrapResponse getBootstrap(String userId) {
@@ -118,6 +121,9 @@ public class PmsPlaylistImportService {
                     playlist.trackCount(),
                     playlist.curator(),
                     playlist.description(),
+                    playlist.coverImageUrl(),
+                    playlist.platformExternalUrl(),
+                    playlist.platformUri(),
                     importedExternalPlaylistIds.contains(playlist.externalPlaylistId()),
                     "complete_spotify_snapshot"
                 ))
@@ -128,6 +134,9 @@ public class PmsPlaylistImportService {
                     playlist.externalPlaylistId(),
                     playlist.title(),
                     playlist.sourcePlatform(),
+                    playlist.coverImageUrl(),
+                    playlist.platformExternalUrl(),
+                    playlist.platformUri(),
                     playlist.trackCount(),
                     playlist.importedAt()
                 ))
@@ -212,6 +221,8 @@ public class PmsPlaylistImportService {
             .toList();
 
         pmsPlaylistImportStore.saveImportedPlaylists(account.userId(), importedPlaylists);
+        List<PmsUserLibraryStore.LibraryPlaylistState> syncedLibraryPlaylists = pmsUserLibrarySyncService
+            .syncImportedPlaylists(account.userId(), importedPlaylists, importedAt);
 
         int importedTrackCount = importedPlaylists.stream()
             .mapToInt(PmsPlaylistImportStore.ImportedPlaylistState::trackCount)
@@ -220,6 +231,9 @@ public class PmsPlaylistImportService {
             .flatMap(playlist -> playlist.tracks().stream())
             .filter(track -> track.spotifyAudioFeatures() != null && track.spotifyAudioFeatures().isComplete())
             .count();
+        int librarySyncedTrackCount = syncedLibraryPlaylists.stream()
+            .mapToInt(PmsUserLibraryStore.LibraryPlaylistState::trackCount)
+            .sum();
 
         return new PmsPlaylistImportResponse(
             "api",
@@ -232,7 +246,9 @@ public class PmsPlaylistImportService {
                 importedPlaylists.size(),
                 importedTrackCount,
                 completeSpotifyAudioFeatureTrackCount,
-                connectionState.connectionMode()
+                connectionState.connectionMode(),
+                syncedLibraryPlaylists.size(),
+                librarySyncedTrackCount
             ),
             importedPlaylists.stream()
                 .map(playlist -> new PmsPlaylistImportResponse.ImportedPlaylistResult(
@@ -246,7 +262,7 @@ public class PmsPlaylistImportService {
                 .toList(),
             new PmsPlaylistImportResponse.NextStep(
                 "/ems",
-                "Playlists were imported into PMS with complete Spotify audio feature snapshots. Continue to EMS analysis."
+                "Playlists were imported into PMS, synced into the formal user library, and saved with complete Spotify audio feature snapshots. Continue to EMS analysis."
             )
         );
     }
@@ -330,6 +346,11 @@ public class PmsPlaylistImportService {
                 track.artistName(),
                 playlist.sourcePlatform(),
                 track.primaryGenre(),
+                track.albumTitle(),
+                track.albumImageUrl(),
+                track.platformExternalUrl(),
+                track.platformUri(),
+                track.previewUrl(),
                 playlist.tracks().indexOf(track) + 1,
                 track.seed(),
                 track.spotifyAudioFeatures()
@@ -344,6 +365,9 @@ public class PmsPlaylistImportService {
             playlist.sourcePlatform(),
             playlist.curator(),
             playlist.description(),
+            playlist.coverImageUrl(),
+            playlist.platformExternalUrl(),
+            playlist.platformUri(),
             importedAt,
             tracks
         );

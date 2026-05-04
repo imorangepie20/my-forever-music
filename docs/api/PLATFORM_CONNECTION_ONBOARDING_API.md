@@ -2,7 +2,7 @@
 
 작성일: `2026-05-03`
 
-이 문서는 회원가입 직후 사용자의 스트리밍 플랫폼 연결 상태를 확인하고, 로컬 온보딩 환경에서 연결과 해제를 수행하는 공개 API 계약입니다.
+이 문서는 회원가입 직후 사용자의 스트리밍 플랫폼 연결 상태를 확인하고, 실제 OAuth 기반 연결 상태를 조회/해제하는 공개 API 계약입니다.
 
 ## 목적
 
@@ -13,8 +13,9 @@
 ## 엔드포인트
 
 - `GET /api/v1/platforms/connections/bootstrap?user_id={user_id}`
-- `POST /api/v1/platforms/connections/connect`
 - `POST /api/v1/platforms/connections/disconnect`
+
+`POST /api/v1/platforms/connections/connect` 경로는 과거 직접 연결용으로 남아 있지만, 실제 사용자 플로우에서는 비활성입니다. 플랫폼 연결 시작은 `POST /api/v1/platforms/oauth/start`를 사용합니다.
 
 ## 연결 상태 조회
 
@@ -50,7 +51,7 @@
       "preferred": true,
       "connected": true,
       "connection_status": "connected",
-      "connection_mode": "sandbox",
+      "connection_mode": "spotify-pkce-draft",
       "external_account_label": "Forever Listener Spotify account",
       "sync_ready": true,
       "credential_status": "ready",
@@ -62,7 +63,16 @@
 }
 ```
 
-## 플랫폼 연결
+## 플랫폼 연결 시작
+
+실제 연결은 OAuth API로 시작합니다.
+
+- `POST /api/v1/platforms/oauth/start`
+- `POST /api/v1/platforms/oauth/complete`
+
+상세 계약은 [PLATFORM_OAUTH_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_OAUTH_API.md) 를 따릅니다.
+
+## 직접 연결 경로
 
 ### 요청 필드
 
@@ -71,14 +81,13 @@
 - `connection_mode`
 - `external_account_label`
 
-### 예시 요청
+### 현재 응답
 
 ```json
 {
-  "user_id": "user-001",
-  "platform_id": "spotify",
-  "connection_mode": "sandbox",
-  "external_account_label": "Forever Listener Spotify account"
+  "service": "api",
+  "status": "error",
+  "message": "Direct platform connect is disabled. Use the real OAuth flow or a platform-specific connection endpoint for Spotify."
 }
 ```
 
@@ -102,7 +111,8 @@
 
 - `local` 프로필에서는 in-memory 연결 저장소를 사용한다
 - `database` 같은 DB 활성 프로필에서는 `platform_account_connection` 테이블을 사용할 수 있도록 자리가 준비되어 있다
-- 웹앱 기준 연결 시작은 현재 `sandbox OAuth` 승인 흐름으로 진행된다
+- 웹앱 기준 연결 시작은 실제 `Spotify OAuth` redirect 흐름으로 진행된다
+- Spotify OAuth 환경값이 없으면 내부 승인 화면으로 대체하지 않고 명확히 실패한다
 - preferred platform이 연결되면 다음 단계가 `/pms`로 바뀐다
 - 저장된 credential이 refresh 실패나 만료로 usable 하지 않으면 `preferred_platform_reconnect_required=true`가 되고, 카드의 `next_action_label`은 `Reconnect`로 바뀐다
 - 이 상태는 `connected=true`일 수 있지만 `sync_ready=false`이므로, PMS import는 계속 막히고 사용자는 `/platforms`에서 다시 OAuth를 시작해야 한다
@@ -111,4 +121,4 @@
 
 1. 연결 성공 후 PMS playlist import job 시작 API를 연결
 2. 연결 scope, token 상태, 최근 sync 시각을 실제 플랫폼 데이터와 묶기
-3. 상세 OAuth start/complete 흐름은 [PLATFORM_OAUTH_SANDBOX_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_OAUTH_SANDBOX_API.md) 를 따른다
+3. 상세 OAuth start/complete 흐름은 [PLATFORM_OAUTH_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_OAUTH_API.md) 를 따른다

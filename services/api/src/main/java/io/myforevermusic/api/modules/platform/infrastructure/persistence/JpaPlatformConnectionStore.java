@@ -64,7 +64,7 @@ public class JpaPlatformConnectionStore implements PlatformConnectionStore {
                 platformId,
                 false,
                 "not_connected",
-                "sandbox",
+                "none",
                 null,
                 null,
                 false,

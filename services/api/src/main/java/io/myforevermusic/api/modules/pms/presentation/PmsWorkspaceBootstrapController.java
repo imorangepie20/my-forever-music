@@ -20,8 +20,9 @@ public class PmsWorkspaceBootstrapController {
     @Operation(summary = "Get PMS bootstrap data for the workspace UI")
     @GetMapping("/bootstrap")
     public PmsWorkspaceBootstrapResponse getWorkspaceBootstrap(
-        @RequestParam(name = "user_id", required = false) String userId
+        @RequestParam(name = "user_id", required = false) String userId,
+        @RequestParam(name = "playlist_id", required = false) String playlistId
     ) {
-        return pmsWorkspaceBootstrapService.getWorkspaceBootstrap(userId);
+        return pmsWorkspaceBootstrapService.getWorkspaceBootstrap(userId, playlistId);
     }
 }

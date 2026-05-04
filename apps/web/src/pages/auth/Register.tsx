@@ -35,6 +35,7 @@ const Register = () => {
     const [submitting, setSubmitting] = useState(false)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const [successState, setSuccessState] = useState<AuthRegistrationResponse | null>(null)
+    const pmsImportPlatforms = platforms.filter((platform) => platform.pms_import_supported)
 
     useEffect(() => {
         const controller = new AbortController()
@@ -42,8 +43,9 @@ const Register = () => {
         fetchPlatformCatalog(controller.signal)
             .then((response) => {
                 setPlatforms(response.platforms)
-                if (response.platforms.length > 0) {
-                    setPreferredPlatformId(response.platforms[0].platform_id)
+                const primaryStreamingPlatforms = response.platforms.filter((platform) => platform.pms_import_supported)
+                if (primaryStreamingPlatforms.length > 0) {
+                    setPreferredPlatformId(primaryStreamingPlatforms[0].platform_id)
                 }
                 setLoadingPlatforms(false)
             })
@@ -100,30 +102,30 @@ const Register = () => {
                     <div className="max-w-2xl">
                         <div className="inline-flex items-center gap-3 rounded-full border border-hud-border-primary bg-hud-accent-primary/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-hud-accent-primary">
                             <ShieldCheck size={15} />
-                            Membership Onboarding
+                            Music Home Onboarding
                         </div>
 
                         <h1 className="mt-6 text-4xl font-semibold tracking-tight text-hud-text-primary sm:text-5xl">
-                            Start with signup, then connect the streaming source that will feed your PMS.
+                            Keep your playlists and taste library even when your streaming platform changes.
                         </h1>
                         <p className="mt-5 max-w-xl text-base leading-7 text-hud-text-secondary">
-                            This first step creates the account shell, captures the primary subscription platform, and
-                            prepares the next onboarding move for playlist import and Spotify feature enrichment.
+                            Create your account, choose the subscription platform that currently holds your playlists,
+                            and then connect it so PMS can preserve your music library before recommendations begin.
                         </p>
 
                         <div className="mt-8 grid gap-4 sm:grid-cols-3">
                             {[
                                 {
-                                    title: 'Account Shell',
-                                    body: 'Create the user record and reserve the onboarding stage for platform connection.',
+                                    title: 'Own Your Library',
+                                    body: 'Your imported playlists become a PMS library that is not tied to one platform account.',
                                 },
                                 {
-                                    title: 'Platform Choice',
-                                    body: 'Pick the subscription source we will use as the first PMS intake target.',
+                                    title: 'Connect One Source',
+                                    body: 'Start from the streaming service you already subscribe to and use most often.',
                                 },
                                 {
-                                    title: 'Next Step',
-                                    body: 'Continue into platform connection so playlist import and audio-feature fill can begin.',
+                                    title: 'Train Your Taste',
+                                    body: 'After import, your tracks and audio features become the first input for your music model.',
                                 },
                             ].map((item) => (
                                 <div
@@ -143,13 +145,16 @@ const Register = () => {
                                 </span>
                                 <div>
                                     <p className="text-xs uppercase tracking-[0.24em] text-hud-text-muted">
-                                        Supported Sources
+                                        Primary Streaming Sources
                                     </p>
                                     <p className="mt-1 text-sm text-hud-text-primary">
                                         {loadingPlatforms
                                             ? 'Loading platform catalog...'
-                                            : platforms.map((platform) => platform.display_name).join(' / ')
-                                                || 'Spotify / Apple Music / TIDAL / YouTube Music / Last.fm'}
+                                            : pmsImportPlatforms.map((platform) => platform.display_name).join(' / ')
+                                                || 'Spotify'}
+                                    </p>
+                                    <p className="mt-2 text-xs leading-5 text-hud-text-muted">
+                                        We will open streaming imports in this order: Spotify first, then TIDAL, then YouTube Music. Apple Music stays deferred until the developer account is ready, and Last.fm is a listening-history signal rather than the primary playlist source.
                                     </p>
                                 </div>
                             </div>
@@ -164,7 +169,7 @@ const Register = () => {
                                 Create Account
                             </p>
                             <h2 className="mt-3 text-2xl font-semibold text-hud-text-primary">
-                                Membership entry point
+                                Start your music home
                             </h2>
                         </div>
                         <Link
@@ -187,7 +192,7 @@ const Register = () => {
                                             Registration Complete
                                         </p>
                                         <h3 className="mt-2 text-xl font-semibold text-hud-text-primary">
-                                            {successState.user.display_name} is ready for onboarding.
+                                            {successState.user.display_name}'s music home is ready to connect.
                                         </h3>
                                         <p className="mt-3 text-sm leading-6 text-hud-text-secondary">
                                             {successState.onboarding.next_step_message}
@@ -294,8 +299,8 @@ const Register = () => {
                                     onChange={(e) => setPreferredPlatformId(e.target.value as typeof preferredPlatformId)}
                                     className="w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-hud-text-primary focus:border-hud-accent-primary focus:outline-none transition-hud"
                                 >
-                                    {platforms.length > 0 ? (
-                                        platforms.map((platform) => (
+                                    {pmsImportPlatforms.length > 0 ? (
+                                        pmsImportPlatforms.map((platform) => (
                                             <option key={platform.platform_id} value={platform.platform_id}>
                                                 {platform.display_name}
                                             </option>
@@ -303,13 +308,13 @@ const Register = () => {
                                     ) : (
                                         <>
                                             <option value="spotify">Spotify</option>
-                                            <option value="apple-music">Apple Music</option>
-                                            <option value="tidal">TIDAL</option>
-                                            <option value="youtube-music">YouTube Music</option>
-                                            <option value="last-fm">Last.fm</option>
                                         </>
                                     )}
                                 </select>
+                                <p className="mt-2 text-xs leading-5 text-hud-text-muted">
+                                    Choose the service that should feed your first PMS playlist import. Last.fm can be
+                                    connected after signup to enrich your listening model.
+                                </p>
                             </div>
 
                             <label className="flex items-start gap-3 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
@@ -344,7 +349,8 @@ const Register = () => {
                                     className="mt-1 h-4 w-4 rounded border-hud-border-secondary bg-hud-bg-primary text-hud-accent-primary focus:ring-hud-accent-primary"
                                 />
                                 <span className="text-sm leading-6 text-hud-text-secondary">
-                                    I agree to the Privacy Policy for storing profile, playlist import, and onboarding data.
+                                    I agree to the Privacy Policy for storing profile, playlist import, audio feature,
+                                    recommendation, and listening behavior data.
                                 </span>
                             </label>
 

@@ -20,11 +20,11 @@ const pageCopy: Record<string, { title: string; subtitle: string }> = {
     },
     '/platforms/oauth/authorize': {
         title: 'Platform OAuth Approval',
-        subtitle: 'Review the sandbox provider consent step before the callback completes.',
+        subtitle: 'Review the provider consent step before the callback completes.',
     },
     '/platforms/oauth/callback': {
         title: 'Platform OAuth Callback',
-        subtitle: 'Finalize the sandbox authorization and move into the next onboarding stage.',
+        subtitle: 'Finalize provider authorization and move into the next onboarding stage.',
     },
     '/pms': {
         title: 'PMS Seed Workspace',

@@ -33,7 +33,7 @@ const architectureCards = [
 const deliveryTracks = [
     'Signup and primary platform onboarding',
     'Platform connection and playlist intake',
-    'Spotify audio-feature enrichment with fallback generation',
+    'Spotify audio-feature import without generated placeholders',
 ]
 
 const HomePage = () => {

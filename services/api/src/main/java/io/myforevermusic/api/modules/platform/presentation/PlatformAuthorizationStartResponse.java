@@ -33,7 +33,7 @@ public record PlatformAuthorizationStartResponse(
         Instant expiresAt,
         String approvalPagePath,
         String callbackPath,
-        String sandboxApprovalCode,
+        String approvalCode,
         String externalAuthorizationUrl,
         String redirectUri
     ) {

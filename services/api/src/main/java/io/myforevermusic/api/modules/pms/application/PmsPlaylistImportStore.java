@@ -18,6 +18,9 @@ public interface PmsPlaylistImportStore {
         String sourcePlatform,
         String curator,
         String highlight,
+        String coverImageUrl,
+        String platformExternalUrl,
+        String platformUri,
         Instant importedAt,
         List<ImportedTrackState> tracks
     ) {
@@ -34,6 +37,11 @@ public interface PmsPlaylistImportStore {
         String artistName,
         String sourcePlatform,
         String primaryGenre,
+        String albumTitle,
+        String albumImageUrl,
+        String platformExternalUrl,
+        String platformUri,
+        String previewUrl,
         int sortOrder,
         boolean seed,
         PmsTrackSpotifyAudioFeatures spotifyAudioFeatures

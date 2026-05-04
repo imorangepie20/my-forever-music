@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -26,6 +27,7 @@ public class SpotifyTokenRefreshClient implements PlatformTokenRefreshClient {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
+    @Autowired
     public SpotifyTokenRefreshClient(
         PlatformOAuthProperties platformOAuthProperties,
         ObjectMapper objectMapper

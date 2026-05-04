@@ -6,15 +6,17 @@ MusicSpace 재구축용 새 프로젝트 루트입니다.
 
 핵심 서비스 정의 원문은 [docs/PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md) 에 정리되어 있습니다.
 
+회원이 이 사이트를 반복적으로 이용하는 이유와 장기 제품 방향은 [docs/product/USER_MUSIC_HOME_VISION.md](/Users/woosungjo/music-space/my-forever-music/docs/product/USER_MUSIC_HOME_VISION.md) 에 정리되어 있습니다.
+
 현재 작업 전략은 [docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md) 을 기준으로 합니다. 우선 이 MacBook 로컬 시스템에서 실서비스 기능을 구현하고 시험한 뒤 Ubuntu 서버로 이전합니다.
 
 ## 서비스 한 줄 정의
 
-`my-forever-music`은 사용자가 구독 중인 음악 스트리밍 플랫폼의 플레이리스트를 가져와 음악 취향을 분석하고, 외부 트렌드 플레이리스트와 결합해 개인화된 추천 흐름을 만드는 서비스입니다.
+`my-forever-music`은 사용자가 구독 중인 음악 스트리밍 플랫폼의 플레이리스트를 가져와 자기 소유의 음악 취향 라이브러리로 보존하고, 플랫폼을 옮겨도 유지되는 개인화 추천과 음악 감상 경험을 제공하는 서비스입니다.
 
 핵심 도메인은 아래 3개 공간으로 나뉩니다.
 
-- `PMS`: 사용자의 플레이리스트와 선호 데이터를 쌓는 개인 음악 공간
+- `PMS`: 사용자의 플레이리스트, 선호, 평가, 행동 데이터를 보존하는 개인 음악 공간
 - `EMS`: 외부 플랫폼의 공개 플레이리스트와 트렌드를 수집하는 탐색 공간
 - `GMS`: 사용자 모델이 평가해 통과시킨 추천 결과가 모이는 게이트웨이 공간
 
@@ -75,10 +77,11 @@ my-forever-music/
 ## 현재 반영 상태
 
 - 제품 목표는 `스트리밍 플랫폼 플레이리스트 수집 -> 오디오 특성 분석 -> 사용자 취향 모델 -> EMS/GMS 추천 루프` 구조로 정의됨
+- 제품 중심 가치는 `스트리밍 플랫폼이 바뀌어도 유지되는 사용자 소유 playlist/taste library`로 정의됨
 - `apps/web`는 Vite 기반 최소 제품 셸과 `GMS preview` 테스트 화면까지 정리 완료
 - `apps/web`는 `/signup` 화면에서 회원가입과 기본 스트리밍 플랫폼 선택 가능
 - `apps/web`는 `/login` 화면에서 기존 계정 재로그인과 온보딩 복원 가능
-- `apps/web`는 `/platforms` 화면에서 스트리밍 플랫폼 카탈로그, 가입 사용자 세션, sandbox 연결/해제와 Spotify OAuth redirect 흐름을 제공
+- `apps/web`는 `/platforms` 화면에서 스트리밍 플랫폼 카탈로그, 가입 사용자 세션, 실제 Spotify OAuth redirect 흐름과 Last.fm signal profile 저장을 제공
 - `apps/web`는 `/platforms` 화면에서 Last.fm 공개 사용자명 기준 signal preview와 EMS seed artist 반영을 제공
 - `apps/web`는 `/platforms` 화면에서 Last.fm username 저장, 최근 scrobble sync, 저장 snapshot 확인까지 제공
 - `apps/web`는 `/pms` 화면에서 사용자별 PMS bootstrap과 platform playlist import를 제공
@@ -86,7 +89,7 @@ my-forever-music/
 - `apps/web`의 `EMS` 화면은 Spring Boot `workspace analysis` 결과를 받아 추천값 적용 가능
 - `apps/desktop`는 향후 Windows 앱 개발을 위한 예약 구조 생성 완료
 - `services/api`는 `GET /api/v1/platforms/catalog` 엔드포인트로 플랫폼 역할과 온보딩 흐름 제공
-- 플랫폼 카탈로그에는 `YouTube Music`과 `Last.fm`까지 포함되며, `Last.fm`은 현재 분석 신호 중심 플랫폼으로 분리됨
+- 플랫폼 카탈로그에는 `TIDAL`, `YouTube Music`, `Apple Music`, `Last.fm`까지 포함되며, 확장 순서는 `Spotify -> TIDAL -> YouTube Music`, Apple Music은 개발자 계정 준비 전까지 보류로 고정됨
 - `services/api`는 `GET /api/v1/platforms/lastfm/preview` 엔드포인트로 최근 scrobble, top artist, top track preview를 제공
 - `services/api`는 `POST /api/v1/platforms/lastfm/profile` 엔드포인트로 Last.fm signal profile 저장과 EMS 재사용 경로를 제공
 - `services/api`는 `GET/POST /api/v1/platforms/lastfm/scrobbles/*` 엔드포인트로 scrobble snapshot 저장과 bootstrap 조회를 제공
@@ -95,17 +98,19 @@ my-forever-music/
 - `services/api`는 `POST /api/v1/auth/login` 엔드포인트로 기존 계정 로그인과 현재 온보딩 복원을 제공
 - `services/api`는 `GET/POST /api/v1/platforms/connections/*` 엔드포인트로 가입 직후 플랫폼 연결 온보딩 제공
 - `services/api`는 `GET/POST /api/v1/pms/import/*` 엔드포인트로 PMS playlist import 제공
-- `services/api`는 platform credential 저장과 playlist provider 추상화를 통해 sandbox와 실제 Spotify import를 같은 흐름에서 처리함
+- `services/api`는 platform credential 저장과 playlist provider 추상화를 통해 실제 Spotify playlist import를 처리함
 - `services/api`는 Spotify PKCE draft 시작 URL, external callback, authorization code token exchange까지 반영됨
 - `services/api`는 실제 Spotify playlist 목록과 playlist item import 경로를 추가함
 - `services/api`는 Spotify access token 만료 시 refresh token 기반 자동 갱신을 지원함
 - `services/api`와 `apps/web`는 refresh 실패 시 `reconnect_required` 상태와 재연결 UX까지 반영함
 - `services/api`는 DB 활성 프로필에서 PMS import 결과를 `pms_imported_*` 테이블로 영속 저장함
+- `services/api`는 PMS import 직후 정식 `PMS user library` sync를 수행하고, DB 활성 프로필에서는 `pms_user_*` 테이블로도 영속 저장함
+- `services/api`의 `PMS workspace bootstrap`는 현재 정식 `PMS user library`를 raw import snapshot보다 우선 사용함
 - `services/api`는 PMS workspace bootstrap과 `services/ai` preview 호출용 GMS 브리지 엔드포인트 생성 완료
 - `services/api`는 PMS seed 기반 `EMS workspace analysis` 엔드포인트 추가 완료
 - `services/api`는 `local` 프로필 기준으로 DB 없이 로컬 부팅 검증 완료
 - `services/api`의 `PMS bootstrap`과 `GMS preview -> services/ai` 브리지 응답 검증 완료
-- `services/api`는 PMS bootstrap용 `Flyway + JPA` 최소 카탈로그와 demo seed 데이터 추가 완료
+- `services/api`는 import 전 PMS workspace가 가짜 seed를 노출하지 않도록 빈 라이브러리 상태를 반환함
 - `services/api`의 `pms_track`는 Spotify 오디오 특성 전체 스냅샷을 저장할 수 있게 확장됨
 - PMS import 시 Spotify 오디오 특성 전체 저장 기준 문서가 추가됨
 - `services/api`는 DB 활성 프로필에서 `pms_playlist / pms_track / pms_playlist_track` 기반 bootstrap 응답 가능
@@ -117,23 +122,29 @@ my-forever-music/
 - 웹 우선 개발 후 데스크탑 확장을 전제로 문서화 시작
 - 현재 1차 구현/시험 서비스 환경은 `MacBook 로컬`, Ubuntu는 다음 이전 단계로 정리됨
 
-아직 미구현이거나 sandbox 단계인 핵심 서비스 문서의 목표:
+아직 실제 provider 구현 전이라 사용자 플로우에 열지 않는 핵심 서비스 문서의 목표:
 
 - Spotify 장기 세션 운영 고도화와 refresh 실패 관측/운영 정책
-- Apple Music / TIDAL / YouTube Music 실제 PMS provider 연동
+- TIDAL 실제 PMS provider 연동
+- YouTube Music 실제 PMS provider 연동
+- Apple Music 실제 PMS provider 연동은 개발자 계정 준비 후 진행
 - Last.fm scrobble 주기 동기화와 시계열 취향 변화 반영
-- PMS import 결과의 정식 사용자/플레이리스트 도메인 동기화
 - 사용자 행동 데이터 기반 개인화 모델 업데이트
+- 사용자별 음악 학습 모델 개발
+- 정식 `PMS user library` 이후의 사용자 편집/평가 도메인 확장
+- 사용자 제작 playlist와 추천 결과 저장/평가 도메인 확장
+- 사이트 내부 음악 감상 행동 이벤트 저장
 - EMS 외부 플레이리스트 수집, GMS 추천 통과, 사용자 평가의 PMS 환류
 - 페이지 이동 간 유지되는 공통 음악 플레이어
 
 ## 다음 추천 작업
 
 1. MacBook 로컬에서 핵심 사용자 플로우를 끝까지 안정화
-2. PMS import 결과를 정식 사용자/플레이리스트 데이터 모델과 동기화
-3. Apple Music / TIDAL 실제 플랫폼 provider 설계
-4. Spotify refresh 실패 로그, 재시도 정책, 장기 세션 운영 정리
-5. Last.fm 저장 신호를 GMS ranking과 장기 사용자 모델에 더 직접 연결
+2. Spotify OAuth, playlist import, PMS user library 영속 저장 안정화
+3. TIDAL 실제 플랫폼 provider 설계와 PMS import 검증
+4. YouTube Music 실제 플랫폼 provider 설계
+5. 사용자별 음악 학습 모델 개발
+6. 추천 결과 평가 저장과 사용자 제작 playlist 구현
 
 ## 로컬 DB 참고
 

@@ -1,6 +1,7 @@
 package io.myforevermusic.api.modules.platform.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.myforevermusic.api.modules.auth.application.AuthRegistrationService;
 import io.myforevermusic.api.modules.auth.infrastructure.local.InMemoryAuthAccountStore;
@@ -19,7 +20,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 class PlatformAuthorizationServiceTest {
 
     @Test
-    void shouldStartAndCompleteSandboxAuthorization() {
+    void shouldRejectSpotifyAuthorizationWhenOAuthIsNotConfigured() {
         InMemoryAuthAccountStore authAccountStore = new InMemoryAuthAccountStore();
         InMemoryPlatformCredentialStore platformCredentialStore = new InMemoryPlatformCredentialStore();
         AuthRegistrationService authRegistrationService = new AuthRegistrationService(
@@ -46,23 +47,47 @@ class PlatformAuthorizationServiceTest {
             new PlatformOAuthProperties()
         );
 
-        var start = service.startAuthorization(new PlatformAuthorizationStartRequest(userId, "spotify"));
-        var complete = service.completeAuthorization(
-            new PlatformAuthorizationCompleteRequest(
-                userId,
-                "spotify",
-                start.authorization().state(),
-                start.authorization().sandboxApprovalCode(),
-                null
-            )
+        assertThatThrownBy(() -> service.startAuthorization(new PlatformAuthorizationStartRequest(userId, "spotify")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Spotify OAuth is not configured");
+    }
+
+    @Test
+    void shouldRejectTidalAuthorizationUntilPlaylistImportProviderIsComplete() {
+        InMemoryAuthAccountStore authAccountStore = new InMemoryAuthAccountStore();
+        AuthRegistrationService authRegistrationService = new AuthRegistrationService(
+            authAccountStore,
+            new BCryptPasswordEncoder()
+        );
+        String userId = authRegistrationService.register(new AuthRegistrationRequest(
+            "Forever Listener",
+            "tidal-next@example.com",
+            "music2026",
+            "spotify",
+            false,
+            true,
+            true
+        )).user().userId();
+
+        PlatformOAuthProperties properties = new PlatformOAuthProperties();
+        properties.getTidal().setEnabled(true);
+        properties.getTidal().setClientId("tidal-client-id");
+        properties.getTidal().setRedirectUri("http://localhost:5173/platforms/oauth/callback");
+        properties.getTidal().setScopes(List.of("r_usr"));
+
+        PlatformAuthorizationService service = new PlatformAuthorizationService(
+            authAccountStore,
+            new PlatformCatalogService(),
+            new InMemoryPlatformAuthorizationSessionStore(),
+            new InMemoryPlatformConnectionStore(),
+            new InMemoryPlatformCredentialStore(),
+            new PlatformAuthorizationCodeExchangeRegistry(List.of(new SandboxAuthorizationCodeExchangeClient())),
+            properties
         );
 
-        assertThat(start.status()).isEqualTo("authorization_pending");
-        assertThat(start.authorization().approvalPagePath()).contains("/platforms/oauth/authorize");
-        assertThat(complete.status()).isEqualTo("authorization_completed");
-        assertThat(complete.connection().connected()).isTrue();
-        assertThat(complete.nextStep().path()).isEqualTo("/pms");
-        assertThat(platformCredentialStore.findByUserIdAndPlatformId(userId, "spotify")).isPresent();
+        assertThatThrownBy(() -> service.startAuthorization(new PlatformAuthorizationStartRequest(userId, "tidal")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("completed PMS import provider");
     }
 
     @Test

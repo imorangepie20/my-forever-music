@@ -122,6 +122,9 @@ class PmsPlaylistImportControllerWebMvcTest {
                     3,
                     "spotify-library",
                     "High replay late-night mix from the connected Spotify account.",
+                    null,
+                    "https://open.spotify.com/playlist/spotify-liked-night-drive",
+                    "spotify:playlist:spotify-liked-night-drive",
                     false,
                     "complete_spotify_snapshot"
                 )
@@ -132,6 +135,9 @@ class PmsPlaylistImportControllerWebMvcTest {
                     "spotify-liked-night-drive",
                     "Liked Songs Night Drive",
                     "spotify",
+                    null,
+                    "https://open.spotify.com/playlist/spotify-liked-night-drive",
+                    "spotify:playlist:spotify-liked-night-drive",
                     3,
                     Instant.parse("2026-05-03T09:05:00Z")
                 )
@@ -151,7 +157,9 @@ class PmsPlaylistImportControllerWebMvcTest {
                 1,
                 3,
                 3,
-                "sandbox-oauth"
+                "sandbox-oauth",
+                1,
+                3
             ),
             List.of(
                 new PmsPlaylistImportResponse.ImportedPlaylistResult(
@@ -165,7 +173,7 @@ class PmsPlaylistImportControllerWebMvcTest {
             ),
             new PmsPlaylistImportResponse.NextStep(
                 "/ems",
-                "Playlists were imported into PMS with complete Spotify audio feature snapshots. Continue to EMS analysis."
+                "Playlists were imported into PMS, synced into the formal user library, and saved with complete Spotify audio feature snapshots. Continue to EMS analysis."
             )
         );
     }

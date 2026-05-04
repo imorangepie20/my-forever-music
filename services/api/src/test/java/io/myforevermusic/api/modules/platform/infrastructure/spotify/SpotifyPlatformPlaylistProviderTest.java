@@ -1,6 +1,7 @@
 package io.myforevermusic.api.modules.platform.infrastructure.spotify;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.myforevermusic.api.modules.auth.application.AuthRegisteredAccount;
@@ -24,7 +25,10 @@ class SpotifyPlatformPlaylistProviderTest {
                     "spotify-user-001",
                     "Forever Listener",
                     false,
-                    24
+                    24,
+                    null,
+                    "https://open.spotify.com/playlist/owned-001",
+                    "spotify:playlist:owned-001"
                 ),
                 new SpotifyWebApiClient.SpotifyPlaylistSummary(
                     "followed-001",
@@ -33,7 +37,10 @@ class SpotifyPlatformPlaylistProviderTest {
                     "other-user-001",
                     "Other User",
                     false,
-                    17
+                    17,
+                    null,
+                    "https://open.spotify.com/playlist/followed-001",
+                    "spotify:playlist:followed-001"
                 ),
                 new SpotifyWebApiClient.SpotifyPlaylistSummary(
                     "collab-001",
@@ -42,7 +49,10 @@ class SpotifyPlatformPlaylistProviderTest {
                     "other-user-002",
                     "Collab Partner",
                     true,
-                    11
+                    11,
+                    null,
+                    "https://open.spotify.com/playlist/collab-001",
+                    "spotify:playlist:collab-001"
                 )
             ),
             Map.of(),
@@ -60,7 +70,7 @@ class SpotifyPlatformPlaylistProviderTest {
     }
 
     @Test
-    void shouldLoadSpotifyTracksAndFallbackWhenAudioFeaturesAreMissing() {
+    void shouldLoadSpotifyTracksWithSpotifyApiAudioFeatures() {
         SpotifyWebApiClient spotifyWebApiClient = new FakeSpotifyWebApiClient(
             List.of(
                 new SpotifyWebApiClient.SpotifyPlaylistSummary(
@@ -70,7 +80,10 @@ class SpotifyPlatformPlaylistProviderTest {
                     "spotify-user-001",
                     "Forever Listener",
                     false,
-                    2
+                    2,
+                    null,
+                    "https://open.spotify.com/playlist/owned-001",
+                    "spotify:playlist:owned-001"
                 )
             ),
             Map.of(
@@ -80,16 +93,24 @@ class SpotifyPlatformPlaylistProviderTest {
                         "track-001",
                         "Midnight Receiver",
                         "Neon Bloom",
+                        "Signal Bloom",
+                        null,
                         "https://api.spotify.com/v1/tracks/track-001",
+                        "https://open.spotify.com/track/track-001",
                         "spotify:track:track-001",
+                        null,
                         218000
                     ),
                     new SpotifyWebApiClient.SpotifyPlaylistTrack(
                         "track-002",
                         "Quiet Index",
                         "Mono District",
+                        "Focus Grid",
+                        null,
                         "https://api.spotify.com/v1/tracks/track-002",
+                        "https://open.spotify.com/track/track-002",
                         "spotify:track:track-002",
+                        null,
                         221000
                     )
                 )
@@ -116,6 +137,28 @@ class SpotifyPlatformPlaylistProviderTest {
                     116.2,
                     0.67,
                     Instant.parse("2026-05-03T01:00:00Z")
+                ),
+                "track-002",
+                new SpotifyWebApiClient.SpotifyAudioFeaturesSnapshot(
+                    "track-002",
+                    "https://api.spotify.com/v1/audio-analysis/track-002",
+                    "https://api.spotify.com/v1/tracks/track-002",
+                    "spotify:track:track-002",
+                    "audio_features",
+                    221000,
+                    2,
+                    1,
+                    4,
+                    0.16,
+                    0.71,
+                    0.69,
+                    0.01,
+                    0.12,
+                    -8.1,
+                    0.04,
+                    112.4,
+                    0.61,
+                    Instant.parse("2026-05-03T01:00:00Z")
                 )
             )
         );
@@ -133,9 +176,56 @@ class SpotifyPlatformPlaylistProviderTest {
             .isEqualTo("spotify_api");
         assertThat(importedPlaylists.get(0).tracks().get(0).spotifyAudioFeatures().isComplete()).isTrue();
         assertThat(importedPlaylists.get(0).tracks().get(1).spotifyAudioFeatures().getAudioFeatureSource())
-            .isEqualTo("fallback_generated");
+            .isEqualTo("spotify_api");
         assertThat(importedPlaylists.get(0).tracks().get(1).spotifyAudioFeatures().isComplete()).isTrue();
         assertThat(importedPlaylists.get(0).tracks()).allMatch(track -> track.seed());
+    }
+
+    @Test
+    void shouldRejectImportWhenSpotifyAudioFeaturesAreMissing() {
+        SpotifyWebApiClient spotifyWebApiClient = new FakeSpotifyWebApiClient(
+            List.of(
+                new SpotifyWebApiClient.SpotifyPlaylistSummary(
+                    "owned-001",
+                    "Focus Grid",
+                    "Deep focus tracks.",
+                    "spotify-user-001",
+                    "Forever Listener",
+                    false,
+                    1,
+                    null,
+                    "https://open.spotify.com/playlist/owned-001",
+                    "spotify:playlist:owned-001"
+                )
+            ),
+            Map.of(
+                "owned-001",
+                List.of(
+                    new SpotifyWebApiClient.SpotifyPlaylistTrack(
+                        "track-001",
+                        "Midnight Receiver",
+                        "Neon Bloom",
+                        "Signal Bloom",
+                        null,
+                        "https://api.spotify.com/v1/tracks/track-001",
+                        "https://open.spotify.com/track/track-001",
+                        "spotify:track:track-001",
+                        null,
+                        218000
+                    )
+                )
+            ),
+            Map.of()
+        );
+        SpotifyPlatformPlaylistProvider provider = new SpotifyPlatformPlaylistProvider(spotifyWebApiClient);
+
+        assertThatThrownBy(() -> provider.loadPlaylistsForImport(
+            sampleAccount(),
+            spotifyCredential(),
+            List.of("owned-001")
+        ))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Spotify audio features are missing");
     }
 
     private AuthRegisteredAccount sampleAccount() {

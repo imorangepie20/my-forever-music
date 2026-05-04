@@ -5,5 +5,5 @@ import java.util.Optional;
 
 public interface PmsWorkspaceBootstrapSource {
 
-    Optional<PmsWorkspaceBootstrapResponse> load(String userId);
+    Optional<PmsWorkspaceBootstrapResponse> load(String userId, String playlistId);
 }

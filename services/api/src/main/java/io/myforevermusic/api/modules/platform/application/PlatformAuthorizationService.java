@@ -22,8 +22,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class PlatformAuthorizationService {
 
-    private static final List<String> DEFAULT_REQUESTED_SCOPES = List.of("playlist-read", "profile-read");
-    private static final String SANDBOX_APPROVAL_CODE = "sandbox-approved";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final AuthAccountStore authAccountStore;
@@ -55,21 +53,29 @@ public class PlatformAuthorizationService {
     public PlatformAuthorizationStartResponse startAuthorization(PlatformAuthorizationStartRequest request) {
         AuthRegisteredAccount account = findAccount(request.userId());
         PlatformOption platform = findPlatform(request.platformId());
+        if (!platform.pmsImportSupported()) {
+            throw new IllegalArgumentException(
+                "%s does not have a completed PMS import provider yet.".formatted(platform.displayName())
+            );
+        }
         Instant now = Instant.now();
         String state = "oauth-%s".formatted(UUID.randomUUID());
-        boolean spotifyPkceEnabled = "spotify".equals(platform.platformId())
-            && platformOAuthProperties.getSpotify().isConfigured();
-        String authorizationMode = spotifyPkceEnabled ? "spotify-pkce-draft" : "sandbox-oauth";
-        String authorizationChannel = spotifyPkceEnabled ? "external_browser_redirect" : "internal_approval_page";
-        List<String> requestedScopes = spotifyPkceEnabled
-            ? platformOAuthProperties.getSpotify().getScopes()
-            : DEFAULT_REQUESTED_SCOPES;
-        String pkceCodeVerifier = spotifyPkceEnabled ? generatePkceCodeVerifier() : null;
-        String externalAuthorizationUrl = spotifyPkceEnabled
-            ? buildSpotifyAuthorizationUrl(state, requestedScopes, pkceCodeVerifier)
-            : null;
-        String redirectUri = spotifyPkceEnabled ? platformOAuthProperties.getSpotify().getRedirectUri() : null;
-        String approvalCode = spotifyPkceEnabled ? null : SANDBOX_APPROVAL_CODE;
+        OAuthStartConfig oauthStartConfig = resolveOAuthStartConfig(platform);
+        if (!oauthStartConfig.configured()) {
+            throw new IllegalArgumentException(oauthStartConfig.notConfiguredMessage());
+        }
+        String authorizationMode = oauthStartConfig.authorizationMode();
+        String authorizationChannel = "external_browser_redirect";
+        List<String> requestedScopes = oauthStartConfig.requestedScopes();
+        String pkceCodeVerifier = generatePkceCodeVerifier();
+        String externalAuthorizationUrl = buildPkceAuthorizationUrl(
+            oauthStartConfig,
+            state,
+            requestedScopes,
+            pkceCodeVerifier
+        );
+        String redirectUri = oauthStartConfig.redirectUri();
+        String approvalCode = null;
 
         PlatformAuthorizationSession session = platformAuthorizationSessionStore.create(
             new PlatformAuthorizationSessionDraft(
@@ -235,19 +241,55 @@ public class PlatformAuthorizationService {
             .orElseThrow(() -> new IllegalArgumentException("Platform is not supported: %s".formatted(platformId)));
     }
 
-    private String buildSpotifyAuthorizationUrl(
+    private OAuthStartConfig resolveOAuthStartConfig(PlatformOption platform) {
+        if ("spotify".equals(platform.platformId())) {
+            PlatformOAuthProperties.Spotify spotify = platformOAuthProperties.getSpotify();
+            return new OAuthStartConfig(
+                "spotify-pkce-draft",
+                spotify.isConfigured(),
+                spotify.getClientId(),
+                spotify.getRedirectUri(),
+                spotify.getAuthorizationUri(),
+                spotify.getScopes(),
+                "Spotify OAuth is not configured. Set SPOTIFY_OAUTH_ENABLED, SPOTIFY_CLIENT_ID, and SPOTIFY_REDIRECT_URI before starting platform onboarding."
+            );
+        }
+
+        if ("tidal".equals(platform.platformId())) {
+            PlatformOAuthProperties.Tidal tidal = platformOAuthProperties.getTidal();
+            return new OAuthStartConfig(
+                "tidal-pkce-draft",
+                tidal.isConfigured(),
+                tidal.getClientId(),
+                tidal.getRedirectUri(),
+                tidal.getAuthorizationUri(),
+                tidal.getScopes(),
+                "TIDAL OAuth is not configured. Set TIDAL_OAUTH_ENABLED, TIDAL_CLIENT_ID, TIDAL_REDIRECT_URI, TIDAL_COUNTRY_CODE, and TIDAL_SCOPES before starting TIDAL onboarding."
+            );
+        }
+
+        throw new IllegalArgumentException(
+            "%s OAuth is not implemented yet.".formatted(platform.displayName())
+        );
+    }
+
+    private String buildPkceAuthorizationUrl(
+        OAuthStartConfig oauthStartConfig,
         String state,
         List<String> requestedScopes,
         String pkceCodeVerifier
     ) {
         String codeChallenge = toCodeChallenge(pkceCodeVerifier);
-        PlatformOAuthProperties.Spotify spotify = platformOAuthProperties.getSpotify();
-
-        return spotify.getAuthorizationUri()
-            + "?client_id=" + encode(spotify.getClientId())
+        String authorizationUrl = oauthStartConfig.authorizationUri()
+            + "?client_id=" + encode(oauthStartConfig.clientId())
             + "&response_type=code"
-            + "&redirect_uri=" + encode(spotify.getRedirectUri())
-            + "&scope=" + encode(String.join(" ", requestedScopes))
+            + "&redirect_uri=" + encode(oauthStartConfig.redirectUri());
+
+        if (!requestedScopes.isEmpty()) {
+            authorizationUrl += "&scope=" + encode(String.join(" ", requestedScopes));
+        }
+
+        return authorizationUrl
             + "&state=" + encode(state)
             + "&code_challenge_method=S256"
             + "&code_challenge=" + encode(codeChallenge);
@@ -271,5 +313,16 @@ public class PlatformAuthorizationService {
 
     private String encode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private record OAuthStartConfig(
+        String authorizationMode,
+        boolean configured,
+        String clientId,
+        String redirectUri,
+        String authorizationUri,
+        List<String> requestedScopes,
+        String notConfiguredMessage
+    ) {
     }
 }

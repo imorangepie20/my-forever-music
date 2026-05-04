@@ -1,6 +1,7 @@
 package io.myforevermusic.api.modules.platform.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.myforevermusic.api.modules.auth.application.AuthRegistrationService;
 import io.myforevermusic.api.modules.auth.infrastructure.local.InMemoryAuthAccountStore;
@@ -17,7 +18,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 class PlatformConnectionServiceTest {
 
     @Test
-    void shouldReturnConnectedPreferredPlatformAfterConnect() {
+    void shouldRejectDirectConnectForPmsPlatform() {
         InMemoryAuthAccountStore authAccountStore = new InMemoryAuthAccountStore();
         InMemoryPlatformCredentialStore platformCredentialStore = new InMemoryPlatformCredentialStore();
         AuthRegistrationService authRegistrationService = new AuthRegistrationService(
@@ -45,21 +46,14 @@ class PlatformConnectionServiceTest {
             )
         );
 
-        service.connect(new PlatformConnectRequest(
+        assertThatThrownBy(() -> service.connect(new PlatformConnectRequest(
             userId,
             "spotify",
             "sandbox",
             "Forever Listener Spotify"
-        ));
-
-        var response = service.getBootstrap(userId);
-
-        assertThat(response.summary().preferredPlatformConnected()).isTrue();
-        assertThat(response.summary().nextStepPath()).isEqualTo("/pms");
-        assertThat(response.connections()).anyMatch(connection ->
-            connection.platformId().equals("spotify") && connection.connected() && connection.syncReady()
-        );
-        assertThat(platformCredentialStore.findByUserIdAndPlatformId(userId, "spotify")).isPresent();
+        )))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Direct platform connect is disabled");
     }
 
     @Test
@@ -80,10 +74,11 @@ class PlatformConnectionServiceTest {
             true
         )).user().userId();
 
+        InMemoryPlatformConnectionStore platformConnectionStore = new InMemoryPlatformConnectionStore();
         PlatformConnectionService service = new PlatformConnectionService(
             authAccountStore,
             new PlatformCatalogService(),
-            new InMemoryPlatformConnectionStore(),
+            platformConnectionStore,
             platformCredentialStore,
             new PlatformCredentialService(
                 platformCredentialStore,
@@ -91,7 +86,30 @@ class PlatformConnectionServiceTest {
             )
         );
 
-        service.connect(new PlatformConnectRequest(userId, "spotify", "sandbox", null));
+        platformConnectionStore.connect(new PlatformConnectionDraft(
+            userId,
+            "spotify",
+            "spotify-pkce-draft",
+            "Forever Listener Spotify",
+            "playlist-read-private",
+            true,
+            Instant.parse("2026-05-03T00:00:00Z"),
+            Instant.parse("2026-05-03T00:00:00Z")
+        ));
+        platformCredentialStore.save(new PlatformAccountCredential(
+            userId,
+            "spotify",
+            "spotify-pkce-draft",
+            "spotify-user-001",
+            "Forever Listener Spotify",
+            "access-token",
+            "refresh-token",
+            "Bearer",
+            "playlist-read-private",
+            Instant.now().plusSeconds(3600),
+            Instant.parse("2026-05-03T00:00:00Z"),
+            Instant.parse("2026-05-03T00:00:00Z")
+        ));
         service.disconnect(new PlatformDisconnectRequest(userId, "spotify"));
 
         assertThat(platformCredentialStore.findByUserIdAndPlatformId(userId, "spotify")).isEmpty();
@@ -115,10 +133,11 @@ class PlatformConnectionServiceTest {
             true
         )).user().userId();
 
+        InMemoryPlatformConnectionStore platformConnectionStore = new InMemoryPlatformConnectionStore();
         PlatformConnectionService service = new PlatformConnectionService(
             authAccountStore,
             new PlatformCatalogService(),
-            new InMemoryPlatformConnectionStore(),
+            platformConnectionStore,
             platformCredentialStore,
             new PlatformCredentialService(
                 platformCredentialStore,
@@ -126,7 +145,16 @@ class PlatformConnectionServiceTest {
             )
         );
 
-        service.connect(new PlatformConnectRequest(userId, "spotify", "spotify-pkce-draft", "Forever Listener Spotify"));
+        platformConnectionStore.connect(new PlatformConnectionDraft(
+            userId,
+            "spotify",
+            "spotify-pkce-draft",
+            "Forever Listener Spotify",
+            "playlist-read-private",
+            true,
+            Instant.parse("2026-05-03T00:00:00Z"),
+            Instant.parse("2026-05-03T00:00:00Z")
+        ));
         platformCredentialStore.save(new PlatformAccountCredential(
             userId,
             "spotify",
@@ -155,7 +183,7 @@ class PlatformConnectionServiceTest {
     }
 
     @Test
-    void shouldKeepPreferredLastFmOnPlatformsUntilPmsImportSourceIsChosen() {
+    void shouldRejectDirectConnectForLastFmSignalPlatform() {
         InMemoryAuthAccountStore authAccountStore = new InMemoryAuthAccountStore();
         InMemoryPlatformCredentialStore platformCredentialStore = new InMemoryPlatformCredentialStore();
         AuthRegistrationService authRegistrationService = new AuthRegistrationService(
@@ -166,7 +194,7 @@ class PlatformConnectionServiceTest {
             "Forever Listener",
             "lastfm-listener@example.com",
             "music2026",
-            "last-fm",
+            "spotify",
             false,
             true,
             true
@@ -183,19 +211,8 @@ class PlatformConnectionServiceTest {
             )
         );
 
-        var connectResponse = service.connect(new PlatformConnectRequest(userId, "last-fm", "sandbox", null));
-        var bootstrap = service.getBootstrap(userId);
-
-        assertThat(connectResponse.nextStep().path()).isEqualTo("/platforms");
-        assertThat(connectResponse.nextStep().message()).contains("PMS import is not available yet");
-        assertThat(bootstrap.summary().preferredPlatformConnected()).isFalse();
-        assertThat(bootstrap.summary().nextStepPath()).isEqualTo("/platforms");
-        assertThat(bootstrap.summary().nextStepMessage()).contains("PMS playlist import is not supported yet");
-        assertThat(bootstrap.connections()).anyMatch(connection ->
-            connection.platformId().equals("last-fm")
-                && connection.connected()
-                && !connection.syncReady()
-                && !connection.reconnectRequired()
-        );
+        assertThatThrownBy(() -> service.connect(new PlatformConnectRequest(userId, "last-fm", "sandbox", null)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Direct platform connect is disabled");
     }
 }

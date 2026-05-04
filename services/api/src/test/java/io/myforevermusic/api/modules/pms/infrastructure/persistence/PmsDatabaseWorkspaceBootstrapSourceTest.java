@@ -62,7 +62,7 @@ class PmsDatabaseWorkspaceBootstrapSourceTest {
             "indietronica"
         );
 
-        when(playlistRepository.findAllByOrderByDisplayOrderAscIdAsc())
+        when(playlistRepository.findAllByOwnerUserIdOrderByDisplayOrderAscIdAsc("user-001"))
             .thenReturn(List.of(playlist));
         when(playlistTrackRepository.findByPlaylist_IdOrderBySortOrderAscIdAsc("playlist-001"))
             .thenReturn(List.of(
@@ -77,7 +77,7 @@ class PmsDatabaseWorkspaceBootstrapSourceTest {
             playlistTrackRepository
         );
 
-        Optional<PmsWorkspaceBootstrapResponse> result = source.load(null);
+        Optional<PmsWorkspaceBootstrapResponse> result = source.load("user-001", null);
 
         assertThat(result).isPresent();
         assertThat(result.orElseThrow().workspaceDefaults().playlistId()).isEqualTo("playlist-001");

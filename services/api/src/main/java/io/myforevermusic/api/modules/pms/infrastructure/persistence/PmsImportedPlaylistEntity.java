@@ -39,6 +39,15 @@ public class PmsImportedPlaylistEntity {
     @Column(name = "highlight", nullable = false, length = 1000)
     private String highlight;
 
+    @Column(name = "cover_image_url", length = 500)
+    private String coverImageUrl;
+
+    @Column(name = "platform_external_url", length = 500)
+    private String platformExternalUrl;
+
+    @Column(name = "platform_uri", length = 200)
+    private String platformUri;
+
     @Column(name = "imported_at", nullable = false)
     private Instant importedAt;
 
@@ -57,6 +66,9 @@ public class PmsImportedPlaylistEntity {
         this.sourcePlatform = state.sourcePlatform();
         this.curator = state.curator();
         this.highlight = state.highlight();
+        this.coverImageUrl = state.coverImageUrl();
+        this.platformExternalUrl = state.platformExternalUrl();
+        this.platformUri = state.platformUri();
         this.importedAt = state.importedAt();
     }
 
@@ -90,6 +102,18 @@ public class PmsImportedPlaylistEntity {
 
     public String getHighlight() {
         return highlight;
+    }
+
+    public String getCoverImageUrl() {
+        return coverImageUrl;
+    }
+
+    public String getPlatformExternalUrl() {
+        return platformExternalUrl;
+    }
+
+    public String getPlatformUri() {
+        return platformUri;
     }
 
     public Instant getImportedAt() {

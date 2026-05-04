@@ -48,7 +48,8 @@
   "primary_audio_feature_source": "spotify",
   "onboarding_flow": [
     "사용자가 구독 중인 스트리밍 플랫폼을 선택한다.",
-    "선택한 플랫폼의 플레이리스트를 PMS로 가져온다."
+    "선택한 플랫폼의 플레이리스트를 PMS로 가져온다.",
+    "Spotify 오디오 특성을 확보하지 못한 track은 가짜 값으로 채우지 않고 import를 중단한다."
   ],
   "platforms": [
     {
@@ -65,17 +66,18 @@
       ]
     },
     {
-      "platform_id": "youtube-music",
-      "display_name": "YouTube Music",
-      "integration_stage": "planned-pms-import",
-      "pms_import_supported": true,
+      "platform_id": "tidal",
+      "display_name": "TIDAL",
+      "integration_stage": "planned-provider-next",
+      "pms_import_supported": false,
       "ems_collection_supported": true,
-      "audio_feature_strategy": "cross-platform-spotify-match",
-      "pms_role": "사용자 저장 플레이리스트 PMS 적재 확장 대상",
-      "ems_role": "추천 믹스와 청취 흐름을 EMS 신호로 활용할 대상",
+      "audio_feature_strategy": "disabled-until-real-provider",
+      "pms_role": "Spotify 다음으로 실제 TIDAL provider 구현 예정",
+      "ems_role": "트렌딩 및 공개 플레이리스트를 EMS 후보군으로 수집하는 다음 대상",
       "notes": [
-        "초기 단계는 sandbox import로 연결",
-        "트랙 메타데이터를 Spotify 기준 특성과 매칭하는 보강 단계 필요"
+        "현재 사용자 온보딩에서는 선택할 수 없음",
+        "TIDAL OAuth 2.1 + PKCE 토큰 교환 기반을 먼저 준비",
+        "실제 TIDAL API playlist provider와 Spotify 특성 매칭 검증이 끝난 뒤 활성화"
       ]
     },
     {
@@ -84,7 +86,7 @@
       "integration_stage": "analysis-signal-source",
       "pms_import_supported": false,
       "ems_collection_supported": true,
-      "audio_feature_strategy": "scrobble-history-with-spotify-match",
+      "audio_feature_strategy": "scrobble-history-signal",
       "pms_role": "플레이리스트 import보다 장기 청취 이력 신호에 집중",
       "ems_role": "scrobble, top artist, tag 데이터를 EMS/GMS 학습 신호로 연결",
       "notes": [
@@ -100,8 +102,10 @@
 
 - 이 응답은 현재 `사용자 연결 상태`를 뜻하지 않습니다.
 - 이 응답은 `플랫폼별 제품 역할`과 `구현 우선순위`를 설명하는 카탈로그입니다.
-- 실제 OAuth 연결, PMS import job, EMS ingestion job은 이후 단계에서 추가됩니다.
-- 현재 기준 `YouTube Music`은 PMS import 확장 대상이고, `Last.fm`은 PMS import보다 장기 청취 분석 신호용 플랫폼으로 취급합니다.
+- 현재 사용자 가입/온보딩에서 PMS import source로 선택 가능한 플랫폼은 `Spotify`뿐입니다.
+- 확장 우선순위는 `Spotify -> TIDAL -> YouTube Music`이며, `Apple Music`은 개발자 계정 준비 전까지 보류합니다.
+- `TIDAL`, `YouTube Music`, `Apple Music`은 실제 provider가 완성되기 전까지 `pms_import_supported=false`로 내려줍니다.
+- `Last.fm`은 PMS import보다 장기 청취 분석 신호용 플랫폼으로 취급합니다.
 - 이 문서는 [PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md) 와 [PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md) 를 구현 계약 관점에서 연결합니다.
 
 ## 다음 연결 지점

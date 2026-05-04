@@ -8,6 +8,9 @@ Spring Boot 메인 API 서비스 폴더입니다.
 - PMS / EMS / GMS 도메인 오케스트레이션 담당
 - `apps/web`, `apps/desktop`가 공통으로 사용하는 백엔드 API 제공
 - 사용자가 구독 중인 스트리밍 플랫폼과 연결하고 플레이리스트를 PMS로 적재
+- 플랫폼을 옮겨도 유지되는 사용자 소유 playlist/taste library 관리
+- 플랫폼 연동과 PMS user library 저장 이후 사용자별 음악 학습 모델 입력 데이터 제공
+- 추천 평가, 저장, 재생 행동을 PMS 학습 데이터로 환류
 - EMS 수집 데이터와 GMS 평가 결과가 다시 PMS 학습 데이터로 이어지는 환류 담당
 
 ## 권장 스택
@@ -45,6 +48,8 @@ services/api/
 3. 외부 AI 호출은 직접 모델을 넣지 말고 `services/ai` 연동 계층으로 분리
 4. 데스크탑 앱을 고려해 세션보다 토큰/클라이언트 독립 구조를 우선 검토
 5. 플랫폼 원본 데이터와 보강된 오디오 특성 데이터는 분리해 저장하는 방향을 우선 검토
+6. 외부 플랫폼 playlist import 결과는 가능한 한 `PMS user library` canonical model로 승격
+7. 사용자 평가, 저장, 재생, 스킵, playlist 추가 같은 행동 이벤트는 추천 모델 입력으로 남길 수 있게 설계
 
 ## 현재 스캐폴드에 포함된 것
 
@@ -73,9 +78,9 @@ services/api/
 - Swagger UI 경로: `/docs`
 - OpenAPI 문서 경로: `/openapi`
 
-이 스캐폴드는 아직 핵심 서비스의 전체 구현이 아니라 `PMS bootstrap -> EMS analysis -> GMS preview` 최소 검증 버전이다. 장기적으로는 플랫폼 OAuth, 플레이리스트 동기화, 행동 이벤트 적재, GMS 평가 저장까지 확장한다.
+이 스캐폴드는 아직 핵심 서비스의 전체 구현이 아니라 `PMS bootstrap -> EMS analysis -> GMS preview` 최소 검증 버전이다. 장기적으로는 플랫폼 OAuth, 플레이리스트 동기화, 사용자 제작 playlist, 행동 이벤트 적재, GMS 평가 저장까지 확장한다.
 
-현재는 여기에 `회원가입 -> 기본 플랫폼 선택 -> 플랫폼 연결 상태 조회 -> sandbox/Spotify OAuth 승인/callback -> PMS playlist import -> EMS 다음 단계 안내`까지 추가되어, 서비스 구현을 온보딩부터 순차적으로 확장할 수 있는 상태다.
+현재는 여기에 `회원가입 -> Spotify 기본 플랫폼 선택 -> 플랫폼 연결 상태 조회 -> 실제 Spotify OAuth/callback -> PMS playlist import -> EMS 다음 단계 안내`까지 추가되어, 서비스 구현을 온보딩부터 순차적으로 확장할 수 있는 상태다.
 
 이제 `POST /api/v1/auth/login`도 추가되어, 로컬 시험 서비스 중 기존 계정으로 다시 로그인하고 현재 온보딩 단계(`/platforms` 또는 `/pms`)를 복원할 수 있다.
 
@@ -89,17 +94,29 @@ services/api/
 
 현재 `pms_track`는 기본 메타데이터만이 아니라 `Spotify 오디오 특성 전체 스냅샷`을 저장할 수 있도록 확장되어 있다. 따라서 향후 플랫폼 playlist import는 트랙 저장 전에 오디오 특성 채움 과정을 반드시 거치는 것을 기본 전제로 한다.
 
-또한 현재는 `platform credential store`와 `platform playlist provider` 계층이 추가되어, sandbox와 실제 외부 플랫폼 연동을 같은 import 흐름 위에서 모드별로 처리할 수 있다.
+또한 현재는 `platform credential store`와 `platform playlist provider` 계층이 추가되어, 실제 외부 플랫폼 연동을 import 흐름 위에서 provider별로 처리할 수 있다.
 
 추가로 `platform authorization code exchange client` 계층도 들어가 있어서, Spotify PKCE draft가 켜져 있으면 callback의 authorization code를 실제 token endpoint와 교환하고 그 결과를 credential로 저장한다.
 
-현재 `spotify` provider는 실제 사용자 token으로 `GET /me/playlists`, `GET /playlists/{playlist_id}/items`를 호출하고, 트랙별 오디오 특성은 공식 `GET /audio-features`를 우선 시도한 뒤 실패하거나 누락된 항목은 `fallback_generated` 완전 스냅샷으로 보강한다.
+TIDAL은 Spotify 다음 provider로 고정되어 있으며, 현재는 TIDAL OAuth 2.1 + PKCE token exchange/refresh client 기반만 추가되어 있다. 실제 TIDAL playlist provider와 PMS import 검증이 끝나기 전까지 사용자 온보딩과 import 후보에는 노출하지 않는다.
+
+현재 `spotify` provider는 실제 사용자 token으로 `GET /me/playlists`, `GET /playlists/{playlist_id}/items`를 호출하고, 트랙별 오디오 특성은 공식 `GET /audio-features` 응답만 저장한다. 실패하거나 누락된 항목이 있으면 가짜 오디오 특성을 만들지 않고 import를 중단한다.
+
+현재 이 import 경로는 단순 텍스트 seed만 저장하지 않는다. playlist cover image, playlist external URL/URI, track album title, album image, track external URL/URI, preview URL까지 같이 저장한다.
 
 또한 현재 `spotify` credential은 만료 60초 전부터 refresh token 기반 자동 갱신을 시도한다. Spotify refresh 응답에 새 refresh token이 없으면 기존 refresh token을 유지한다.
 
 refresh 이후에도 usable credential이 확보되지 않으면 `platform connection bootstrap`과 `pms import bootstrap`은 `reconnect_required` 상태를 내려준다. 이때 `POST /api/v1/pms/import/playlists`는 `409 conflict`와 `platform_reconnect_required` 코드로 응답하므로, 웹은 사용자를 `/platforms` 재연결 흐름으로 돌려보내면 된다.
 
 추가로 `PMS import` 저장소는 이제 프로필별로 나뉜다. `local`에서는 `InMemoryPmsPlaylistImportStore`를 사용하고, `!local`에서는 `JpaPmsPlaylistImportStore`가 `pms_imported_playlist`, `pms_imported_track`, `pms_imported_playlist_track` 테이블에 import 결과를 영속 저장한다.
+
+이 import 직후 정식 사용자 라이브러리 sync도 함께 수행한다. `local`에서는 `InMemoryPmsUserLibraryStore`, `!local`에서는 `JpaPmsUserLibraryStore`가 `pms_user_playlist`, `pms_user_track`, `pms_user_playlist_track` 테이블에 동기화 결과를 유지한다.
+
+또한 `GET /api/v1/pms/workspace/bootstrap`는 현재 raw import snapshot보다 정식 `PMS user library`를 우선 사용한다.
+
+추가로 `GET /api/v1/pms/workspace/bootstrap`는 이제 optional `playlist_id` query parameter를 받으며, 해당 값이 있으면 가능한 경우 그 playlist 기준으로 seed/track/artwork 컨텍스트를 다시 투영한다.
+
+현재 `POST /api/v1/gms/recommendations/preview`는 AI preview 결과를 그대로 보여주는 데서 멈추지 않고, 가능하면 `PMS user library`에서 실제 playable track으로 재매핑한다. 그래서 웹앱은 `GMS` 카드에서도 실제 album art와 platform playback target을 표시할 수 있다.
 
 상세 저장 기준은 [PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md) 를 본다.
 
@@ -118,7 +135,7 @@ API 계약 문서 인덱스는 [docs/api/README.md](/Users/woosungjo/music-space
 
 이 상태에서도 `EMS workspace analysis`는 동작한다. 다만 `local`에서는 입력 텍스트 시드 중심으로 분석하고, `database` 프로필에서는 `PMS` 카탈로그 seed track도 함께 반영한다.
 
-반대로 `database` 같은 DB 활성 프로필로 실행하면 Flyway가 `pms_*` demo bootstrap 테이블과 `pms_imported_*` import 영속 테이블을 함께 만들고, 가져온 플레이리스트를 DB에 유지한다.
+반대로 `database` 같은 DB 활성 프로필로 실행하면 Flyway가 `pms_*` demo bootstrap 테이블과 `pms_imported_*`, `pms_user_*` 영속 테이블을 함께 만들고, 가져온 플레이리스트와 정식 사용자 라이브러리를 DB에 유지한다.
 
 ## 참고 환경 변수
 
@@ -138,6 +155,15 @@ API 계약 문서 인덱스는 [docs/api/README.md](/Users/woosungjo/music-space
 - `SPOTIFY_AUTHORIZATION_URI`
 - `SPOTIFY_TOKEN_URI`
 - `SPOTIFY_API_BASE_URI`
+- `TIDAL_OAUTH_ENABLED`
+- `TIDAL_CLIENT_ID`
+- `TIDAL_CLIENT_SECRET`
+- `TIDAL_REDIRECT_URI`
+- `TIDAL_AUTHORIZATION_URI`
+- `TIDAL_TOKEN_URI`
+- `TIDAL_API_BASE_URI`
+- `TIDAL_COUNTRY_CODE`
+- `TIDAL_SCOPES`
 - `LASTFM_ENABLED`
 - `LASTFM_API_KEY`
 - `LASTFM_SHARED_SECRET`
@@ -198,7 +224,9 @@ export SPOTIFY_REDIRECT_URI=https://your-domain.example.com/platforms/oauth/call
 AI_SERVICE_BASE_URL=http://localhost:8000 ./gradlew bootRun
 ```
 
-이 설정이 있으면 `/api/v1/platforms/oauth/start`의 Spotify 응답은 internal sandbox approval 대신 external authorization URL을 내려준다. 이후 `/api/v1/pms/import/bootstrap`와 `/api/v1/pms/import/playlists`는 실제 Spotify playlist/provider 경로를 사용한다.
+이 설정이 있으면 `/api/v1/platforms/oauth/start`의 Spotify 응답은 external authorization URL을 내려준다. OAuth 설정이 없으면 내부 승인 화면이나 mock credential로 대체하지 않고 실패한다.
+
+TIDAL OAuth 설정값도 `application.yml`에 준비되어 있지만, 현재 catalog에서는 `pms_import_supported=false`이므로 실제 TIDAL playlist import provider가 완성될 때까지 `/api/v1/platforms/oauth/start` 대상이 아니다.
 
 프로젝트에 맞춘 상세 설정과 실행 스크립트는 [SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md) 를 본다.
 
@@ -218,7 +246,7 @@ AI_SERVICE_BASE_URL=http://localhost:8000 ./gradlew bootRun
 curl -X POST http://127.0.0.1:8081/api/v1/platforms/lastfm/scrobbles/sync \
   -H 'Content-Type: application/json' \
   -d '{
-    "user_id": "user-001",
+    "user_id": "user-{uuid}",
     "limit": 40
   }'
 ```
@@ -244,9 +272,11 @@ curl -X POST http://127.0.0.1:8081/api/v1/gms/recommendations/preview \
   -H 'Content-Type: application/json' \
   -d '{
     "mode": "gms",
+    "user_id": "user-{uuid}",
+    "playlist_id": "pms-spotify-{spotify_playlist_id}",
     "mood": "upbeat",
     "limit": 3,
-    "seed_track_ids": ["track-alpha", "track-beta"]
+    "seed_track_ids": ["pms-track-spotify-{spotify_track_id}"]
   }'
 ```
 
@@ -254,9 +284,10 @@ curl -X POST http://127.0.0.1:8081/api/v1/gms/recommendations/preview \
 
 PMS bootstrap은 현재 아래 세 모드로 동작한다.
 
-- `imported-user`: 현재 사용자 기준 PMS import 결과
-- `database`: Flyway로 적재된 `pms_playlist`, `pms_track`, `pms_playlist_track` 기반 bootstrap
-- `local`: 정적 fallback bootstrap
+- `imported-user`: 현재 사용자 기준 정식 PMS user library
+- `imported-snapshot`: 정식 라이브러리 sync 전 raw import 복구 소스
+- `user-owned-database`: 같은 `user_id` 소유의 `pms_playlist`, `pms_track`, `pms_playlist_track` 기반 bootstrap
+- `empty-library`: import 전 빈 PMS workspace
 
 ## Wrapper 상태
 

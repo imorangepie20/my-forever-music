@@ -25,7 +25,7 @@ public class PmsImportedWorkspaceBootstrapSource implements PmsWorkspaceBootstra
     }
 
     @Override
-    public Optional<PmsWorkspaceBootstrapResponse> load(String userId) {
+    public Optional<PmsWorkspaceBootstrapResponse> load(String userId, String playlistId) {
         if (userId == null || userId.isBlank()) {
             return Optional.empty();
         }
@@ -37,7 +37,10 @@ public class PmsImportedWorkspaceBootstrapSource implements PmsWorkspaceBootstra
             return Optional.empty();
         }
 
-        PmsPlaylistImportStore.ImportedPlaylistState defaultPlaylist = importedPlaylists.getFirst();
+        PmsPlaylistImportStore.ImportedPlaylistState defaultPlaylist = importedPlaylists.stream()
+            .filter(playlist -> playlistId != null && !playlistId.isBlank() && playlist.playlistId().equals(playlistId))
+            .findFirst()
+            .orElse(importedPlaylists.getFirst());
         List<PmsPlaylistImportStore.ImportedTrackState> defaultTracks = defaultPlaylist.tracks().stream()
             .sorted(Comparator.comparingInt(PmsPlaylistImportStore.ImportedTrackState::sortOrder)
                 .thenComparing(PmsPlaylistImportStore.ImportedTrackState::trackId))
@@ -89,7 +92,10 @@ public class PmsImportedWorkspaceBootstrapSource implements PmsWorkspaceBootstra
             playlist.sourcePlatform(),
             playlist.trackCount(),
             playlist.curator(),
-            playlist.highlight()
+            playlist.highlight(),
+            playlist.coverImageUrl(),
+            playlist.platformExternalUrl(),
+            playlist.platformUri()
         );
     }
 
@@ -101,6 +107,13 @@ public class PmsImportedWorkspaceBootstrapSource implements PmsWorkspaceBootstra
             track.title(),
             track.artistName(),
             track.sourcePlatform(),
+            track.albumTitle(),
+            track.albumImageUrl(),
+            track.platformExternalUrl(),
+            track.platformUri(),
+            track.previewUrl(),
+            track.spotifyAudioFeatures() == null ? null : track.spotifyAudioFeatures().getDurationMs(),
+            track.seed(),
             track.spotifyAudioFeatures() == null ? null : track.spotifyAudioFeatures().getSpotifyTrackId(),
             track.spotifyAudioFeatures() != null && track.spotifyAudioFeatures().isComplete(),
             track.spotifyAudioFeatures() == null ? "unresolved" : track.spotifyAudioFeatures().getAudioFeatureSource()

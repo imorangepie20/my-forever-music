@@ -47,18 +47,17 @@ class PlatformConnectionBootstrapControllerWebMvcTest {
     }
 
     @Test
-    void shouldConnectPlatform() throws Exception {
-        when(platformConnectionService.connect(any())).thenReturn(sampleCommand("connected", true));
+    void shouldRejectDirectConnectPlatform() throws Exception {
+        when(platformConnectionService.connect(any()))
+            .thenThrow(new IllegalArgumentException("Direct platform connect is disabled."));
 
-        PlatformConnectRequest request = new PlatformConnectRequest("user-001", "spotify", "sandbox", "Forever Listener Spotify");
+        PlatformConnectRequest request = new PlatformConnectRequest("user-001", "spotify", "spotify-pkce-draft", "Forever Listener Spotify");
 
         mockMvc.perform(post("/api/v1/platforms/connections/connect")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsBytes(request)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.status").value("connected"))
-            .andExpect(jsonPath("$.connection.connected").value(true))
-            .andExpect(jsonPath("$.next_step.path").value("/pms"));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("Direct platform connect is disabled."));
     }
 
     @Test
@@ -126,7 +125,7 @@ class PlatformConnectionBootstrapControllerWebMvcTest {
                 "Spotify",
                 connected,
                 connected ? "connected" : "not_connected",
-                "sandbox",
+                "spotify-pkce-draft",
                 "Forever Listener Spotify",
                 "playlist-read, profile-read",
                 connected,

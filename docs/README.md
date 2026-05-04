@@ -6,7 +6,10 @@
 
 - [PROJECT_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_GUIDE.md): 새 세션과 새 작업자가 먼저 읽어야 하는 통합 가이드
 - [PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md): 서비스 핵심 기능과 장기 제품 흐름의 원문 정의
+- [product/USER_MUSIC_HOME_VISION.md](/Users/woosungjo/music-space/my-forever-music/docs/product/USER_MUSIC_HOME_VISION.md): 사용자가 사이트에 머무는 이유, 플랫폼 이동 후에도 보존되는 음악 취향 홈, 플랫폼 연동 이후 사용자별 음악 학습 모델 개발 순서 정의
+- [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md): mock/sandbox 없이 실제 구현된 기능만 사용자 플로우에 노출하는 기준
 - [architecture/MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md): 현재는 MacBook 로컬에서 구현/시험 후 Ubuntu로 이전하는 실행 전략
+- [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md): MacBook 시험 서비스에서 실제 API/저장소/provider만 기본 사용자 경로로 쓰는 정책
 - [architecture/TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md): 현재 채택 기술 스택
 - [architecture/SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md): Spotify OAuth Redirect URI, env, HTTPS 테스트 기준
 - [architecture/HTTPS_DOMAIN_DEV_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/HTTPS_DOMAIN_DEV_SETUP.md): `imapplepie20.tplinkdns.com` 기준 HTTPS reverse proxy와 Certbot 적용 절차
@@ -18,6 +21,7 @@
 ## 제품 정의 문서
 
 - [PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md): 플랫폼 연동, 오디오 특성 분석, PMS/EMS/GMS 환류, 플레이어 유지 요구사항을 담은 핵심 서비스 정의
+- [product/USER_MUSIC_HOME_VISION.md](/Users/woosungjo/music-space/my-forever-music/docs/product/USER_MUSIC_HOME_VISION.md): 회원의 반복 사용 목적, 사용자 소유 PMS 라이브러리, 사용자별 음악 학습 모델, 평가/playlist/playback 중심 체류 경험 정의
 
 ## 서비스 가이드
 
@@ -33,8 +37,8 @@
 - [api/LASTFM_SIGNAL_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/LASTFM_SIGNAL_PREVIEW_API.md): Last.fm 공개 사용자명 기준 청취 신호 preview 계약
 - [api/LASTFM_PROFILE_CONNECTION_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/LASTFM_PROFILE_CONNECTION_API.md): Last.fm 사용자명을 계정에 저장하는 signal profile 연결 계약
 - [api/LASTFM_SCROBBLE_SYNC_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/LASTFM_SCROBBLE_SYNC_API.md): Last.fm 최근 scrobble 저장과 snapshot 재사용 계약
-- [api/PLATFORM_OAUTH_SANDBOX_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_OAUTH_SANDBOX_API.md): sandbox OAuth 시작/승인/callback 완료 계약
-- [api/PMS_PLAYLIST_IMPORT_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_PLAYLIST_IMPORT_API.md): sandbox 플랫폼 playlist import와 PMS 적재 계약
+- [api/PLATFORM_OAUTH_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_OAUTH_API.md): 실제 provider OAuth 시작/callback 완료 계약
+- [api/PMS_PLAYLIST_IMPORT_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_PLAYLIST_IMPORT_API.md): 실제 플랫폼 playlist import와 PMS 적재 계약
 - [api/AI_RECOMMENDATION_PREVIEW.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AI_RECOMMENDATION_PREVIEW.md): AI 추천 preview 내부 계약
 - [api/EMS_WORKSPACE_ANALYSIS_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/EMS_WORKSPACE_ANALYSIS_API.md): EMS workspace 추천값 분석 계약
 - [api/GMS_RECOMMENDATION_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_PREVIEW_API.md): Spring Boot API의 GMS preview 엔드포인트 초안

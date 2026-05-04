@@ -27,7 +27,7 @@ class LastFmScrobbleSyncServiceTest {
             "Forever Listener",
             "scrobble-sync@example.com",
             "music2026",
-            "last-fm",
+            "spotify",
             false,
             true,
             true

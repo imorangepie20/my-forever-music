@@ -16,6 +16,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -25,6 +26,7 @@ public class SpotifyAuthorizationCodeExchangeClient implements PlatformAuthoriza
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
+    @Autowired
     public SpotifyAuthorizationCodeExchangeClient(
         PlatformOAuthProperties platformOAuthProperties,
         ObjectMapper objectMapper

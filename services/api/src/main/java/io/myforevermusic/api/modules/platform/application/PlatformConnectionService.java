@@ -97,6 +97,15 @@ public class PlatformConnectionService {
     }
 
     public PlatformConnectionCommandResponse connect(PlatformConnectRequest request) {
+        findAccount(request.userId());
+        PlatformOption platform = findPlatform(request.platformId());
+        throw new IllegalArgumentException(
+            "Direct platform connect is disabled. Use the real OAuth flow or a platform-specific connection endpoint for %s."
+                .formatted(platform.displayName())
+        );
+    }
+
+    public PlatformConnectionCommandResponse connectSandboxForTests(PlatformConnectRequest request) {
         AuthRegisteredAccount account = findAccount(request.userId());
         PlatformOption platform = findPlatform(request.platformId());
         Instant now = Instant.now();

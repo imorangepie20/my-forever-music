@@ -51,7 +51,7 @@ public class InMemoryPlatformConnectionStore implements PlatformConnectionStore 
         Instant now = Instant.now();
 
         StoredConnection disconnected = current == null
-            ? new StoredConnection(userId, platformId, false, "not_connected", "sandbox", null, null, false, null, now)
+            ? new StoredConnection(userId, platformId, false, "not_connected", "none", null, null, false, null, now)
             : current.withDisconnected(now);
 
         connections.put(key, disconnected);

@@ -82,6 +82,9 @@ public class SpotifyPlatformPlaylistProvider implements PlatformPlaylistProvider
                 "spotify",
                 playlist.ownerDisplayName(),
                 normalizeDescription(playlist.description()),
+                playlist.coverImageUrl(),
+                playlist.externalUrl(),
+                playlist.spotifyUri(),
                 playlist.trackCount(),
                 List.of()
             ))
@@ -163,8 +166,11 @@ public class SpotifyPlatformPlaylistProvider implements PlatformPlaylistProvider
         try {
             return spotifyWebApiClient.getTrackAudioFeatures(credential, uniqueTrackIds);
         } catch (RuntimeException exception) {
-            log.warn("Spotify audio-features lookup failed. Falling back to generated snapshots: {}", exception.getMessage());
-            return Map.of();
+            log.warn("Spotify audio-features lookup failed: {}", exception.getMessage());
+            throw new IllegalStateException(
+                "Spotify audio features could not be resolved. No fallback audio feature snapshot will be generated.",
+                exception
+            );
         }
     }
 
@@ -182,6 +188,11 @@ public class SpotifyPlatformPlaylistProvider implements PlatformPlaylistProvider
                     track.title(),
                     track.artistName(),
                     inferPrimaryGenre(playlist, track),
+                    track.albumTitle(),
+                    track.albumImageUrl(),
+                    track.externalUrl(),
+                    track.spotifyUri(),
+                    track.previewUrl(),
                     index < 2,
                     resolveTrackAudioFeatures(track, audioFeaturesByTrackId.get(track.spotifyTrackId()), resolvedAt)
                 );
@@ -194,6 +205,9 @@ public class SpotifyPlatformPlaylistProvider implements PlatformPlaylistProvider
             "spotify",
             playlist.ownerDisplayName(),
             normalizeDescription(playlist.description()),
+            playlist.coverImageUrl(),
+            playlist.externalUrl(),
+            playlist.spotifyUri(),
             importTracks.size(),
             importTracks
         );
@@ -230,36 +244,9 @@ public class SpotifyPlatformPlaylistProvider implements PlatformPlaylistProvider
             );
         }
 
-        return buildFallbackAudioFeatures(track, resolvedAt);
-    }
-
-    private PmsTrackSpotifyAudioFeatures buildFallbackAudioFeatures(
-        SpotifyPlaylistTrack track,
-        Instant resolvedAt
-    ) {
-        String seed = "%s|%s|%s".formatted(track.spotifyTrackId(), track.title(), track.artistName());
-        return new PmsTrackSpotifyAudioFeatures(
-            track.spotifyTrackId(),
-            "fallback_generated",
-            true,
-            "https://api.spotify.com/v1/audio-analysis/%s".formatted(track.spotifyTrackId()),
-            track.trackHref() == null ? "https://api.spotify.com/v1/tracks/%s".formatted(track.spotifyTrackId()) : track.trackHref(),
-            track.spotifyUri() == null ? "spotify:track:%s".formatted(track.spotifyTrackId()) : track.spotifyUri(),
-            "audio_features",
-            track.durationMs() == null ? 180000 + boundedInt(seed, 1, 0, 90000) : track.durationMs(),
-            boundedInt(seed, 2, 0, 11),
-            boundedInt(seed, 3, 0, 1),
-            List.of(3, 4, 4, 4, 5).get(boundedInt(seed, 4, 0, 4)),
-            boundedDouble(seed, 5, 0.05, 0.85),
-            boundedDouble(seed, 6, 0.28, 0.9),
-            boundedDouble(seed, 7, 0.25, 0.92),
-            boundedDouble(seed, 8, 0.0, 0.45),
-            boundedDouble(seed, 9, 0.05, 0.35),
-            boundedDouble(seed, 10, -15.0, -4.0),
-            boundedDouble(seed, 11, 0.02, 0.2),
-            boundedDouble(seed, 12, 76.0, 160.0),
-            boundedDouble(seed, 13, 0.15, 0.85),
-            resolvedAt
+        throw new IllegalStateException(
+            "Spotify audio features are missing for track %s (%s). Import is stopped so PMS does not store generated audio values."
+                .formatted(track.spotifyTrackId(), track.title())
         );
     }
 
@@ -294,9 +281,4 @@ public class SpotifyPlatformPlaylistProvider implements PlatformPlaylistProvider
         return min + (int) (normalized % (max - min + 1));
     }
 
-    private double boundedDouble(String seed, int salt, double min, double max) {
-        long normalized = Integer.toUnsignedLong((seed + "|" + salt).hashCode()) % 1000L;
-        double ratio = normalized / 999.0d;
-        return Math.round((min + (ratio * (max - min))) * 1000.0d) / 1000.0d;
-    }
 }
