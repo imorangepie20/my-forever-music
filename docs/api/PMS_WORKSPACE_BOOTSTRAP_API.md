@@ -48,8 +48,11 @@
   - `duration_ms`
   - `seed`
   - `spotify_track_id`
+  - `audio_feature_track_id`
   - `spotify_audio_features_filled`
+  - `audio_features_filled`
   - `spotify_audio_feature_source`
+  - `audio_feature_source`
 - `suggested_artists`
 - `suggested_genres`
 
@@ -61,7 +64,7 @@
 - 그다음 `database` 같은 DB 활성 프로필에서는 같은 `user_id` 소유의 `pms_*` 테이블 데이터를 읽는다
 - 어느 소스에도 사용자 데이터가 없으면 빈 playlist/track/signal 목록을 반환한다
 - 현재 DB 스키마는 `playlist / track / playlist_track` 기반의 PMS 카탈로그를 제공하지만, 사용자 플로우에서 임의 demo 데이터를 fallback으로 노출하지 않는다
-- 현재 `pms_track`는 track 메타데이터뿐 아니라 Spotify 오디오 특성 전체 스냅샷을 함께 저장하는 구조로 확장되었다
+- 현재 `pms_track`는 track 메타데이터와 legacy `spotify_*` audio feature snapshot을 함께 저장하는 구조로 확장되었다
 - 현재 `PMS user library`는 `pms_user_playlist / pms_user_track / pms_user_playlist_track` 또는 `local in-memory store`를 통해 유지된다
 - Flyway 마이그레이션:
   - [V1__create_pms_bootstrap_catalog.sql](/Users/woosungjo/music-space/my-forever-music/services/api/src/main/resources/db/migration/V1__create_pms_bootstrap_catalog.sql)
@@ -73,7 +76,10 @@
 - `playlist_id`가 같이 들어오면 가능한 경우 그 playlist를 현재 workspace 기준으로 우선 투영한다
 - seed track은 `pms_playlist_track.is_seed = true` 기준으로 고른다
 - artist / genre suggestion은 선택된 기본 playlist의 track 분포를 집계해 계산한다
-- `suggested_tracks`는 현재 각 track이 Spotify 오디오 특성을 채운 상태인지 함께 내려준다
+- `suggested_tracks`는 현재 각 track이 `legacy 호환 오디오 특성 snapshot`을 채운 상태인지 함께 내려준다
+- `audio_feature_track_id`, `audio_features_filled`, `audio_feature_source`는 provider-neutral alias 필드다
+- `spotify_audio_feature_source`는 필드 이름과 달리 반드시 Spotify provenance를 뜻하지 않는다
+- 현재 응답은 alias 필드와 legacy `spotify_*` 필드를 함께 내려준다
 - 현재 응답은 플레이리스트 cover image, 트랙 album image, 외부 플랫폼 URL, platform URI까지 함께 내려주므로 `PMS / EMS / GMS` 페이지에서 같은 리치 미디어 컨텍스트를 재사용할 수 있다
 
 ## 다음 연결 지점

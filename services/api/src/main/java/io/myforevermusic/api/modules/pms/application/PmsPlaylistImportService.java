@@ -125,7 +125,7 @@ public class PmsPlaylistImportService {
                     playlist.platformExternalUrl(),
                     playlist.platformUri(),
                     importedExternalPlaylistIds.contains(playlist.externalPlaylistId()),
-                    "complete_spotify_snapshot"
+                    "provider_neutral_enrichment"
                 ))
                 .toList(),
             importedPlaylists.stream()
@@ -229,7 +229,7 @@ public class PmsPlaylistImportService {
             .sum();
         int completeSpotifyAudioFeatureTrackCount = (int) importedPlaylists.stream()
             .flatMap(playlist -> playlist.tracks().stream())
-            .filter(track -> track.spotifyAudioFeatures() != null && track.spotifyAudioFeatures().isComplete())
+            .filter(track -> track.audioFeatures() != null && track.audioFeatures().isComplete())
             .count();
         int librarySyncedTrackCount = syncedLibraryPlaylists.stream()
             .mapToInt(PmsUserLibraryStore.LibraryPlaylistState::trackCount)
@@ -245,6 +245,7 @@ public class PmsPlaylistImportService {
                 platform.displayName(),
                 importedPlaylists.size(),
                 importedTrackCount,
+                completeSpotifyAudioFeatureTrackCount,
                 completeSpotifyAudioFeatureTrackCount,
                 connectionState.connectionMode(),
                 syncedLibraryPlaylists.size(),
@@ -262,7 +263,7 @@ public class PmsPlaylistImportService {
                 .toList(),
             new PmsPlaylistImportResponse.NextStep(
                 "/ems",
-                "Playlists were imported into PMS, synced into the formal user library, and saved with complete Spotify audio feature snapshots. Continue to EMS analysis."
+                "Playlists were imported into PMS, synced into the formal user library, and recorded with their current audio feature snapshot status. Continue to EMS analysis."
             )
         );
     }
@@ -353,7 +354,7 @@ public class PmsPlaylistImportService {
                 track.previewUrl(),
                 playlist.tracks().indexOf(track) + 1,
                 track.seed(),
-                track.spotifyAudioFeatures()
+                track.audioFeatures()
             ))
             .toList();
 

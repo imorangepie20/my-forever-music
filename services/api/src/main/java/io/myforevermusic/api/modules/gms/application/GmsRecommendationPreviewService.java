@@ -8,7 +8,7 @@ import io.myforevermusic.api.modules.gms.presentation.GmsRecommendationPreviewRe
 import io.myforevermusic.api.modules.platform.application.LastFmScrobbleStore;
 import io.myforevermusic.api.modules.platform.infrastructure.lastfm.LastFmWebApiClient;
 import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
-import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackSpotifyAudioFeatures;
+import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -159,7 +159,7 @@ public class GmsRecommendationPreviewService {
                     track.previewUrl(),
                     track.seed(),
                     track.sortOrder(),
-                    track.spotifyAudioFeatures()
+                    track.audioFeatures()
                 )))
             .sorted(Comparator
                 .comparing((LibraryCandidateTrack candidate) -> requestedPlaylistMatch(requestedPlaylistId, candidate))
@@ -193,10 +193,10 @@ public class GmsRecommendationPreviewService {
             candidate.albumTitle(),
             candidate.albumImageUrl(),
             firstNonBlank(candidate.platformExternalUrl(), candidate.playlistExternalUrl()),
-            firstNonBlank(candidate.platformUri(), candidate.spotifyAudioFeatures() == null ? null : candidate.spotifyAudioFeatures().getSpotifyUri()),
+            firstNonBlank(candidate.platformUri(), candidate.audioFeatures() == null ? null : candidate.audioFeatures().getSpotifyUri()),
             candidate.previewUrl(),
-            candidate.spotifyAudioFeatures() == null ? null : candidate.spotifyAudioFeatures().getSpotifyTrackId(),
-            candidate.spotifyAudioFeatures() == null ? null : candidate.spotifyAudioFeatures().getDurationMs(),
+            candidate.audioFeatures() == null ? null : candidate.audioFeatures().getAudioFeatureTrackId(),
+            candidate.audioFeatures() == null ? null : candidate.audioFeatures().getDurationMs(),
             rankedCandidate.affinityScore(),
             aiItem.sourceSpace(),
             aiItem.energyLevel(),
@@ -228,13 +228,13 @@ public class GmsRecommendationPreviewService {
             score += 0.12d;
         }
 
-        score += 0.14d * energyAlignment(candidate.spotifyAudioFeatures(), request.energyLevel());
+        score += 0.14d * energyAlignment(candidate.audioFeatures(), request.energyLevel());
         score += 0.09d * moodAlignment(candidate, request.mood());
 
         return Math.min(0.99d, score);
     }
 
-    private double energyAlignment(PmsTrackSpotifyAudioFeatures features, Integer requestedEnergyLevel) {
+    private double energyAlignment(PmsTrackAudioFeatures features, Integer requestedEnergyLevel) {
         if (requestedEnergyLevel == null || features == null || features.getEnergy() == null) {
             return 0.5d;
         }
@@ -250,7 +250,7 @@ public class GmsRecommendationPreviewService {
         }
 
         String genre = normalizeValue(candidate.primaryGenre());
-        PmsTrackSpotifyAudioFeatures features = candidate.spotifyAudioFeatures();
+        PmsTrackAudioFeatures features = candidate.audioFeatures();
         double energy = features == null || features.getEnergy() == null ? 0.5d : features.getEnergy();
         double valence = features == null || features.getValence() == null ? 0.5d : features.getValence();
 
@@ -439,7 +439,7 @@ public class GmsRecommendationPreviewService {
         String previewUrl,
         boolean seed,
         int sortOrder,
-        PmsTrackSpotifyAudioFeatures spotifyAudioFeatures
+        PmsTrackAudioFeatures audioFeatures
     ) {
     }
 

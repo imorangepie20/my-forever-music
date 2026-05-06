@@ -33,12 +33,12 @@
 
 ## 제품 데이터 기준
 
-- 트랙의 핵심 분석 기준은 우선 `Spotify` 오디오 특성을 기준으로 삼는다
+- 트랙의 핵심 분석 기준은 `provider-neutral audio feature model`을 우선으로 삼는다
 - 주요 분석 항목은 `danceability`, `energy`, `valence`, `acousticness`, `liveness`, `speechiness`, `tempo`다
-- 플레이리스트 import 시점에는 트랙별 `Spotify 오디오 특성 전체 스냅샷`을 채워 저장하는 것을 기본 원칙으로 삼는다
+- 플레이리스트 import는 track metadata 저장을 먼저 보장하고, 오디오 특성은 동기 또는 후속 보강 단계로 처리한다
 - 사용자의 재생 횟수, 청취 시간, skip, save, playlist 추가 같은 행동 데이터도 장기적으로 함께 학습한다
-- 특정 트랙의 오디오 특성을 직접 확보하지 못하면 사용자 플로우에서는 가짜 값을 생성하지 않고 import 실패/재시도/제외 정책으로 처리한다
-- `services/ai`는 장기적으로 약 `10만 곡` 수준의 기반 트랙 데이터와 사용자별 추가 학습 데이터를 함께 다루는 구조를 목표로 한다
+- 특정 트랙의 오디오 특성을 직접 확보하지 못하면 가짜 값을 생성하지 않고 `unresolved` 상태와 재시도/보강 정책으로 처리한다
+- `services/ai`는 장기적으로 약 `10만 곡` 수준의 provider-neutral 기반 트랙 데이터와 사용자별 추가 학습 데이터를 함께 다루는 구조를 목표로 한다
 
 ## 도메인 모델 기준
 

@@ -53,9 +53,9 @@ Spotify, TIDAL, YouTube Music, Apple Music 같은 플랫폼은 원본 playlist�
 1. 사용자가 회원가입 또는 로그인한다.
 2. 구독 중인 스트리밍 플랫폼을 연결한다.
 3. 연결된 플랫폼에서 playlist를 가져온다.
-4. 가져온 track마다 Spotify 오디오 특성 전체 스냅샷을 채운다. 실패 시 가짜 값을 만들지 않고 import를 중단하거나 명시적인 재시도/제외 정책으로 처리한다.
+4. 가져온 track metadata를 PMS에 저장하고, 오디오 특성은 provider-neutral 기준으로 보강한다. 실패 시 가짜 값을 만들지 않고 `unresolved` 상태와 명시적인 재시도/보강 정책으로 처리한다.
 5. 가져온 playlist와 track을 PMS user library에 저장한다.
-6. PMS user library와 Spotify 오디오 특성 스냅샷을 기반으로 사용자별 음악 학습 모델을 만든다.
+6. PMS user library와 provider-neutral 오디오 특성 스냅샷을 기반으로 사용자별 음악 학습 모델을 만든다.
 7. 사용자는 자신의 취향 기반 추천을 받는다.
 8. 추천 결과를 평가하거나 새 playlist에 추가한다.
 9. 사이트 안에서 음악을 재생하고 감상한다.
@@ -65,7 +65,7 @@ Spotify, TIDAL, YouTube Music, Apple Music 같은 플랫폼은 원본 playlist�
 
 - `auth`: 사용자의 장기 계정과 온보딩 상태를 관리한다.
 - `platform`: 외부 스트리밍 플랫폼 연결, OAuth, credential, playlist provider를 관리한다.
-- `pms`: 사용자 소유 playlist, track, audio feature snapshot, 평가, 행동 데이터를 보존한다.
+- `pms`: 사용자 소유 playlist, track, provider-neutral audio feature snapshot, 평가, 행동 데이터를 보존한다.
 - `ems`: 외부 공개 playlist와 트렌딩 음악을 탐색하고 후보군을 만든다.
 - `gms`: PMS 사용자 모델을 통과한 추천 후보를 보여주고 평가를 받는다.
 - `player`: 웹과 데스크탑에서 같은 음악 감상 상태를 유지한다.
@@ -90,6 +90,6 @@ Spotify, TIDAL, YouTube Music, Apple Music 같은 플랫폼은 원본 playlist�
 - 새 기능을 만들 때는 먼저 `사용자의 장기 음악 취향 보존`에 도움이 되는지 확인합니다.
 - 외부 플랫폼 기능은 특정 플랫폼 종속 기능으로 끝내지 말고, 가능한 한 PMS canonical model로 흡수합니다.
 - 사용자별 음악 학습 모델은 플랫폼 연동과 PMS user library 저장이 안정화된 뒤 개발합니다.
-- 모델의 1차 입력은 가져온 playlist, track metadata, Spotify audio feature snapshot, Last.fm scrobble, 사이트 내부 행동 이벤트입니다.
+- 모델의 1차 입력은 가져온 playlist, track metadata, provider-neutral audio feature snapshot, Last.fm scrobble, 사이트 내부 행동 이벤트입니다.
 - 추천 기능은 결과 표시보다 `평가 -> 학습 -> 재추천` 루프까지 닫는 것을 목표로 합니다.
 - 재생 기능은 부가 기능이 아니라 사용자가 사이트에 머무는 핵심 이유로 봅니다.

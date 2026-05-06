@@ -1,6 +1,6 @@
 package io.myforevermusic.api.modules.pms.application;
 
-import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackSpotifyAudioFeatures;
+import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -337,7 +337,7 @@ public class PmsPlaylistImportCatalogService {
         String platformUri,
         String previewUrl,
         boolean seed,
-        PmsTrackSpotifyAudioFeatures spotifyAudioFeatures
+        PmsTrackAudioFeatures audioFeatures
     ) {
     }
 
@@ -369,7 +369,7 @@ public class PmsPlaylistImportCatalogService {
         String artistName,
         String primaryGenre,
         boolean seed,
-        PmsTrackSpotifyAudioFeatures spotifyAudioFeatures
+        PmsTrackAudioFeatures audioFeatures
     ) {
         return new ImportCandidateTrack(
             externalTrackId,
@@ -382,11 +382,11 @@ public class PmsPlaylistImportCatalogService {
             null,
             null,
             seed,
-            spotifyAudioFeatures
+            audioFeatures
         );
     }
 
-    private static PmsTrackSpotifyAudioFeatures audioFeatures(
+    private static PmsTrackAudioFeatures audioFeatures(
         String spotifyTrackId,
         String source,
         int durationMs,
@@ -403,7 +403,7 @@ public class PmsPlaylistImportCatalogService {
         double tempo,
         double valence
     ) {
-        return new PmsTrackSpotifyAudioFeatures(
+        return new PmsTrackAudioFeatures(
             spotifyTrackId,
             source,
             true,

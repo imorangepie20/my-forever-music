@@ -17,14 +17,24 @@ import type {
     LastFmScrobbleSyncRequest,
     LastFmScrobbleSyncResponse,
     LastFmSignalPreviewResponse,
+    EmsCollectionSearchRequest,
+    EmsCollectionSearchResponse,
+    EmsCollectionPlaylistBrowseResponse,
+    EmsCollectionTrackBrowseResponse,
     EmsWorkspaceAnalysisRequest,
     EmsWorkspaceAnalysisResponse,
     GmsRecommendationPreviewRequest,
     GmsRecommendationPreviewResponse,
+    GmsRecommendationFeedbackRequest,
+    GmsRecommendationFeedbackResponse,
     PmsWorkspaceBootstrapResponse,
     PmsPlaylistImportBootstrapResponse,
     PmsPlaylistImportRequest,
     PmsPlaylistImportResponse,
+    PmsPersonalPlaylistBootstrapResponse,
+    PmsPersonalPlaylistCommandResponse,
+    PmsPersonalPlaylistCreateRequest,
+    PmsPersonalPlaylistTrackSaveRequest,
     SystemInfoResponse,
 } from '@/types/api'
 
@@ -249,6 +259,57 @@ export const importPmsPlaylists = (payload: PmsPlaylistImportRequest) =>
         body: JSON.stringify(payload),
     })
 
+export const fetchPmsPersonalPlaylists = (userId: string, signal?: AbortSignal) =>
+    requestJson<PmsPersonalPlaylistBootstrapResponse>(
+        `/api/v1/pms/personal-playlists/bootstrap?user_id=${encodeURIComponent(userId)}`,
+        { signal },
+    )
+
+export const createPmsPersonalPlaylist = (payload: PmsPersonalPlaylistCreateRequest) =>
+    requestJson<PmsPersonalPlaylistCommandResponse>('/api/v1/pms/personal-playlists', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    })
+
+export const saveTrackToPmsPersonalPlaylist = (payload: PmsPersonalPlaylistTrackSaveRequest) =>
+    requestJson<PmsPersonalPlaylistCommandResponse>('/api/v1/pms/personal-playlists/tracks', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    })
+
+export const searchEmsCollection = (payload: EmsCollectionSearchRequest) =>
+    requestJson<EmsCollectionSearchResponse>('/api/v1/ems/collection/search', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    })
+
+export const fetchEmsCollectedPlaylists = (platformId: string = 'spotify', signal?: AbortSignal) =>
+    requestJson<EmsCollectionPlaylistBrowseResponse>(
+        `/api/v1/ems/collection/playlists?platform_id=${encodeURIComponent(platformId)}`,
+        { signal },
+    )
+
+export const fetchEmsCollectedTracks = (platformId: string = 'spotify', signal?: AbortSignal) =>
+    requestJson<EmsCollectionTrackBrowseResponse>(
+        `/api/v1/ems/collection/tracks?platform_id=${encodeURIComponent(platformId)}`,
+        { signal },
+    )
+
+export const fetchEmsPlaylistTracks = (playlistId: number, signal?: AbortSignal) =>
+    requestJson<EmsCollectionTrackBrowseResponse>(
+        `/api/v1/ems/collection/playlists/${playlistId}/tracks`,
+        { signal },
+    )
+
 export const analyzeEmsWorkspace = (payload: EmsWorkspaceAnalysisRequest, signal?: AbortSignal) =>
     requestJson<EmsWorkspaceAnalysisResponse>('/api/v1/ems/workspace/analysis', {
         method: 'POST',
@@ -269,4 +330,13 @@ export const previewGmsRecommendations = (payload: GmsRecommendationPreviewReque
             mode: 'gms',
             ...payload,
         }),
+    })
+
+export const recordGmsRecommendationFeedback = (payload: GmsRecommendationFeedbackRequest) =>
+    requestJson<GmsRecommendationFeedbackResponse>('/api/v1/gms/recommendations/feedback', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
     })

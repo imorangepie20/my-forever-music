@@ -20,12 +20,12 @@ public class PlatformCatalogService {
             "api",
             "ok",
             Instant.now(),
-            "spotify",
+            "provider-neutral-transition",
             List.of(
                 "사용자가 구독 중인 스트리밍 플랫폼을 선택한다.",
                 "선택한 플랫폼의 플레이리스트를 PMS로 가져온다.",
-                "트랙별 오디오 특성을 우선 Spotify 기준으로 확보한다.",
-                "Spotify 오디오 특성을 확보하지 못한 곡은 가짜 특성으로 채우지 않고 import를 중단한다.",
+                "오디오 특성은 provider-neutral 전략으로 보강한다.",
+                "즉시 확보하지 못한 곡은 가짜 값으로 채우지 않고 unresolved 상태로 남긴다.",
                 "스트리밍 플랫폼 확장은 Spotify -> TIDAL -> YouTube Music 순서로 진행하고 Apple Music은 개발자 계정 확보 후 재개한다.",
                 "가져온 데이터는 EMS/GMS 추천 루프와 사용자 모델 학습에 연결한다."
             ),
@@ -33,31 +33,31 @@ public class PlatformCatalogService {
                 new PlatformCatalogResponse.PlatformOption(
                     "spotify",
                     "Spotify",
-                    "priority-analysis-source",
+                    "priority-import-source",
                     true,
                     true,
-                    "native-audio-features",
+                    "metadata-import-and-external-feature-backfill",
                     "사용자 플레이리스트 PMS 적재의 1차 기준 플랫폼",
                     "공개 플레이리스트와 트렌드 수집의 우선 연구 대상",
                     List.of(
-                        "핵심 오디오 특성 기준 소스",
-                        "danceability, energy, valence, acousticness, liveness, speechiness, tempo를 우선 사용",
-                        "개인화 모델의 공통 기반 데이터셋 구축에 가장 적합한 시작점"
+                        "개인 개발 환경에서는 Spotify audio features를 canonical source로 가정하지 않는다",
+                        "playlist import와 playback metadata source로 가장 중요한 시작점이다",
+                        "오디오 특성은 외부 provider backfill 전략으로 전환 중이다"
                     )
                 ),
                 new PlatformCatalogResponse.PlatformOption(
                     "tidal",
                     "TIDAL",
-                    "planned-provider-next",
-                    false,
+                    "testing-provider",
                     true,
-                    "disabled-until-real-provider",
-                    "Spotify 다음으로 실제 TIDAL provider 구현을 진행하며, 완료 전까지 PMS import 비활성",
+                    true,
+                    "external-feature-backfill-after-provider",
+                    "TIDAL playlist provider가 구현되었으며, provider-neutral 오디오 특성 보강 검증 단계",
                     "트렌딩 및 공개 플레이리스트를 EMS 후보군으로 수집하는 다음 대상",
                     List.of(
-                        "현재 사용자 온보딩에서는 선택할 수 없다",
-                        "TIDAL OAuth 2.1 + PKCE 토큰 교환 기반을 먼저 준비한다",
-                        "실제 TIDAL API playlist provider와 Spotify 오디오 특성 매칭 검증이 끝난 뒤 PMS import를 활성화한다"
+                        "PMS import가 활성화되어 있으나 아직 검증 단계",
+                        "TIDAL OAuth 2.1 + PKCE 토큰 교환 구현 완료",
+                        "오디오 특성은 외부 provider lookup 또는 후속 보강이 필요함"
                     )
                 ),
                 new PlatformCatalogResponse.PlatformOption(
@@ -72,7 +72,7 @@ public class PlatformCatalogService {
                     List.of(
                         "현재 사용자 온보딩에서는 선택할 수 없다",
                         "TIDAL 연동과 PMS import가 안정화된 뒤 구현한다",
-                        "트랙 메타데이터와 Spotify 특성 매칭이 실제 API로 검증될 때까지 사용자 플로우에 노출하지 않는다"
+                        "트랙 메타데이터와 provider-neutral 오디오 특성 보강이 실제 API로 검증될 때까지 사용자 플로우에 노출하지 않는다"
                     )
                 ),
                 new PlatformCatalogResponse.PlatformOption(
@@ -87,7 +87,7 @@ public class PlatformCatalogService {
                     List.of(
                         "현재 사용자 온보딩에서는 선택할 수 없다",
                         "개발자 계정과 MusicKit/API 권한이 준비된 뒤 다시 진행한다",
-                        "실제 Apple Music API 연동과 Spotify 특성 매칭 검증이 끝날 때까지 사용자 플로우에 노출하지 않는다"
+                        "실제 Apple Music API 연동과 provider-neutral 오디오 특성 보강 검증이 끝날 때까지 사용자 플로우에 노출하지 않는다"
                     )
                 ),
                 new PlatformCatalogResponse.PlatformOption(

@@ -57,6 +57,10 @@ app:
   ai:
     base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
     recommendation-preview-path: ${AI_RECOMMENDATION_PREVIEW_PATH:/v1/recommendations/preview}
+  audio-features:
+    reccobeats:
+      enabled: ${RECCOBEATS_ENABLED:true}
+      base-url: ${RECCOBEATS_API_BASE_URL:https://api.reccobeats.com/v1}
   platform:
     lastfm:
       enabled: ${LASTFM_ENABLED:false}

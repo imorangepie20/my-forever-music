@@ -27,7 +27,7 @@ public class PmsCatalogTrackEntity {
     private String primaryGenre;
 
     @Embedded
-    private PmsTrackSpotifyAudioFeatures spotifyAudioFeatures;
+    private PmsTrackAudioFeatures audioFeatures;
 
     protected PmsCatalogTrackEntity() {
     }
@@ -45,7 +45,7 @@ public class PmsCatalogTrackEntity {
             artistName,
             sourcePlatform,
             primaryGenre,
-            PmsTrackSpotifyAudioFeatures.unresolved()
+            PmsTrackAudioFeatures.unresolved()
         );
     }
 
@@ -55,16 +55,16 @@ public class PmsCatalogTrackEntity {
         String artistName,
         String sourcePlatform,
         String primaryGenre,
-        PmsTrackSpotifyAudioFeatures spotifyAudioFeatures
+        PmsTrackAudioFeatures audioFeatures
     ) {
         this.id = id;
         this.title = title;
         this.artistName = artistName;
         this.sourcePlatform = sourcePlatform;
         this.primaryGenre = primaryGenre;
-        this.spotifyAudioFeatures = spotifyAudioFeatures == null
-            ? PmsTrackSpotifyAudioFeatures.unresolved()
-            : spotifyAudioFeatures;
+        this.audioFeatures = audioFeatures == null
+            ? PmsTrackAudioFeatures.unresolved()
+            : audioFeatures;
     }
 
     public String getId() {
@@ -87,19 +87,35 @@ public class PmsCatalogTrackEntity {
         return primaryGenre;
     }
 
-    public PmsTrackSpotifyAudioFeatures getSpotifyAudioFeatures() {
-        return spotifyAudioFeatures;
+    public PmsTrackAudioFeatures getAudioFeatures() {
+        return audioFeatures;
+    }
+
+    public PmsTrackAudioFeatures getSpotifyAudioFeatures() {
+        return audioFeatures;
+    }
+
+    public String getAudioFeatureTrackId() {
+        return audioFeatures.getAudioFeatureTrackId();
     }
 
     public String getSpotifyTrackId() {
-        return spotifyAudioFeatures.getSpotifyTrackId();
+        return audioFeatures.getAudioFeatureTrackId();
+    }
+
+    public String getAudioFeatureSource() {
+        return audioFeatures.getAudioFeatureSource();
     }
 
     public String getSpotifyAudioFeatureSource() {
-        return spotifyAudioFeatures.getAudioFeatureSource();
+        return audioFeatures.getAudioFeatureSource();
+    }
+
+    public boolean isAudioFeaturesFilled() {
+        return audioFeatures.isComplete();
     }
 
     public boolean isSpotifyAudioFeaturesFilled() {
-        return spotifyAudioFeatures.isComplete();
+        return audioFeatures.isComplete();
     }
 }

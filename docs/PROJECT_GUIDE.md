@@ -25,8 +25,8 @@
 - 해당 플랫폼의 플레이리스트를 가져와 `PMS`에 저장한다
 - `PMS`는 특정 플랫폼에 묶이지 않는 사용자 소유 음악 취향 라이브러리다
 - 플랫폼을 바꾸더라도 사용자의 playlist, track, 평가, 취향 모델은 계속 유지된다
-- 각 트랙의 오디오 특성을 우선 `Spotify` 기반으로 확보한다
-- 오디오 특성을 직접 확보하지 못한 트랙은 가짜 특성으로 채우지 않고 import를 중단하거나 명시적인 재시도/제외 정책으로 처리한다
+- 각 트랙의 오디오 특성은 `provider-neutral` 전략으로 보강한다
+- 오디오 특성을 직접 확보하지 못한 트랙은 가짜 특성으로 채우지 않고 `unresolved` 상태로 남기며 후속 보강/재시도 정책으로 처리한다
 - 사용자 플레이리스트와 행동 데이터를 바탕으로 개인별 취향 모델을 점진적으로 학습한다
 - `EMS`는 외부 플랫폼의 공개 플레이리스트와 트렌딩 트랙을 수집하는 외부 탐색 공간이다
 - `GMS`는 사용자 모델이 통과시킨 추천 결과가 모이는 개인화 게이트웨이 공간이다
@@ -107,16 +107,18 @@ docs/
 4. [USER_MUSIC_HOME_VISION.md](/Users/woosungjo/music-space/my-forever-music/docs/product/USER_MUSIC_HOME_VISION.md)
 5. [REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md)
 6. [MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md)
-7. [TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md)
-8. [DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md)
-9. [SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md)
-10. [HTTPS_DOMAIN_DEV_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/HTTPS_DOMAIN_DEV_SETUP.md)
-11. [ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
-12. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
-13. [docs/api/README.md](/Users/woosungjo/music-space/my-forever-music/docs/api/README.md)
-14. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
-15. [UBUNTU_SERVER_RUNBOOK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_RUNBOOK.md)
-16. [UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
+7. [DATABASE_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DATABASE_SETUP_GUIDE.md)
+8. [TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md)
+9. [AUDIO_FEATURE_PROVIDER_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/AUDIO_FEATURE_PROVIDER_STRATEGY.md)
+10. [DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md)
+11. [SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md)
+12. [HTTPS_DOMAIN_DEV_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/HTTPS_DOMAIN_DEV_SETUP.md)
+13. [ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
+14. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
+15. [docs/api/README.md](/Users/woosungjo/music-space/my-forever-music/docs/api/README.md)
+16. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
+17. [UBUNTU_SERVER_RUNBOOK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_RUNBOOK.md)
+18. [UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
 
 ## 7. 앞으로 문서를 갱신하는 규칙
 
@@ -127,13 +129,26 @@ docs/
 
 ## 8. 지금 시점의 우선순위
 
-1. MacBook 로컬에서 핵심 사용자 플로우를 끝까지 안정화
-2. Spotify OAuth, playlist import, PMS user library 영속 저장 안정화
-3. TIDAL 실제 provider와 PMS import 검증
-4. YouTube Music 실제 provider 설계
-5. 사용자별 음악 학습 모델 개발
-6. 추천 결과 평가 저장과 사용자 제작 playlist 구현
-7. 사이트 내부 재생 이벤트, 저장, 스킵, playlist 추가 같은 행동 데이터 모델 정의
+### 1차 집중: Spotify & TIDAL PMS 안정화
+
+1. Spotify OAuth, playlist import, PMS user library 영속 저장 안정화
+2. TIDAL 실제 provider와 PMS import 검증
+3. ReccoBeats 등 외부 provider 기반 오디오 특성 보강 파이프라인 정리
+4. 사용자별 음악 학습 모델 개발
+5. 추천 결과 평가 저장과 사용자 제작 playlist 구현
+6. 사이트 내부 재생 이벤트, 저장, 스킵, playlist 추가 같은 행동 데이터 모델 정의
+
+### 보류: YouTube Music & Apple Music
+
+- **YouTube Music**: 공식 API가 없어 PMS import 불가. EMS 신호원으로만 검토.
+- **Apple Music**: Apple Developer Program membership 필요. 준비 시까지 보류.
+
+### 플랫폼 확장 순서 (확정)
+
+1. **Spotify** ✅ 완료 - 1차 기준 플랫폼
+2. **TIDAL** 🟡 검증중 - Spotify 다음 우선순위
+3. ~~YouTube Music~~ - 공식 API 없음, EMS 신호원으로만 검토
+4. ~~Apple Music~~ - Developer Program 준비 시까지 보류
 
 현재 참고 상태:
 
@@ -146,7 +161,7 @@ docs/
 - `POST /api/v1/platforms/oauth/*`는 사용자 플로우에서 실제 Spotify OAuth 설정이 있어야 시작됨
 - `GET/POST /api/v1/pms/import/*` PMS playlist import 경로 추가 완료
 - `services/api`에는 platform credential 저장소와 playlist provider 추상화가 추가되어 실제 Spotify import를 처리함
-- `services/api`는 실제 Spotify playlist listing/item import와 Spotify API audio-features 저장까지 반영됨
+- `services/api`는 실제 Spotify playlist listing/item import를 처리하며, 오디오 특성은 현재 legacy Spotify lookup path와 placeholder 저장 구조가 함께 남아 있음
 - `services/api`는 Spotify access token 만료 시 refresh token 기반 자동 갱신을 수행함
 - `services/api`와 `apps/web`는 refresh 실패 시 `reconnect_required` 상태와 재연결 UX까지 반영함
 - `services/api`는 DB 활성 프로필에서 PMS import 결과를 `pms_imported_*` 테이블에 영속 저장함
@@ -154,7 +169,7 @@ docs/
 - `GET /api/v1/pms/workspace/bootstrap`는 현재 정식 `PMS user library -> raw import snapshot -> user-owned database catalog -> empty library` 순서로 소스를 선택함
 - 사용자별 음악 학습 모델은 플랫폼 연동과 PMS user library 저장 안정화 이후 개발하는 단계로 고정함
 - 플랫폼 카탈로그에는 `TIDAL`, `YouTube Music`, `Apple Music`, `Last.fm`이 포함되며, 확장 순서는 `Spotify -> TIDAL -> YouTube Music`, Apple Music은 개발자 계정 준비 전까지 보류로 고정됨
-- 현재 사용자 온보딩의 PMS import 가능 플랫폼은 실제 provider가 구현된 `Spotify`만 노출함
+- 현재 사용자 온보딩의 PMS import는 `Spotify`가 1차 안정화 대상이고, `TIDAL`은 실제 provider가 있으나 검증 단계로 남아 있음
 - `GET /api/v1/platforms/lastfm/preview` 경로가 추가되어 공개 Last.fm 사용자명 기준 signal preview를 확인할 수 있음
 - `POST /api/v1/platforms/lastfm/profile` 경로가 추가되어 Last.fm 사용자명을 계정에 저장할 수 있음
 - `GET/POST /api/v1/platforms/lastfm/scrobbles/*` 경로가 추가되어 최근 scrobble snapshot을 저장하고 다시 `/platforms`에서 확인할 수 있음
@@ -166,8 +181,8 @@ docs/
 - `POST /api/v1/ems/workspace/analysis` 응답 경로 추가 완료
 - `POST /api/v1/gms/recommendations/preview`는 `services/ai`와의 브리지까지 검증 완료
 - `services/api`는 import 전 PMS workspace가 임의 demo playlist/seed를 노출하지 않고 빈 라이브러리 상태를 반환함
-- `pms_track`는 Spotify 오디오 특성 전체 스냅샷 저장 구조로 확장됨
-- PMS import 시 오디오 특성 전체 저장 기준 문서가 추가됨
+- `pms_track`는 아직 `spotify_*` 이름의 legacy 오디오 특성 저장 구조를 사용하지만, 문서 기준은 provider-neutral 전략으로 전환됨
+- PMS import 시 오디오 특성 저장 기준은 [AUDIO_FEATURE_PROVIDER_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/AUDIO_FEATURE_PROVIDER_STRATEGY.md) 와 [PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md) 를 함께 따른다
 - `docs/api/README.md`가 API 계약 문서의 공식 진입점으로 추가됨
 - DB 활성 프로필에서는 PMS bootstrap이 실제 `pms_*` 테이블 기반으로 응답 가능
 - `apps/web`에는 `/platforms` route가 추가되어 preferred PMS source platform을 선택할 수 있음
@@ -178,6 +193,8 @@ docs/
 - `apps/web`는 `/pms`, `/ems`, `/gms-preview`에서 playlist cover, album image, playable track card, global playback dock을 공유함
 - `GET /api/v1/pms/workspace/bootstrap`는 optional `playlist_id` 기준으로 현재 음악 컨텍스트를 다시 투영함
 - `POST /api/v1/gms/recommendations/preview`는 가능하면 synthetic item 대신 `PMS user library`의 실제 playable track으로 재매핑함
+- `POST /api/v1/gms/recommendations/feedback`는 GMS 추천 후보에 대한 like/dislike/save/skip 평가를 저장함
+- `GET/POST /api/v1/pms/personal-playlists/*`는 사용자 제작 PMS playlist 생성과 GMS 추천 후보 저장을 제공함
 - 현재 구현은 아직 `핵심 서비스 문서`의 전체 범위가 아니라, 그중 `PMS / EMS / GMS` 추천 흐름의 최소 검증 버전임
 
 ## 9. 참고 메모

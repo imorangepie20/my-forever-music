@@ -3,7 +3,7 @@ package io.myforevermusic.api.modules.pms.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsUserLibraryStore;
-import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackSpotifyAudioFeatures;
+import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
 import io.myforevermusic.api.modules.pms.presentation.PmsWorkspaceBootstrapResponse;
 import java.time.Instant;
 import java.util.List;
@@ -97,14 +97,14 @@ class PmsUserLibraryWorkspaceBootstrapSourceTest {
         assertThat(result.orElseThrow().workspaceDefaults().seedGenres())
             .containsExactly("synth-pop", "dream-pop");
         assertThat(result.orElseThrow().suggestedTracks()).allMatch(
-            PmsWorkspaceBootstrapResponse.TrackSeedSuggestion::spotifyAudioFeaturesFilled
+            PmsWorkspaceBootstrapResponse.TrackSeedSuggestion::audioFeaturesFilled
         );
         assertThat(result.orElseThrow().suggestedArtists().getFirst().artistName()).isEqualTo("Neon Bloom");
         assertThat(result.orElseThrow().suggestedGenres().getFirst().genre()).isEqualTo("synth-pop");
     }
 
-    private PmsTrackSpotifyAudioFeatures sampleFeatures(String spotifyTrackId) {
-        return new PmsTrackSpotifyAudioFeatures(
+    private PmsTrackAudioFeatures sampleFeatures(String spotifyTrackId) {
+        return new PmsTrackAudioFeatures(
             spotifyTrackId,
             "spotify_api",
             true,

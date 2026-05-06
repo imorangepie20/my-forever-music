@@ -44,6 +44,7 @@ class PmsPlaylistImportControllerWebMvcTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.summary.preferred_platform_connected").value(true))
             .andExpect(jsonPath("$.available_playlists[0].external_playlist_id").value("spotify-liked-night-drive"))
+            .andExpect(jsonPath("$.available_playlists[0].audio_feature_policy").value("provider_neutral_enrichment"))
             .andExpect(jsonPath("$.imported_playlists[0].playlist_id").value("pms-spotify-spotify-liked-night-drive"));
     }
 
@@ -63,6 +64,7 @@ class PmsPlaylistImportControllerWebMvcTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("playlists_imported"))
             .andExpect(jsonPath("$.import_result.imported_playlist_count").value(1))
+            .andExpect(jsonPath("$.import_result.complete_audio_feature_track_count").value(3))
             .andExpect(jsonPath("$.next_step.path").value("/ems"));
     }
 
@@ -126,7 +128,7 @@ class PmsPlaylistImportControllerWebMvcTest {
                     "https://open.spotify.com/playlist/spotify-liked-night-drive",
                     "spotify:playlist:spotify-liked-night-drive",
                     false,
-                    "complete_spotify_snapshot"
+                    "provider_neutral_enrichment"
                 )
             ),
             List.of(
@@ -157,6 +159,7 @@ class PmsPlaylistImportControllerWebMvcTest {
                 1,
                 3,
                 3,
+                3,
                 "sandbox-oauth",
                 1,
                 3
@@ -173,7 +176,7 @@ class PmsPlaylistImportControllerWebMvcTest {
             ),
             new PmsPlaylistImportResponse.NextStep(
                 "/ems",
-                "Playlists were imported into PMS, synced into the formal user library, and saved with complete Spotify audio feature snapshots. Continue to EMS analysis."
+                "Playlists were imported into PMS, synced into the formal user library, and recorded with their current audio feature snapshot status. Continue to EMS analysis."
             )
         );
     }

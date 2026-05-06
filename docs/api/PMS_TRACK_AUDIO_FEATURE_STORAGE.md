@@ -1,104 +1,128 @@
 # PMS Track Audio Feature Storage
 
-작성일: `2026-05-02`
+작성일: `2026-05-06`
 
 ## 목적
 
-이 문서는 사용자의 구독 스트리밍 플랫폼에서 플레이리스트를 가져올 때, 각 트랙의 `Spotify 오디오 특성`을 어떤 기준으로 저장해야 하는지 정의합니다.
+이 문서는 사용자의 구독 스트리밍 플랫폼에서 playlist를 가져올 때, 각 track의 `오디오 특성 snapshot`을 어떤 기준으로 저장할지 정의합니다.
 
-핵심 원칙은 간단합니다.
+파일명은 과거 명명 규칙 때문에 그대로 두지만, 현재 정책은 `Spotify 전용`이 아니라 `provider-neutral`입니다.
 
-- `PMS`에 저장되는 트랙은 가능한 한 `Spotify Get Track's Audio Features` 기준의 전체 스냅샷을 가져야 합니다.
-- 부분 저장이 아니라 `전체 필드 채움`을 기본 원칙으로 합니다.
-- 직접 Spotify 오디오 특성을 확보하지 못한 트랙은 가짜 값으로 채우지 않고 import를 중단하거나 사용자에게 재시도/제외 정책을 안내합니다.
+핵심 원칙은 아래와 같습니다.
+
+- `PMS import`와 `오디오 특성 보강`은 분리 가능한 단계로 본다
+- track metadata는 먼저 저장한다
+- 오디오 특성은 가능한 경우 즉시 보강하고, 실패하면 `unresolved` 또는 `unavailable` 상태로 남긴다
+- 어떤 경우에도 fake numeric value를 생성하지 않는다
+
+상위 전략 문서는 [AUDIO_FEATURE_PROVIDER_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/AUDIO_FEATURE_PROVIDER_STRATEGY.md) 를 따른다.
 
 ## 적용 범위
 
-- 사용자 스트리밍 플랫폼 플레이리스트 import
-- `PMS` 트랙 저장
-- Spotify track 매칭과 오디오 특성 보강
+- 사용자 스트리밍 플랫폼 playlist import
+- `PMS` track 저장
+- provider-neutral audio feature enrichment
 - PMS bootstrap과 이후 EMS/GMS 추천의 기준 데이터
 
 ## 저장 원칙
 
 ### 플레이리스트 import 시점 저장
 
-사용자의 스트리밍 플랫폼 플레이리스트를 가져올 때는 아래 순서를 따릅니다.
+사용자의 스트리밍 플랫폼 playlist를 가져올 때는 아래 순서를 따릅니다.
 
-1. 플랫폼 원본 트랙 메타데이터를 확보합니다.
-2. Spotify track 매칭을 시도합니다.
-3. 매칭 성공 시 Spotify 오디오 특성을 가져옵니다.
-4. 매칭 또는 오디오 특성 조회 실패 시 `PMS`에 임의 값을 저장하지 않습니다.
-5. 최종적으로 `오디오 특성 전체 스냅샷`이 확보된 트랙만 `PMS`에 저장합니다.
+1. 플랫폼 원본 track metadata를 확보합니다.
+2. `PMS import snapshot`과 `PMS user library`를 먼저 저장합니다.
+3. 가능한 경우 같은 요청 안에서 오디오 특성을 즉시 조회합니다.
+4. 조회 실패 시 `PMS`에 가짜 값을 넣지 않고 `unresolved` 또는 `unavailable` 상태로 저장합니다.
+5. 이후 동기 재시도 또는 비동기 backfill 작업으로 다시 보강합니다.
 
-즉, 목표 상태에서는 `PMS 트랙 저장`과 `오디오 특성 채움`이 분리된 선택 단계가 아니라 하나의 import 파이프라인으로 동작해야 합니다.
+즉, 현재 목표 상태에서는 `playlist import 성공`과 `audio feature 완전성`을 같은 체크포인트로 묶지 않습니다.
 
-### 전체 스냅샷 기준
+### Provider-neutral 스냅샷 기준
 
-현재 프로젝트에서 `Spotify 오디오 특성 전체 스냅샷`으로 보는 필드는 아래와 같습니다.
+현재 DB 쓰기 경로와 API 권장 필드는 `audio_*` / `audio_feature_*` 이름을 사용합니다.
+기존 `spotify_*` 컬럼과 API 필드는 당분간 `legacy compatibility fields`로 남겨둡니다.
 
-- `spotify_track_id`
-- `spotify_analysis_url`
-- `spotify_track_href`
-- `spotify_uri`
-- `spotify_feature_type`
-- `spotify_duration_ms`
-- `spotify_key`
-- `spotify_mode`
-- `spotify_time_signature`
-- `spotify_acousticness`
-- `spotify_danceability`
-- `spotify_energy`
-- `spotify_instrumentalness`
-- `spotify_liveness`
-- `spotify_loudness`
-- `spotify_speechiness`
-- `spotify_tempo`
-- `spotify_valence`
-- `spotify_resolved_at`
+현재 저장 구조의 권장 필드는 아래와 같습니다.
 
-추가 관리 필드:
+- `audio_feature_track_id`
+- `audio_analysis_url`
+- `audio_track_href`
+- `audio_track_uri`
+- `audio_feature_type`
+- `audio_duration_ms`
+- `audio_key`
+- `audio_mode`
+- `audio_time_signature`
+- `audio_acousticness`
+- `audio_danceability`
+- `audio_energy`
+- `audio_instrumentalness`
+- `audio_liveness`
+- `audio_loudness`
+- `audio_speechiness`
+- `audio_tempo`
+- `audio_valence`
+- `audio_resolved_at`
 
-- `spotify_audio_feature_source`
-- `spotify_audio_features_filled`
+관리 필드:
+
+- `audio_feature_source`
+- `audio_features_filled`
+
+주의:
+
+- legacy `spotify_*` 필드 이름이 남아 있어도 값의 provenance가 반드시 Spotify라는 뜻은 아닙니다.
+- 새 저장/조회 경로는 `audio_*` provider-neutral 컬럼을 기준으로 합니다.
 
 ## 상태 기준
 
 ### source 값 기준
 
-`spotify_audio_feature_source`는 오디오 특성을 어떻게 확보했는지 표현합니다.
+`audio_feature_source`는 현재 호환 스냅샷을 어떻게 확보했는지 표현합니다.
+
+허용 예시:
 
 - `spotify_api`
   - Spotify API에서 직접 가져온 값
-- `spotify_match`
-  - 타 플랫폼 트랙을 Spotify track에 매칭한 뒤 가져온 값
+- `reccobeats_lookup`
+  - Spotify id 또는 provider lookup key로 ReccoBeats 조회
+- `reccobeats_isrc_match`
+  - ISRC 후보 중 title/artist/duration으로 재선택한 값
+- `unavailable`
+  - 조회를 시도했지만 현재 snapshot을 채우지 못함
 - `unresolved`
-  - 실제 import 목표 상태에서는 허용하지 않는 임시 상태
+  - 아직 조회를 시도하지 않았거나 후속 보강 대상
 
 ### filled 값 기준
 
-`spotify_audio_features_filled`는 단순히 일부 값이 있다는 뜻이 아니라, 이 프로젝트가 요구하는 전체 스냅샷이 채워졌는지 나타내는 플래그입니다.
+`audio_features_filled`는 현재 호환 스냅샷이 서비스 기준으로 충분히 채워졌는지 나타내는 플래그입니다.
 
-아래 조건을 만족해야 `true`로 봅니다.
+현재 기준으로는 아래 조건을 만족할 때 `true`로 봅니다.
 
-- 전체 수치 필드가 모두 존재함
-- `spotify_resolved_at`이 존재함
+- 핵심 수치 필드가 모두 존재함
+- `audio_resolved_at`이 존재함
 - source가 명확함
+
+단, `time_signature`, `analysis_url`, provider 전용 href는 공급원에 따라 비어 있을 수 있으므로 장기 canonical model에서는 필수 필드에서 분리할 수 있습니다.
 
 ## 현재 구현 메모
 
 현재 코드 기준 반영 내용:
 
-- `pms_track` 테이블이 Spotify 오디오 특성 스냅샷 저장 구조로 확장됨
+- `pms_track`, `pms_imported_track`, `pms_user_track` 테이블은 provider-neutral `audio_*` 컬럼을 기준으로 audio feature snapshot을 저장합니다
 - Flyway 마이그레이션: [V3__add_spotify_audio_features_to_pms_track.sql](/Users/woosungjo/music-space/my-forever-music/services/api/src/main/resources/db/migration/V3__add_spotify_audio_features_to_pms_track.sql)
-- JPA 모델: [PmsTrackSpotifyAudioFeatures.java](/Users/woosungjo/music-space/my-forever-music/services/api/src/main/java/io/myforevermusic/api/modules/pms/infrastructure/persistence/PmsTrackSpotifyAudioFeatures.java)
+- provider-neutral 컬럼 추가 마이그레이션: [V18__add_provider_neutral_audio_feature_columns.sql](/Users/woosungjo/music-space/my-forever-music/services/api/src/main/resources/db/migration/V18__add_provider_neutral_audio_feature_columns.sql)
+- JPA 모델: [PmsTrackAudioFeatures.java](/Users/woosungjo/music-space/my-forever-music/services/api/src/main/java/io/myforevermusic/api/modules/pms/infrastructure/persistence/PmsTrackAudioFeatures.java)
+  - class name은 legacy 호환 때문에 유지하지만 컬럼 매핑은 `audio_*`를 사용합니다
 - 트랙 엔터티: [PmsCatalogTrackEntity.java](/Users/woosungjo/music-space/my-forever-music/services/api/src/main/java/io/myforevermusic/api/modules/pms/infrastructure/persistence/PmsCatalogTrackEntity.java)
-- PMS bootstrap 응답은 track별 `spotify_audio_features_filled`, `spotify_audio_feature_source`를 같이 보여줌
-- 실제 Spotify import provider는 `spotify_api` 응답이 누락되면 fallback 스냅샷을 만들지 않고 import를 실패시킴
+- PMS bootstrap 응답은 track별 `audio_features_filled`, `audio_feature_source`를 권장 필드로 내려주고 legacy `spotify_*` alias도 함께 유지합니다
+- 현재 Spotify import provider는 audio-features 조회가 실패해도 import를 계속 진행하고, `source=unavailable`, `filled=false` placeholder를 저장합니다
+- 이 동작은 새 provider-neutral 정책과 더 가깝고, 과거 문서의 `import 중단` 설명은 더 이상 기준이 아닙니다
 
 ## 다음 연결 지점
 
-1. TIDAL provider에서 Spotify track 매칭을 실제 API 기반으로 추가
-2. Spotify 오디오 특성 조회 실패 시 재시도/부분 제외/사용자 안내 정책 결정
-3. import 시점의 `complete snapshot save` 검증 단계를 provider 공통 계약으로 강화
-4. 이 정책을 실제 플랫폼 import API 계약과 연결
+1. `audio feature enrichment provider` 추상화 추가
+2. ReccoBeats lookup client와 batch enrichment 경로 연결
+3. legacy `spotify_*` API alias 제거 시점 정의
+4. 오래된 DB 컬럼 정리용 후속 migration 설계

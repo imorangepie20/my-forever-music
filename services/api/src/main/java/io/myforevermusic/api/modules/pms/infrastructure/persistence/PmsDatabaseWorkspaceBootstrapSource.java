@@ -119,13 +119,16 @@ public class PmsDatabaseWorkspaceBootstrapSource implements PmsWorkspaceBootstra
             null,
             null,
             null,
-            track.getSpotifyAudioFeatures().getSpotifyUri(),
+            track.getAudioFeatures().getSpotifyUri(),
             null,
-            track.getSpotifyAudioFeatures().getDurationMs(),
+            track.getAudioFeatures().getDurationMs(),
             playlistTrack.isSeed(),
-            track.getSpotifyTrackId(),
-            track.isSpotifyAudioFeaturesFilled(),
-            track.getSpotifyAudioFeatureSource()
+            track.getAudioFeatureTrackId(),
+            track.getAudioFeatureTrackId(),
+            track.isAudioFeaturesFilled(),
+            track.isAudioFeaturesFilled(),
+            track.getAudioFeatureSource(),
+            track.getAudioFeatureSource()
         );
     }
 

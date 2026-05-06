@@ -10,6 +10,7 @@
 - [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md): mock/sandbox 없이 실제 구현된 기능만 사용자 플로우에 노출하는 기준
 - [architecture/MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md): 현재는 MacBook 로컬에서 구현/시험 후 Ubuntu로 이전하는 실행 전략
 - [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md): MacBook 시험 서비스에서 실제 API/저장소/provider만 기본 사용자 경로로 쓰는 정책
+- [architecture/AUDIO_FEATURE_PROVIDER_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/AUDIO_FEATURE_PROVIDER_STRATEGY.md): Spotify Development Mode 제약 이후 provider-neutral 오디오 특성 전략과 legacy `spotify_*` 호환 규칙
 - [architecture/TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md): 현재 채택 기술 스택
 - [architecture/SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md): Spotify OAuth Redirect URI, env, HTTPS 테스트 기준
 - [architecture/HTTPS_DOMAIN_DEV_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/HTTPS_DOMAIN_DEV_SETUP.md): `imapplepie20.tplinkdns.com` 기준 HTTPS reverse proxy와 Certbot 적용 절차
@@ -43,7 +44,7 @@
 - [api/EMS_WORKSPACE_ANALYSIS_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/EMS_WORKSPACE_ANALYSIS_API.md): EMS workspace 추천값 분석 계약
 - [api/GMS_RECOMMENDATION_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_PREVIEW_API.md): Spring Boot API의 GMS preview 엔드포인트 초안
 - [api/PLATFORM_CATALOG_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_CATALOG_API.md): 플랫폼 선택과 제품 역할 설명용 카탈로그 계약
-- [api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md): PMS track의 Spotify 오디오 특성 전체 저장 기준
+- [api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md): PMS track의 provider-neutral 오디오 특성 저장 기준과 legacy `spotify_*` 호환 규칙
 - [api/PMS_WORKSPACE_BOOTSTRAP_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_WORKSPACE_BOOTSTRAP_API.md): PMS 화면 bootstrap 데이터 계약
 
 ## 참고 문서
@@ -51,3 +52,4 @@
 - [streaming-platforms-api/spotify.md](/Users/woosungjo/music-space/my-forever-music/docs/streaming-platforms-api/spotify.md)
 - [streaming-platforms-api/applemusic.md](/Users/woosungjo/music-space/my-forever-music/docs/streaming-platforms-api/applemusic.md)
 - [streaming-platforms-api/tidal.md](/Users/woosungjo/music-space/my-forever-music/docs/streaming-platforms-api/tidal.md)
+- [streaming-platforms-api/reccobeats.md](/Users/woosungjo/music-space/my-forever-music/docs/streaming-platforms-api/reccobeats.md): ReccoBeats 조회형/업로드형 오디오 특성 API, 실제 호출 확인 결과, 현재 PMS 저장 기준과의 충돌 메모

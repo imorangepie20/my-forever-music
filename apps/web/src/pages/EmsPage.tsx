@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useState } from 'react'
-import { Gauge, HeartPulse, RefreshCw, SlidersHorizontal, Sparkles } from 'lucide-react'
+import { Gauge, HeartPulse, RefreshCw, Search, SlidersHorizontal, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
@@ -7,8 +7,17 @@ import PlaylistFeatureCard from '@/components/music/PlaylistFeatureCard'
 import TrackFeatureCard from '@/components/music/TrackFeatureCard'
 import { usePlayback } from '@/contexts/PlaybackContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
-import { analyzeEmsWorkspace, ApiError, fetchPmsWorkspaceBootstrap } from '@/services/api'
+import {
+    analyzeEmsWorkspace,
+    ApiError,
+    fetchPmsWorkspaceBootstrap,
+    searchEmsCollection,
+    fetchEmsCollectedPlaylists,
+    fetchEmsCollectedTracks,
+    fetchEmsPlaylistTracks,
+} from '@/services/api'
 import type { EmsWorkspaceAnalysisResponse } from '@/types/api'
+import type { EmsCollectionPlaylistItem, EmsCollectionTrackItem } from '@/types/api'
 import type { WorkspaceMood } from '@/types/workspace'
 
 const moods: Array<{ value: WorkspaceMood; label: string; description: string }> = [
@@ -45,6 +54,17 @@ const EmsPage = () => {
     const [bootstrap, setBootstrap] = useState<Awaited<ReturnType<typeof fetchPmsWorkspaceBootstrap>> | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+
+    // EMS Discovery state
+    const [searchQuery, setSearchQuery] = useState('')
+    const [isSearching, setIsSearching] = useState(false)
+    const [searchError, setSearchError] = useState<string | null>(null)
+    const [searchResult, setSearchResult] = useState<{ playlists: number; tracks: number } | null>(null)
+    const [collectedPlaylists, setCollectedPlaylists] = useState<EmsCollectionPlaylistItem[]>([])
+    const [collectedTracks, setCollectedTracks] = useState<EmsCollectionTrackItem[]>([])
+    const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null)
+    const [playlistTracks, setPlaylistTracks] = useState<EmsCollectionTrackItem[]>([])
+    const [isLoadingCollection, setIsLoadingCollection] = useState(false)
 
     useEffect(() => {
         const controller = new AbortController()
@@ -106,6 +126,51 @@ const EmsPage = () => {
         workspace.userId,
     ])
 
+    // Load collected playlists/tracks on mount
+    useEffect(() => {
+        const controller = new AbortController()
+
+        setIsLoadingCollection(true)
+        Promise.all([
+            fetchEmsCollectedPlaylists('spotify', controller.signal),
+            fetchEmsCollectedTracks('spotify', controller.signal),
+        ])
+            .then(([playlistResponse, trackResponse]) => {
+                startTransition(() => {
+                    setCollectedPlaylists(playlistResponse.playlists)
+                    setCollectedTracks(trackResponse.tracks)
+                })
+            })
+            .catch((err: unknown) => {
+                if (err instanceof DOMException && err.name === 'AbortError') return
+            })
+            .finally(() => {
+                setIsLoadingCollection(false)
+            })
+
+        return () => controller.abort()
+    }, [searchResult])
+
+    // Load tracks for selected playlist
+    useEffect(() => {
+        if (selectedPlaylistId === null) {
+            setPlaylistTracks([])
+            return
+        }
+
+        const controller = new AbortController()
+
+        fetchEmsPlaylistTracks(selectedPlaylistId, controller.signal)
+            .then((response) => {
+                startTransition(() => setPlaylistTracks(response.tracks))
+            })
+            .catch((err: unknown) => {
+                if (err instanceof DOMException && err.name === 'AbortError') return
+            })
+
+        return () => controller.abort()
+    }, [selectedPlaylistId])
+
     const activePlaylist = useMemo(
         () =>
             bootstrap?.playlists.find((playlist) => playlist.playlist_id === workspace.playlistId) ??
@@ -126,8 +191,221 @@ const EmsPage = () => {
         })
     }
 
+    const handleSearch = () => {
+        if (!searchQuery.trim() || !workspace.userId) return
+
+        setIsSearching(true)
+        setSearchError(null)
+        setSearchResult(null)
+
+        searchEmsCollection({
+            user_id: workspace.userId,
+            platform_id: 'spotify',
+            query: searchQuery.trim(),
+            limit: 5,
+        })
+            .then((response) => {
+                startTransition(() => {
+                    setSearchResult({
+                        playlists: response.collected_playlist_count,
+                        tracks: response.collected_track_count,
+                    })
+                })
+            })
+            .catch((err: unknown) => {
+                const message = err instanceof ApiError ? err.message : 'Search failed. Try again.'
+                startTransition(() => setSearchError(message))
+            })
+            .finally(() => setIsSearching(false))
+    }
+
     return (
         <div className="space-y-6">
+            {/* External Discovery Section */}
+            <HudCard
+                title="External Discovery"
+                subtitle="Search public Spotify playlists and tracks, then collect them into your EMS library"
+                action={
+                    isLoadingCollection ? (
+                        <span className="inline-flex items-center gap-2 text-xs text-hud-text-muted">
+                            <RefreshCw size={14} className="animate-spin" />
+                            Loading collection
+                        </span>
+                    ) : null
+                }
+            >
+                <div className="space-y-5">
+                    {/* Search bar */}
+                    <div className="flex gap-3">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            placeholder="Search Spotify for playlists and tracks..."
+                            className="flex-1 rounded-xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-sm text-hud-text-primary placeholder:text-hud-text-muted outline-none transition-hud focus:border-hud-border-primary"
+                        />
+                        <Button
+                            type="button"
+                            variant="primary"
+                            onClick={handleSearch}
+                            disabled={isSearching || !searchQuery.trim() || !workspace.userId}
+                        >
+                            {isSearching ? (
+                                <span className="inline-flex items-center gap-2">
+                                    <RefreshCw size={14} className="animate-spin" />
+                                    Searching
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center gap-2">
+                                    <Search size={14} />
+                                    Search
+                                </span>
+                            )}
+                        </Button>
+                    </div>
+
+                    {/* Search result feedback */}
+                    {searchError && (
+                        <div className="rounded-2xl border border-hud-accent-danger/40 bg-hud-accent-danger/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                            {searchError}
+                        </div>
+                    )}
+                    {searchResult && (
+                        <div className="rounded-2xl border border-hud-accent-primary/40 bg-hud-accent-primary/10 p-4 text-sm text-hud-text-secondary">
+                            Collected {searchResult.playlists} playlist{searchResult.playlists !== 1 ? 's' : ''} and {searchResult.tracks} track{searchResult.tracks !== 1 ? 's' : ''} from Spotify.
+                        </div>
+                    )}
+
+                    {/* Collected playlists */}
+                    {collectedPlaylists.length > 0 && (
+                        <div>
+                            <h3 className="mb-3 text-sm font-semibold text-hud-text-primary">Collected Playlists</h3>
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                {collectedPlaylists.map((playlist) => (
+                                    <PlaylistFeatureCard
+                                        key={playlist.id}
+                                        title={playlist.title}
+                                        sourcePlatform={playlist.source_platform}
+                                        curator={playlist.curator}
+                                        trackCount={playlist.track_count}
+                                        description={playlist.description}
+                                        imageUrl={playlist.cover_image_url}
+                                        isActive={selectedPlaylistId === playlist.id}
+                                        actionLabel={playlist.collection_source}
+                                        onSelect={() => setSelectedPlaylistId(
+                                            selectedPlaylistId === playlist.id ? null : playlist.id
+                                        )}
+                                        onPlay={() =>
+                                            playItem({
+                                                id: `ems-playlist:${playlist.id}`,
+                                                kind: 'playlist',
+                                                title: playlist.title,
+                                                subtitle: `${playlist.curator} · ${playlist.source_platform}`,
+                                                sourcePlatform: playlist.source_platform,
+                                                imageUrl: playlist.cover_image_url,
+                                                externalUrl: playlist.platform_external_url,
+                                                platformUri: playlist.spotify_uri,
+                                                supportingText: playlist.description,
+                                            })
+                                        }
+                                        onOpenExternal={() => openExternal(playlist.platform_external_url)}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Playlist tracks */}
+                    {selectedPlaylistId !== null && playlistTracks.length > 0 && (
+                        <div>
+                            <h3 className="mb-3 text-sm font-semibold text-hud-text-primary">Playlist Tracks</h3>
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                {playlistTracks.map((track) => (
+                                    <TrackFeatureCard
+                                        key={track.id}
+                                        title={track.title}
+                                        artistName={track.artist_name}
+                                        sourcePlatform={track.source_platform}
+                                        albumTitle={track.album_title}
+                                        imageUrl={track.album_image_url}
+                                        durationMs={track.duration_ms}
+                                        badges={[track.source_platform]}
+                                        onPlay={() =>
+                                            playItem({
+                                                id: `ems-track:${track.id}`,
+                                                kind: 'track',
+                                                title: track.title,
+                                                subtitle: `${track.artist_name} · ${track.source_platform}`,
+                                                sourcePlatform: track.source_platform,
+                                                imageUrl: track.album_image_url,
+                                                albumTitle: track.album_title,
+                                                externalUrl: track.platform_external_url,
+                                                platformUri: track.spotify_uri,
+                                                previewUrl: track.preview_url,
+                                                durationMs: track.duration_ms,
+                                                supportingText: null,
+                                            })
+                                        }
+                                        onOpenExternal={() => openExternal(track.platform_external_url)}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Collected tracks (standalone) */}
+                    {collectedTracks.length > 0 && (
+                        <div>
+                            <h3 className="mb-3 text-sm font-semibold text-hud-text-primary">Collected Tracks</h3>
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                {collectedTracks.map((track) => (
+                                    <TrackFeatureCard
+                                        key={track.id}
+                                        title={track.title}
+                                        artistName={track.artist_name}
+                                        sourcePlatform={track.source_platform}
+                                        albumTitle={track.album_title}
+                                        imageUrl={track.album_image_url}
+                                        durationMs={track.duration_ms}
+                                        badges={[track.source_platform, 'discovered']}
+                                        onPlay={() =>
+                                            playItem({
+                                                id: `ems-track:${track.id}`,
+                                                kind: 'track',
+                                                title: track.title,
+                                                subtitle: `${track.artist_name} · ${track.source_platform}`,
+                                                sourcePlatform: track.source_platform,
+                                                imageUrl: track.album_image_url,
+                                                albumTitle: track.album_title,
+                                                externalUrl: track.platform_external_url,
+                                                platformUri: track.spotify_uri,
+                                                previewUrl: track.preview_url,
+                                                durationMs: track.duration_ms,
+                                                supportingText: null,
+                                            })
+                                        }
+                                        onUseAsSeed={() =>
+                                            updateWorkspace({
+                                                seedTrackIdsText: mergeCsv(workspace.seedTrackIdsText, track.external_track_id),
+                                                seedArtistNamesText: mergeCsv(workspace.seedArtistNamesText, track.artist_name),
+                                            })
+                                        }
+                                        onOpenExternal={() => openExternal(track.platform_external_url)}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {collectedPlaylists.length === 0 && collectedTracks.length === 0 && !isLoadingCollection && (
+                        <div className="rounded-[24px] border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">
+                            Search for a genre, artist, or mood above to discover public playlists and tracks from Spotify.
+                        </div>
+                    )}
+                </div>
+            </HudCard>
+
             <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
                 <div className="space-y-6">
                     <HudCard
@@ -177,8 +455,14 @@ const EmsPage = () => {
                     <HudCard title="Track Context Shelf" subtitle="Visible track art makes the EMS tuning space feel like a real listening session">
                         {bootstrap?.suggested_tracks.length ? (
                             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                                {bootstrap.suggested_tracks.map((track) => (
-                                    <TrackFeatureCard
+                                {bootstrap.suggested_tracks.map((track) => {
+                                    const audioFeatureSource =
+                                        track.audio_feature_source ?? track.spotify_audio_feature_source
+                                    const audioFeatureTrackId =
+                                        track.audio_feature_track_id ?? track.spotify_track_id
+
+                                    return (
+                                        <TrackFeatureCard
                                         key={track.track_id}
                                         title={track.title}
                                         artistName={track.artist_name}
@@ -188,7 +472,7 @@ const EmsPage = () => {
                                         durationMs={track.duration_ms}
                                         badges={[
                                             track.seed ? 'seed' : 'candidate',
-                                            track.spotify_audio_feature_source,
+                                            audioFeatureSource,
                                         ]}
                                         reason={
                                             track.seed
@@ -207,7 +491,7 @@ const EmsPage = () => {
                                                 externalUrl: track.platform_external_url,
                                                 platformUri: track.platform_uri,
                                                 previewUrl: track.preview_url,
-                                                spotifyTrackId: track.spotify_track_id,
+                                                spotifyTrackId: audioFeatureTrackId,
                                                 durationMs: track.duration_ms,
                                                 supportingText: activePlaylist?.title ?? null,
                                             })
@@ -220,7 +504,8 @@ const EmsPage = () => {
                                         }
                                         onOpenExternal={() => openExternal(track.platform_external_url)}
                                     />
-                                ))}
+                                    )
+                                })}
                             </div>
                         ) : (
                             <div className="rounded-[24px] border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">

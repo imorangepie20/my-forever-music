@@ -55,11 +55,71 @@ public record GmsRecommendationPreviewResponse(
         String platformUri,
         String previewUrl,
         String spotifyTrackId,
+        String audioFeatureTrackId,
         Integer durationMs,
         Double score,
         String sourceSpace,
         Integer energyLevel,
         String reason
     ) {
+        public RecommendationItem {
+            if (
+                (audioFeatureTrackId == null || audioFeatureTrackId.isBlank())
+                    && spotifyTrackId != null
+                    && !spotifyTrackId.isBlank()
+            ) {
+                audioFeatureTrackId = spotifyTrackId;
+            }
+            if (
+                (spotifyTrackId == null || spotifyTrackId.isBlank())
+                    && audioFeatureTrackId != null
+                    && !audioFeatureTrackId.isBlank()
+            ) {
+                spotifyTrackId = audioFeatureTrackId;
+            }
+        }
+
+        public RecommendationItem(
+            Integer rank,
+            String trackId,
+            String title,
+            String artistName,
+            String sourcePlatform,
+            String sourcePlaylistId,
+            String sourcePlaylistTitle,
+            String albumTitle,
+            String albumImageUrl,
+            String platformExternalUrl,
+            String platformUri,
+            String previewUrl,
+            String spotifyTrackId,
+            Integer durationMs,
+            Double score,
+            String sourceSpace,
+            Integer energyLevel,
+            String reason
+        ) {
+            this(
+                rank,
+                trackId,
+                title,
+                artistName,
+                sourcePlatform,
+                sourcePlaylistId,
+                sourcePlaylistTitle,
+                albumTitle,
+                albumImageUrl,
+                platformExternalUrl,
+                platformUri,
+                previewUrl,
+                spotifyTrackId,
+                spotifyTrackId,
+                durationMs,
+                score,
+                sourceSpace,
+                energyLevel,
+                reason
+            );
+        }
     }
 }

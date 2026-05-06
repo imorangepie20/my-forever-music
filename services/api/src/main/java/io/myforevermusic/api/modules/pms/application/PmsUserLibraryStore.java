@@ -1,6 +1,6 @@
 package io.myforevermusic.api.modules.pms.application;
 
-import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackSpotifyAudioFeatures;
+import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
 import java.time.Instant;
 import java.util.List;
 
@@ -44,7 +44,7 @@ public interface PmsUserLibraryStore {
         String previewUrl,
         int sortOrder,
         boolean seed,
-        PmsTrackSpotifyAudioFeatures spotifyAudioFeatures
+        PmsTrackAudioFeatures audioFeatures
     ) {
     }
 }

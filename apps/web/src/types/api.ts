@@ -382,8 +382,11 @@ export interface PmsWorkspaceBootstrapResponse {
         source_platform: string
         seed: boolean
         spotify_track_id: string | null
+        audio_feature_track_id?: string | null
         spotify_audio_features_filled: boolean
+        audio_features_filled?: boolean
         spotify_audio_feature_source: string
+        audio_feature_source?: string
     }>
     suggested_artists: Array<{
         artist_name: string
@@ -461,6 +464,7 @@ export interface PmsPlaylistImportResponse {
         platform_display_name: string
         imported_playlist_count: number
         imported_track_count: number
+        complete_audio_feature_track_count?: number
         complete_spotify_audio_feature_track_count: number
         connection_mode: string
         library_synced_playlist_count: number
@@ -478,6 +482,68 @@ export interface PmsPlaylistImportResponse {
         path: string
         message: string
     }
+}
+
+export interface PmsPersonalPlaylistTrack {
+    track_id: string
+    title: string
+    artist_name: string
+    source_platform: string
+    album_title: string | null
+    album_image_url: string | null
+    platform_external_url: string | null
+    platform_uri: string | null
+    preview_url: string | null
+    spotify_track_id: string | null
+    audio_feature_track_id?: string | null
+    duration_ms: number | null
+    sort_order: number
+    source_context: string
+    added_at: string
+}
+
+export interface PmsPersonalPlaylist {
+    playlist_id: string
+    title: string
+    description: string
+    track_count: number
+    created_at: string
+    updated_at: string
+    tracks: PmsPersonalPlaylistTrack[]
+}
+
+export interface PmsPersonalPlaylistBootstrapResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string
+    summary: {
+        playlist_count: number
+        saved_track_count: number
+    }
+    playlists: PmsPersonalPlaylist[]
+}
+
+export interface PmsPersonalPlaylistCreateRequest {
+    user_id: string
+    title: string
+    description?: string
+}
+
+export interface PmsPersonalPlaylistTrackSaveRequest {
+    user_id: string
+    target_playlist_id?: string
+    target_playlist_title?: string
+    track_id: string
+    source_context?: string
+}
+
+export interface PmsPersonalPlaylistCommandResponse {
+    service: string
+    status: string
+    processed_at: string
+    playlist: PmsPersonalPlaylist
+    next_step_message: string
 }
 
 export interface EmsWorkspaceAnalysisRequest {
@@ -562,10 +628,108 @@ export interface GmsRecommendationPreviewResponse {
         source_playlist_id: string | null
         source_playlist_title: string | null
         spotify_track_id: string | null
+        audio_feature_track_id?: string | null
         score: number
         source_space: string
         energy_level: number
         reason?: string | null
     }>
     warnings: string[]
+}
+
+export interface EmsCollectionSearchRequest {
+    user_id: string
+    platform_id: string
+    query: string
+    limit?: number
+}
+
+export interface EmsCollectionSearchResponse {
+    service: string
+    status: string
+    generated_at: string
+    platform_id: string
+    query: string
+    collected_playlist_count: number
+    collected_track_count: number
+    collected_at: string
+}
+
+export interface EmsCollectionPlaylistItem {
+    id: number
+    external_playlist_id: string
+    title: string
+    source_platform: string
+    curator: string
+    description: string
+    cover_image_url: string | null
+    platform_external_url: string | null
+    spotify_uri: string | null
+    track_count: number
+    collection_source: string
+    search_query: string
+    collected_at: string
+}
+
+export interface EmsCollectionPlaylistBrowseResponse {
+    service: string
+    status: string
+    generated_at: string
+    platform_id: string
+    playlists: EmsCollectionPlaylistItem[]
+}
+
+export interface EmsCollectionTrackItem {
+    id: number
+    external_track_id: string
+    title: string
+    artist_name: string
+    source_platform: string
+    album_title: string | null
+    album_image_url: string | null
+    platform_external_url: string | null
+    spotify_uri: string | null
+    preview_url: string | null
+    duration_ms: number | null
+    collected_at: string
+}
+
+export interface EmsCollectionTrackBrowseResponse {
+    service: string
+    status: string
+    generated_at: string
+    playlist_id: number | null
+    tracks: EmsCollectionTrackItem[]
+}
+
+export type GmsRecommendationFeedbackType = 'like' | 'dislike' | 'save' | 'skip'
+
+export interface GmsRecommendationFeedbackRequest {
+    user_id: string
+    request_id?: string
+    playlist_id?: string | null
+    track_id: string
+    feedback_type: GmsRecommendationFeedbackType
+    score?: number
+    source_space?: string
+    reason?: string | null
+}
+
+export interface GmsRecommendationFeedbackResponse {
+    service: string
+    status: string
+    processed_at: string
+    feedback: {
+        feedback_id: number
+        user_id: string
+        request_id: string | null
+        playlist_id: string | null
+        track_id: string
+        feedback_type: GmsRecommendationFeedbackType
+        score: number | null
+        source_space: string | null
+        reason: string | null
+        created_at: string
+    }
+    next_step_message: string
 }

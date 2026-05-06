@@ -13,15 +13,39 @@
 
 ```bash
 cd /Users/woosungjo/music-space/my-forever-music/infra/docker
-cp env.local.example .env
 docker compose -f docker-compose.local-db.yml up -d
 ```
 
 macOS에서는 위 명령 전 `Docker Desktop` 또는 Docker daemon이 먼저 실행 중이어야 한다.
 
+### 포트 설정
+
+- PostgreSQL: `127.0.0.1:5433` → 컨테이너 내 `5432`
+- Redis: `127.0.0.1:6379` → 컨테이너 내 `6379`
+
+> **참고**: 로컬 개발 환경에서 다른 서비스와의 포트 충돌을 방지하기 위해 PostgreSQL은 호스트 포트 `5433`을 사용합니다.
+
+### 컨테이너 상태 확인
+
+```bash
+docker compose -f docker-compose.local-db.yml ps
+```
+
+### 컨테이너 중지
+
+```bash
+docker compose -f docker-compose.local-db.yml down
+```
+
+### 데이터베이스 직접 접속
+
+```bash
+docker exec -it my-forever-music-local-postgres psql -U postgres -d my_forever_music
+```
+
 이후 API는 아래처럼 DB 프로필로 실행하면 된다.
 
 ```bash
 cd /Users/woosungjo/music-space/my-forever-music/services/api
-SPRING_PROFILES_ACTIVE=database AI_SERVICE_BASE_URL=http://localhost:8000 ./gradlew bootRun
+SPRING_PROFILES_ACTIVE=database DB_PORT=5433 AI_SERVICE_BASE_URL=http://localhost:8000 ./gradlew bootRun
 ```

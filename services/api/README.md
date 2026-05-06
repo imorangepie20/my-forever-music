@@ -73,6 +73,8 @@ services/api/
 - PMS workspace bootstrap 엔드포인트: `GET /api/v1/pms/workspace/bootstrap`
 - EMS workspace analysis 엔드포인트: `POST /api/v1/ems/workspace/analysis`
 - GMS AI preview 브리지 엔드포인트: `POST /api/v1/gms/recommendations/preview`
+- GMS feedback 저장 엔드포인트: `POST /api/v1/gms/recommendations/feedback`
+- PMS personal playlist 엔드포인트: `GET /api/v1/pms/personal-playlists/bootstrap`, `POST /api/v1/pms/personal-playlists`, `POST /api/v1/pms/personal-playlists/tracks`
 - PMS bootstrap용 JPA 엔터티 / 리포지토리 / Flyway 마이그레이션
 - Actuator 설정: `/actuator/health`
 - Swagger UI 경로: `/docs`
@@ -92,7 +94,7 @@ services/api/
 
 같은 저장값은 `POST /api/v1/ems/workspace/analysis`와 `POST /api/v1/gms/recommendations/preview`에도 반영된다. 현재는 저장된 `Last.fm scrobble snapshot`이 있으면 그 최근 artist recurrence를 먼저 사용하고, snapshot이 비어 있으면 live `Last.fm top artist` 조회로 fallback 한다.
 
-현재 `pms_track`는 기본 메타데이터만이 아니라 `Spotify 오디오 특성 전체 스냅샷`을 저장할 수 있도록 확장되어 있다. 따라서 향후 플랫폼 playlist import는 트랙 저장 전에 오디오 특성 채움 과정을 반드시 거치는 것을 기본 전제로 한다.
+현재 `pms_track`는 기본 메타데이터와 legacy `spotify_*` 오디오 특성 스냅샷 필드를 함께 저장할 수 있도록 확장되어 있다. 현재 기본 구현은 playlist metadata import를 먼저 저장하고, 오디오 특성은 `ReccoBeats` 조회형 API로 보강한다.
 
 또한 현재는 `platform credential store`와 `platform playlist provider` 계층이 추가되어, 실제 외부 플랫폼 연동을 import 흐름 위에서 provider별로 처리할 수 있다.
 
@@ -100,7 +102,7 @@ services/api/
 
 TIDAL은 Spotify 다음 provider로 고정되어 있으며, 현재는 TIDAL OAuth 2.1 + PKCE token exchange/refresh client 기반만 추가되어 있다. 실제 TIDAL playlist provider와 PMS import 검증이 끝나기 전까지 사용자 온보딩과 import 후보에는 노출하지 않는다.
 
-현재 `spotify` provider는 실제 사용자 token으로 `GET /me/playlists`, `GET /playlists/{playlist_id}/items`를 호출하고, 트랙별 오디오 특성은 공식 `GET /audio-features` 응답만 저장한다. 실패하거나 누락된 항목이 있으면 가짜 오디오 특성을 만들지 않고 import를 중단한다.
+현재 `spotify` provider는 실제 사용자 token으로 `GET /me/playlists`, `GET /playlists/{playlist_id}/items`를 호출하고, 트랙별 오디오 특성은 `ReccoBeats GET /v1/audio-features`로 보강한다. 실패하거나 누락된 항목이 있으면 가짜 오디오 특성을 만들지 않고 `unavailable` placeholder로 저장한다.
 
 현재 이 import 경로는 단순 텍스트 seed만 저장하지 않는다. playlist cover image, playlist external URL/URI, track album title, album image, track external URL/URI, preview URL까지 같이 저장한다.
 
@@ -148,6 +150,8 @@ API 계약 문서 인덱스는 [docs/api/README.md](/Users/woosungjo/music-space
 - `APP_VERSION`
 - `AI_SERVICE_BASE_URL`
 - `AI_RECOMMENDATION_PREVIEW_PATH`
+- `RECCOBEATS_ENABLED`
+- `RECCOBEATS_API_BASE_URL`
 - `SPOTIFY_OAUTH_ENABLED`
 - `SPOTIFY_CLIENT_ID`
 - `SPOTIFY_CLIENT_SECRET`
@@ -185,19 +189,16 @@ PostgreSQL을 붙여 PMS bootstrap을 DB 기반으로 확인하려면:
 
 ```bash
 cd /Users/woosungjo/music-space/my-forever-music/infra/docker
-cp env.local.example .env
 docker compose -f docker-compose.local-db.yml up -d
 
 cd /Users/woosungjo/music-space/my-forever-music/services/api
 SPRING_PROFILES_ACTIVE=database \
-DB_HOST=localhost \
-DB_PORT=5432 \
-DB_NAME=my_forever_music \
-DB_USERNAME=postgres \
-DB_PASSWORD=postgres \
+DB_PORT=5433 \
 AI_SERVICE_BASE_URL=http://localhost:8000 \
 ./gradlew bootRun
 ```
+
+> **참고**: 로컬 개발 환경에서 포트 충돌을 방지하기 위해 PostgreSQL은 `5433` 포트를 사용합니다. `application-database.yml`에서 기본값이 설정되어 있으므로 `DB_PORT=5433`만 지정하면 됩니다.
 
 macOS에서는 `docker compose` 실행 전에 `Docker Desktop`이 떠 있어야 한다.
 

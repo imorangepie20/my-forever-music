@@ -4,6 +4,7 @@ import io.myforevermusic.api.modules.platform.application.PlatformAccountCredent
 import io.myforevermusic.api.modules.platform.application.PlatformCredentialStore;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @Profile("!local")
@@ -22,6 +23,7 @@ public class JpaPlatformCredentialStore implements PlatformCredentialStore {
     }
 
     @Override
+    @Transactional
     public PlatformAccountCredential save(PlatformAccountCredential credential) {
         PlatformAccountCredentialEntity entity = platformAccountCredentialRepository
             .findByUserIdAndPlatformId(credential.userId(), credential.platformId())
@@ -32,6 +34,7 @@ public class JpaPlatformCredentialStore implements PlatformCredentialStore {
     }
 
     @Override
+    @Transactional
     public void clear(String userId, String platformId) {
         platformAccountCredentialRepository.deleteByUserIdAndPlatformId(userId, platformId);
     }

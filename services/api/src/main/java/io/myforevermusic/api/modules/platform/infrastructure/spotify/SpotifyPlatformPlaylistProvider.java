@@ -3,13 +3,14 @@ package io.myforevermusic.api.modules.platform.infrastructure.spotify;
 import io.myforevermusic.api.modules.auth.application.AuthRegisteredAccount;
 import io.myforevermusic.api.modules.platform.application.PlatformAccountCredential;
 import io.myforevermusic.api.modules.platform.application.PlatformPlaylistProvider;
-import io.myforevermusic.api.modules.platform.infrastructure.spotify.SpotifyWebApiClient.SpotifyAudioFeaturesSnapshot;
+import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsAudioFeaturesClient;
+import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsAudioFeaturesClient.ReccoBeatsAudioFeaturesSnapshot;
 import io.myforevermusic.api.modules.platform.infrastructure.spotify.SpotifyWebApiClient.SpotifyPlaylistSummary;
 import io.myforevermusic.api.modules.platform.infrastructure.spotify.SpotifyWebApiClient.SpotifyPlaylistTrack;
 import io.myforevermusic.api.modules.platform.infrastructure.spotify.SpotifyWebApiClient.SpotifyUserProfile;
 import io.myforevermusic.api.modules.pms.application.PmsPlaylistImportCatalogService.ImportCandidatePlaylist;
 import io.myforevermusic.api.modules.pms.application.PmsPlaylistImportCatalogService.ImportCandidateTrack;
-import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackSpotifyAudioFeatures;
+import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,9 +55,14 @@ public class SpotifyPlatformPlaylistProvider implements PlatformPlaylistProvider
     );
 
     private final SpotifyWebApiClient spotifyWebApiClient;
+    private final ReccoBeatsAudioFeaturesClient reccoBeatsAudioFeaturesClient;
 
-    public SpotifyPlatformPlaylistProvider(SpotifyWebApiClient spotifyWebApiClient) {
+    public SpotifyPlatformPlaylistProvider(
+        SpotifyWebApiClient spotifyWebApiClient,
+        ReccoBeatsAudioFeaturesClient reccoBeatsAudioFeaturesClient
+    ) {
         this.spotifyWebApiClient = spotifyWebApiClient;
+        this.reccoBeatsAudioFeaturesClient = reccoBeatsAudioFeaturesClient;
     }
 
     @Override
@@ -118,8 +124,7 @@ public class SpotifyPlatformPlaylistProvider implements PlatformPlaylistProvider
             );
         }
 
-        Map<String, SpotifyAudioFeaturesSnapshot> audioFeaturesByTrackId = resolveAudioFeatures(
-            credential,
+        Map<String, ReccoBeatsAudioFeaturesSnapshot> audioFeaturesByTrackId = resolveAudioFeatures(
             tracksByPlaylistId.values().stream().flatMap(List::stream).toList()
         );
         Instant resolvedAt = Instant.now();
@@ -149,8 +154,7 @@ public class SpotifyPlatformPlaylistProvider implements PlatformPlaylistProvider
             || playlist.collaborative();
     }
 
-    private Map<String, SpotifyAudioFeaturesSnapshot> resolveAudioFeatures(
-        PlatformAccountCredential credential,
+    private Map<String, ReccoBeatsAudioFeaturesSnapshot> resolveAudioFeatures(
         List<SpotifyPlaylistTrack> tracks
     ) {
         List<String> uniqueTrackIds = tracks.stream()
@@ -164,20 +168,17 @@ public class SpotifyPlatformPlaylistProvider implements PlatformPlaylistProvider
         }
 
         try {
-            return spotifyWebApiClient.getTrackAudioFeatures(credential, uniqueTrackIds);
+            return reccoBeatsAudioFeaturesClient.getAudioFeaturesForSpotifyTrackIds(uniqueTrackIds);
         } catch (RuntimeException exception) {
-            log.warn("Spotify audio-features lookup failed: {}", exception.getMessage());
-            throw new IllegalStateException(
-                "Spotify audio features could not be resolved. No fallback audio feature snapshot will be generated.",
-                exception
-            );
+            log.warn("ReccoBeats audio-features lookup failed: {}. Proceeding without audio features.", exception.getMessage());
+            return Map.of();
         }
     }
 
     private ImportCandidatePlaylist toImportCandidatePlaylist(
         SpotifyPlaylistSummary playlist,
         List<SpotifyPlaylistTrack> tracks,
-        Map<String, SpotifyAudioFeaturesSnapshot> audioFeaturesByTrackId,
+        Map<String, ReccoBeatsAudioFeaturesSnapshot> audioFeaturesByTrackId,
         Instant resolvedAt
     ) {
         List<ImportCandidateTrack> importTracks = IntStream.range(0, tracks.size())
@@ -213,24 +214,24 @@ public class SpotifyPlatformPlaylistProvider implements PlatformPlaylistProvider
         );
     }
 
-    private PmsTrackSpotifyAudioFeatures resolveTrackAudioFeatures(
+    private PmsTrackAudioFeatures resolveTrackAudioFeatures(
         SpotifyPlaylistTrack track,
-        SpotifyAudioFeaturesSnapshot snapshot,
+        ReccoBeatsAudioFeaturesSnapshot snapshot,
         Instant resolvedAt
     ) {
         if (snapshot != null) {
-            return new PmsTrackSpotifyAudioFeatures(
+            return new PmsTrackAudioFeatures(
                 track.spotifyTrackId(),
-                "spotify_api",
+                "reccobeats_lookup",
                 true,
-                snapshot.analysisUrl(),
-                snapshot.trackHref() == null ? track.trackHref() : snapshot.trackHref(),
-                snapshot.spotifyUri() == null ? track.spotifyUri() : snapshot.spotifyUri(),
-                snapshot.featureType() == null ? "audio_features" : snapshot.featureType(),
-                snapshot.durationMs() == null ? track.durationMs() : snapshot.durationMs(),
+                null,
+                snapshot.spotifyTrackHref() == null ? track.externalUrl() : snapshot.spotifyTrackHref(),
+                track.spotifyUri(),
+                "audio_features",
+                track.durationMs(),
                 snapshot.musicalKey(),
                 snapshot.mode(),
-                snapshot.timeSignature(),
+                null,
                 snapshot.acousticness(),
                 snapshot.danceability(),
                 snapshot.energy(),
@@ -244,9 +245,19 @@ public class SpotifyPlatformPlaylistProvider implements PlatformPlaylistProvider
             );
         }
 
-        throw new IllegalStateException(
-            "Spotify audio features are missing for track %s (%s). Import is stopped so PMS does not store generated audio values."
-                .formatted(track.spotifyTrackId(), track.title())
+        log.info("No audio features for track {} ({}). Storing placeholder.", track.spotifyTrackId(), track.title());
+        return new PmsTrackAudioFeatures(
+            track.spotifyTrackId(),
+            "unavailable",
+            false,
+            null,
+            track.externalUrl(),
+            track.spotifyUri(),
+            "audio_features",
+            track.durationMs(),
+            null, null, null,
+            null, null, null, null, null, null, null, null, null,
+            resolvedAt
         );
     }
 

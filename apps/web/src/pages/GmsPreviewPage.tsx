@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Activity, RefreshCw, Sparkles } from 'lucide-react'
+import { Activity, Bookmark, Heart, RefreshCw, Sparkles, ThumbsDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
@@ -8,8 +8,14 @@ import TrackFeatureCard from '@/components/music/TrackFeatureCard'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { usePlayback } from '@/contexts/PlaybackContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
-import { ApiError, fetchPmsWorkspaceBootstrap, previewGmsRecommendations } from '@/services/api'
-import type { GmsRecommendationPreviewResponse } from '@/types/api'
+import {
+    ApiError,
+    fetchPmsWorkspaceBootstrap,
+    previewGmsRecommendations,
+    recordGmsRecommendationFeedback,
+    saveTrackToPmsPersonalPlaylist,
+} from '@/services/api'
+import type { GmsRecommendationFeedbackType, GmsRecommendationPreviewResponse } from '@/types/api'
 
 const splitField = (value: string) =>
     value
@@ -34,6 +40,9 @@ const GmsPreviewPage = () => {
     const [contextError, setContextError] = useState<string | null>(null)
     const [response, setResponse] = useState<GmsRecommendationPreviewResponse | null>(null)
     const [bootstrap, setBootstrap] = useState<Awaited<ReturnType<typeof fetchPmsWorkspaceBootstrap>> | null>(null)
+    const [feedbackByTrackId, setFeedbackByTrackId] = useState<Record<string, GmsRecommendationFeedbackType>>({})
+    const [feedbackPendingTrackId, setFeedbackPendingTrackId] = useState<string | null>(null)
+    const [saveMessage, setSaveMessage] = useState<string | null>(null)
     const activeUserId = session?.userId || workspace.userId
 
     useEffect(() => {
@@ -109,6 +118,8 @@ const GmsPreviewPage = () => {
             const preview = await previewGmsRecommendations(payload)
             startTransition(() => {
                 setResponse(preview)
+                setFeedbackByTrackId({})
+                setSaveMessage(null)
                 setContextError(null)
             })
         } catch (requestError: unknown) {
@@ -122,6 +133,62 @@ const GmsPreviewPage = () => {
             })
         } finally {
             setIsSubmitting(false)
+        }
+    }
+
+    const handleFeedback = async (
+        item: GmsRecommendationPreviewResponse['items'][number],
+        feedbackType: GmsRecommendationFeedbackType,
+    ) => {
+        if (!session || !response) {
+            setContextError('Log in and request a GMS preview before recording recommendation feedback.')
+            return
+        }
+
+        setFeedbackPendingTrackId(item.track_id)
+        setContextError(null)
+
+        try {
+            await recordGmsRecommendationFeedback({
+                user_id: session.userId,
+                request_id: response.request_id,
+                playlist_id: item.source_playlist_id ?? activePlaylist?.playlist_id ?? workspace.playlistId,
+                track_id: item.track_id,
+                feedback_type: feedbackType,
+                score: feedbackType === 'like' || feedbackType === 'save' ? 1 : -1,
+                source_space: item.source_space,
+                reason: item.reason,
+            })
+
+            if (feedbackType === 'save') {
+                const saveResponse = await saveTrackToPmsPersonalPlaylist({
+                    user_id: session.userId,
+                    target_playlist_title: 'Saved GMS Recommendations',
+                    track_id: item.track_id,
+                    source_context: 'gms-preview',
+                })
+                setSaveMessage(
+                    `${item.title} was saved to ${saveResponse.playlist.title}. ${saveResponse.playlist.track_count} tracks are in that playlist.`,
+                )
+            }
+
+            startTransition(() => {
+                setFeedbackByTrackId((current) => ({
+                    ...current,
+                    [item.track_id]: feedbackType,
+                }))
+            })
+        } catch (requestError: unknown) {
+            const message =
+                requestError instanceof ApiError
+                    ? requestError.message
+                    : 'Unable to record this recommendation feedback.'
+
+            startTransition(() => {
+                setContextError(message)
+            })
+        } finally {
+            setFeedbackPendingTrackId(null)
         }
     }
 
@@ -308,6 +375,12 @@ const GmsPreviewPage = () => {
                                         </ul>
                                     </div>
                                 )}
+
+                                {saveMessage && (
+                                    <div className="rounded-2xl border border-hud-accent-primary/40 bg-hud-accent-primary/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                                        {saveMessage}
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <div className="rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">
@@ -392,7 +465,7 @@ const GmsPreviewPage = () => {
                                                 externalUrl: item.platform_external_url,
                                                 platformUri: item.platform_uri,
                                                 previewUrl: item.preview_url,
-                                                spotifyTrackId: item.spotify_track_id,
+                                                spotifyTrackId: item.audio_feature_track_id ?? item.spotify_track_id,
                                                 durationMs: item.duration_ms,
                                                 supportingText: item.source_playlist_title ?? activePlaylist?.title ?? null,
                                             })
@@ -406,6 +479,29 @@ const GmsPreviewPage = () => {
                                             })
                                         }
                                         onOpenExternal={() => openExternal(item.platform_external_url)}
+                                        feedbackActions={[
+                                            {
+                                                label: 'Like',
+                                                icon: <Heart size={16} />,
+                                                active: feedbackByTrackId[item.track_id] === 'like',
+                                                disabled: feedbackPendingTrackId === item.track_id,
+                                                onClick: () => handleFeedback(item, 'like'),
+                                            },
+                                            {
+                                                label: 'Pass',
+                                                icon: <ThumbsDown size={16} />,
+                                                active: feedbackByTrackId[item.track_id] === 'dislike',
+                                                disabled: feedbackPendingTrackId === item.track_id,
+                                                onClick: () => handleFeedback(item, 'dislike'),
+                                            },
+                                            {
+                                                label: 'Save',
+                                                icon: <Bookmark size={16} />,
+                                                active: feedbackByTrackId[item.track_id] === 'save',
+                                                disabled: feedbackPendingTrackId === item.track_id,
+                                                onClick: () => handleFeedback(item, 'save'),
+                                            },
+                                        ]}
                                     />
                                 ))}
                             </div>

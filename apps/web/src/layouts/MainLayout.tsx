@@ -29,7 +29,7 @@ const MainLayout = () => {
                 </main>
             </div>
 
-            <PlaybackDock />
+            <PlaybackDock sidebarCollapsed={sidebarCollapsed} />
         </div>
     )
 }

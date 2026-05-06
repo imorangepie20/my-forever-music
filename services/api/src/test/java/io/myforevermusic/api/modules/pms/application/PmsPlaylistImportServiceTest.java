@@ -24,7 +24,7 @@ import io.myforevermusic.api.modules.pms.application.PmsPlaylistImportCatalogSer
 import io.myforevermusic.api.modules.pms.application.PmsPlaylistImportCatalogService.ImportCandidateTrack;
 import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsPlaylistImportStore;
-import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackSpotifyAudioFeatures;
+import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
 import io.myforevermusic.api.modules.pms.presentation.PmsPlaylistImportRequest;
 import io.myforevermusic.api.modules.pms.presentation.PmsWorkspaceBootstrapResponse;
 import java.time.Instant;
@@ -104,7 +104,7 @@ class PmsPlaylistImportServiceTest {
         assertThat(userLibraryBootstrap.playlists()).hasSize(2);
         assertThat(userLibraryBootstrap.workspaceDefaults().userId()).isEqualTo(userId);
         assertThat(userLibraryBootstrap.suggestedTracks()).allMatch(
-            PmsWorkspaceBootstrapResponse.TrackSeedSuggestion::spotifyAudioFeaturesFilled
+            PmsWorkspaceBootstrapResponse.TrackSeedSuggestion::audioFeaturesFilled
         );
         assertThat(importedWorkspaceBootstrap.playlists()).hasSize(2);
     }
@@ -239,7 +239,7 @@ class PmsPlaylistImportServiceTest {
                                     "spotify:track:track-001",
                                     null,
                                     true,
-                                    new PmsTrackSpotifyAudioFeatures(
+                                    new PmsTrackAudioFeatures(
                                         "track-001",
                                         "spotify_api",
                                         true,

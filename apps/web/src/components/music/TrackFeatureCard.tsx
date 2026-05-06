@@ -1,4 +1,5 @@
 import { ExternalLink, Play, Plus } from 'lucide-react'
+import type { ReactNode } from 'react'
 import Button from '@/components/common/Button'
 import MusicArtwork from '@/components/music/MusicArtwork'
 import { formatDuration } from '@/lib/musicPlayback'
@@ -15,6 +16,13 @@ interface TrackFeatureCardProps {
     onPlay?: () => void
     onUseAsSeed?: () => void
     onOpenExternal?: () => void
+    feedbackActions?: Array<{
+        label: string
+        icon: ReactNode
+        active?: boolean
+        disabled?: boolean
+        onClick: () => void
+    }>
 }
 
 const TrackFeatureCard = ({
@@ -29,6 +37,7 @@ const TrackFeatureCard = ({
     onPlay,
     onUseAsSeed,
     onOpenExternal,
+    feedbackActions = [],
 }: TrackFeatureCardProps) => {
     const durationLabel = formatDuration(durationMs)
 
@@ -84,6 +93,23 @@ const TrackFeatureCard = ({
                         </Button>
                     )}
                 </div>
+
+                {feedbackActions.length > 0 && (
+                    <div className="flex flex-wrap gap-2 border-t border-hud-border-secondary pt-3">
+                        {feedbackActions.map((action) => (
+                            <Button
+                                key={action.label}
+                                type="button"
+                                variant={action.active ? 'primary' : 'ghost'}
+                                onClick={action.onClick}
+                                disabled={action.disabled}
+                            >
+                                {action.icon}
+                                {action.label}
+                            </Button>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     )

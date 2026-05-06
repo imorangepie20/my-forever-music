@@ -32,7 +32,7 @@ class PlatformCatalogControllerWebMvcTest {
         mockMvc.perform(get("/api/v1/platforms/catalog"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.service").value("api"))
-            .andExpect(jsonPath("$.primary_audio_feature_source").value("spotify"))
+            .andExpect(jsonPath("$.primary_audio_feature_source").value("provider-neutral-transition"))
             .andExpect(jsonPath("$.platforms[0].platform_id").value("spotify"))
             .andExpect(jsonPath("$.platforms[1].audio_feature_strategy").value("disabled-until-real-provider"));
     }
@@ -42,16 +42,16 @@ class PlatformCatalogControllerWebMvcTest {
             "api",
             "ok",
             Instant.parse("2026-05-03T00:00:00Z"),
-            "spotify",
+            "provider-neutral-transition",
             List.of("step-1", "step-2"),
             List.of(
                 new PlatformCatalogResponse.PlatformOption(
                     "spotify",
                     "Spotify",
-                    "priority-analysis-source",
+                    "priority-import-source",
                     true,
                     true,
-                    "native-audio-features",
+                    "metadata-import-and-external-feature-backfill",
                     "PMS source",
                     "EMS source",
                     List.of("note-1")

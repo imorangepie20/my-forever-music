@@ -1,12 +1,14 @@
 package io.myforevermusic.api.modules.platform.infrastructure.spotify;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.myforevermusic.api.modules.auth.application.AuthRegisteredAccount;
 import io.myforevermusic.api.modules.platform.application.PlatformAccountCredential;
 import io.myforevermusic.api.modules.platform.application.PlatformOAuthProperties;
+import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsAudioFeaturesClient;
+import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsAudioFeaturesClient.ReccoBeatsAudioFeaturesSnapshot;
+import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsProperties;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +60,10 @@ class SpotifyPlatformPlaylistProviderTest {
             Map.of(),
             Map.of()
         );
-        SpotifyPlatformPlaylistProvider provider = new SpotifyPlatformPlaylistProvider(spotifyWebApiClient);
+        SpotifyPlatformPlaylistProvider provider = new SpotifyPlatformPlaylistProvider(
+            spotifyWebApiClient,
+            new FakeReccoBeatsAudioFeaturesClient(Map.of())
+        );
 
         var playlists = provider.listImportablePlaylists(sampleAccount(), spotifyCredential());
 
@@ -70,7 +75,7 @@ class SpotifyPlatformPlaylistProviderTest {
     }
 
     @Test
-    void shouldLoadSpotifyTracksWithSpotifyApiAudioFeatures() {
+    void shouldLoadSpotifyTracksWithReccoBeatsAudioFeatures() {
         SpotifyWebApiClient spotifyWebApiClient = new FakeSpotifyWebApiClient(
             List.of(
                 new SpotifyWebApiClient.SpotifyPlaylistSummary(
@@ -115,54 +120,49 @@ class SpotifyPlatformPlaylistProviderTest {
                     )
                 )
             ),
-            Map.of(
-                "track-001",
-                new SpotifyWebApiClient.SpotifyAudioFeaturesSnapshot(
+            Map.of()
+        );
+        SpotifyPlatformPlaylistProvider provider = new SpotifyPlatformPlaylistProvider(
+            spotifyWebApiClient,
+            new FakeReccoBeatsAudioFeaturesClient(Map.of(
+                "track-001", new ReccoBeatsAudioFeaturesSnapshot(
                     "track-001",
-                    "https://api.spotify.com/v1/audio-analysis/track-001",
-                    "https://api.spotify.com/v1/tracks/track-001",
-                    "spotify:track:track-001",
-                    "audio_features",
-                    218000,
-                    1,
-                    1,
-                    4,
+                    "recco-uuid-001",
+                    "https://open.spotify.com/track/track-001",
+                    "USRC17607839",
                     0.19,
                     0.74,
                     0.78,
                     0.02,
+                    1,
                     0.11,
                     -7.8,
+                    1,
                     0.05,
                     116.2,
                     0.67,
                     Instant.parse("2026-05-03T01:00:00Z")
                 ),
-                "track-002",
-                new SpotifyWebApiClient.SpotifyAudioFeaturesSnapshot(
+                "track-002", new ReccoBeatsAudioFeaturesSnapshot(
                     "track-002",
-                    "https://api.spotify.com/v1/audio-analysis/track-002",
-                    "https://api.spotify.com/v1/tracks/track-002",
-                    "spotify:track:track-002",
-                    "audio_features",
-                    221000,
-                    2,
-                    1,
-                    4,
+                    "recco-uuid-002",
+                    "https://open.spotify.com/track/track-002",
+                    "USRC17607840",
                     0.16,
                     0.71,
                     0.69,
                     0.01,
+                    2,
                     0.12,
                     -8.1,
+                    1,
                     0.04,
                     112.4,
                     0.61,
                     Instant.parse("2026-05-03T01:00:00Z")
                 )
-            )
+            ))
         );
-        SpotifyPlatformPlaylistProvider provider = new SpotifyPlatformPlaylistProvider(spotifyWebApiClient);
 
         var importedPlaylists = provider.loadPlaylistsForImport(
             sampleAccount(),
@@ -172,17 +172,17 @@ class SpotifyPlatformPlaylistProviderTest {
 
         assertThat(importedPlaylists).hasSize(1);
         assertThat(importedPlaylists.get(0).tracks()).hasSize(2);
-        assertThat(importedPlaylists.get(0).tracks().get(0).spotifyAudioFeatures().getAudioFeatureSource())
-            .isEqualTo("spotify_api");
-        assertThat(importedPlaylists.get(0).tracks().get(0).spotifyAudioFeatures().isComplete()).isTrue();
-        assertThat(importedPlaylists.get(0).tracks().get(1).spotifyAudioFeatures().getAudioFeatureSource())
-            .isEqualTo("spotify_api");
-        assertThat(importedPlaylists.get(0).tracks().get(1).spotifyAudioFeatures().isComplete()).isTrue();
+        assertThat(importedPlaylists.get(0).tracks().get(0).audioFeatures().getAudioFeatureSource())
+            .isEqualTo("reccobeats_lookup");
+        assertThat(importedPlaylists.get(0).tracks().get(0).audioFeatures().isComplete()).isTrue();
+        assertThat(importedPlaylists.get(0).tracks().get(1).audioFeatures().getAudioFeatureSource())
+            .isEqualTo("reccobeats_lookup");
+        assertThat(importedPlaylists.get(0).tracks().get(1).audioFeatures().isComplete()).isTrue();
         assertThat(importedPlaylists.get(0).tracks()).allMatch(track -> track.seed());
     }
 
     @Test
-    void shouldRejectImportWhenSpotifyAudioFeaturesAreMissing() {
+    void shouldStorePlaceholderWhenReccoBeatsAudioFeaturesAreMissing() {
         SpotifyWebApiClient spotifyWebApiClient = new FakeSpotifyWebApiClient(
             List.of(
                 new SpotifyWebApiClient.SpotifyPlaylistSummary(
@@ -217,15 +217,22 @@ class SpotifyPlatformPlaylistProviderTest {
             ),
             Map.of()
         );
-        SpotifyPlatformPlaylistProvider provider = new SpotifyPlatformPlaylistProvider(spotifyWebApiClient);
+        SpotifyPlatformPlaylistProvider provider = new SpotifyPlatformPlaylistProvider(
+            spotifyWebApiClient,
+            new FakeReccoBeatsAudioFeaturesClient(Map.of())
+        );
 
-        assertThatThrownBy(() -> provider.loadPlaylistsForImport(
+        var importedPlaylists = provider.loadPlaylistsForImport(
             sampleAccount(),
             spotifyCredential(),
             List.of("owned-001")
-        ))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("Spotify audio features are missing");
+        );
+
+        assertThat(importedPlaylists).hasSize(1);
+        assertThat(importedPlaylists.get(0).tracks()).hasSize(1);
+        assertThat(importedPlaylists.get(0).tracks().get(0).audioFeatures().getAudioFeatureSource())
+            .isEqualTo("unavailable");
+        assertThat(importedPlaylists.get(0).tracks().get(0).audioFeatures().isComplete()).isFalse();
     }
 
     private AuthRegisteredAccount sampleAccount() {
@@ -302,6 +309,26 @@ class SpotifyPlatformPlaylistProviderTest {
             PlatformAccountCredential credential,
             List<String> spotifyTrackIds
         ) {
+            return audioFeaturesByTrackId.entrySet().stream()
+                .filter(entry -> spotifyTrackIds.contains(entry.getKey()))
+                .collect(java.util.stream.Collectors.toMap(
+                    Map.Entry::getKey,
+                    Map.Entry::getValue
+                ));
+        }
+    }
+
+    private static final class FakeReccoBeatsAudioFeaturesClient extends ReccoBeatsAudioFeaturesClient {
+
+        private final Map<String, ReccoBeatsAudioFeaturesSnapshot> audioFeaturesByTrackId;
+
+        private FakeReccoBeatsAudioFeaturesClient(Map<String, ReccoBeatsAudioFeaturesSnapshot> audioFeaturesByTrackId) {
+            super(new ReccoBeatsProperties(), new ObjectMapper());
+            this.audioFeaturesByTrackId = audioFeaturesByTrackId;
+        }
+
+        @Override
+        public Map<String, ReccoBeatsAudioFeaturesSnapshot> getAudioFeaturesForSpotifyTrackIds(List<String> spotifyTrackIds) {
             return audioFeaturesByTrackId.entrySet().stream()
                 .filter(entry -> spotifyTrackIds.contains(entry.getKey()))
                 .collect(java.util.stream.Collectors.toMap(

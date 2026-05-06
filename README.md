@@ -94,6 +94,8 @@ my-forever-music/
 - `services/api`는 `POST /api/v1/platforms/lastfm/profile` 엔드포인트로 Last.fm signal profile 저장과 EMS 재사용 경로를 제공
 - `services/api`는 `GET/POST /api/v1/platforms/lastfm/scrobbles/*` 엔드포인트로 scrobble snapshot 저장과 bootstrap 조회를 제공
 - `services/api`는 저장된 Last.fm scrobble snapshot을 `EMS workspace analysis`와 `GMS recommendation preview`에 우선 반영하고, 없으면 live top artist 조회로 fallback 함
+- `services/api`와 `apps/web`는 GMS 추천 후보의 like/dislike/save 평가를 저장해 PMS 학습 신호로 환류할 수 있음
+- `services/api`와 `apps/web`는 PMS personal playlist 생성과 GMS 추천 후보 저장을 제공함
 - `services/api`는 `POST /api/v1/auth/register` 엔드포인트로 회원가입과 기본 플랫폼 선택 제공
 - `services/api`는 `POST /api/v1/auth/login` 엔드포인트로 기존 계정 로그인과 현재 온보딩 복원을 제공
 - `services/api`는 `GET/POST /api/v1/platforms/connections/*` 엔드포인트로 가입 직후 플랫폼 연결 온보딩 제공
@@ -145,6 +147,44 @@ my-forever-music/
 4. YouTube Music 실제 플랫폼 provider 설계
 5. 사용자별 음악 학습 모델 개발
 6. 추천 결과 평가 저장과 사용자 제작 playlist 구현
+
+## 로컬 데이터베이스 설정
+
+### Docker로 PostgreSQL/Redis 실행
+
+```bash
+cd infra/docker
+docker compose -f docker-compose.local-db.yml up -d
+```
+
+포트 설정:
+- PostgreSQL: `127.0.0.1:5433` (다른 서비스와의 충돌 방지)
+- Redis: `127.0.0.1:6379`
+
+### Spring Boot database 프로필 실행
+
+```bash
+cd services/api
+SPRING_PROFILES_ACTIVE=database DB_PORT=5433 ./gradlew bootRun
+```
+
+`database` 프로필은:
+- PostgreSQL 연결 (port 5433)
+- Flyway 마이그레이션 자동 실행
+- JPA/Hibernate 영속성 활성화
+
+### 데이터베이스 직접 접속
+
+```bash
+docker exec -it my-forever-music-local-postgres psql -U postgres -d my_forever_music
+```
+
+### 컨테이너 상태 확인
+
+```bash
+cd infra/docker
+docker compose -f docker-compose.local-db.yml ps
+```
 
 ## 로컬 DB 참고
 

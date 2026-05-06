@@ -72,6 +72,7 @@
   - `platform_uri`
   - `preview_url`
   - `spotify_track_id`
+  - `audio_feature_track_id`
   - `duration_ms`
 
 ## 현재 구현 메모
@@ -81,6 +82,7 @@
 - 현재 `services/api`는 AI preview 응답을 받은 뒤, 가능하면 현재 사용자의 `PMS user library`에서 실제 트랙을 다시 매칭해 playable item으로 재투영한다
 - AI preview가 후보를 반환했는데 PMS user library에서 실제 playable track으로 재매핑하지 못하면 가짜 후보를 그대로 노출하지 않고 요청을 실패시킨다
 - 이때 선택된 `playlist_id`와 seed track/artist/genre, seed 여부, audio feature energy alignment를 함께 사용해 우선순위를 계산한다
+- `audio_feature_track_id`는 provider-neutral 권장 필드이고, legacy `spotify_track_id`는 기존 클라이언트 호환을 위해 같은 값으로 유지한다
 - 따라서 현재 `GMS` 카드와 공통 플레이어는 synthetic track이 아니라 실제 PMS 라이브러리 트랙을 기준으로 동작한다
 - 내부 호출 대상은 `AI_SERVICE_BASE_URL`과 `AI_RECOMMENDATION_PREVIEW_PATH` 설정으로 바꿀 수 있다
 - `mode`가 비어 있으면 `gms`로 해석하는 사용 흐름을 전제로 한다
@@ -105,4 +107,4 @@
 
 1. Last.fm 외에도 PMS import 히스토리, EMS session state를 함께 GMS 입력에 주입
 2. preview 결과를 실제 트랙 카탈로그와 연결
-3. GMS 평가 결과를 다시 PMS 학습 데이터로 환류
+3. GMS feedback 저장 데이터를 사용자별 음악 학습 모델 입력으로 반영

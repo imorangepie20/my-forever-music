@@ -7,6 +7,7 @@ import io.myforevermusic.api.modules.platform.application.PlatformAccountCredent
 import io.myforevermusic.api.modules.platform.application.PlatformOAuthProperties;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -18,11 +19,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 public class SpotifyWebApiClient {
+
+    private static final Logger log = LoggerFactory.getLogger(SpotifyWebApiClient.class);
 
     private final PlatformOAuthProperties platformOAuthProperties;
     private final ObjectMapper objectMapper;
@@ -44,6 +49,91 @@ public class SpotifyWebApiClient {
         this.platformOAuthProperties = platformOAuthProperties;
         this.objectMapper = objectMapper;
         this.httpClient = httpClient;
+    }
+
+    public record SpotifySearchResult<T>(List<T> items, int total) {}
+
+    public SpotifySearchResult<SpotifyPlaylistSummary> searchPlaylists(
+        PlatformAccountCredential credential,
+        String query,
+        int limit
+    ) {
+        int clampedLimit = Math.min(Math.max(limit, 1), 10);
+        SpotifySearchPlaylistEnvelope payload = get(
+            credential,
+            buildApiUri("/search?q=%s&type=playlist&limit=%d".formatted(
+                URLEncoder.encode(query, StandardCharsets.UTF_8), clampedLimit
+            )),
+            SpotifySearchPlaylistEnvelope.class
+        );
+
+        List<SpotifyPlaylistItemResponse> items = Optional.ofNullable(payload.playlists())
+            .map(SpotifyPlaylistPageResponse::items)
+            .orElse(List.of());
+
+        List<SpotifyPlaylistSummary> results = items.stream()
+            .filter(item -> item != null && item.id() != null && !item.id().isBlank())
+            .map(item -> new SpotifyPlaylistSummary(
+                item.id(),
+                item.name() == null || item.name().isBlank() ? "Untitled Spotify Playlist" : item.name(),
+                item.description(),
+                item.owner() == null ? null : item.owner().id(),
+                item.owner() == null || item.owner().displayName() == null || item.owner().displayName().isBlank()
+                    ? "Spotify" : item.owner().displayName(),
+                item.collaborative() != null && item.collaborative(),
+                item.tracks() == null || item.tracks().total() == null ? 0 : item.tracks().total(),
+                firstImageUrl(item.images()),
+                spotifyExternalUrl(item.externalUrls()),
+                item.uri()
+            ))
+            .toList();
+
+        int total = payload.playlists() != null && payload.playlists().total() != null
+            ? payload.playlists().total() : results.size();
+
+        return new SpotifySearchResult<>(results, total);
+    }
+
+    public SpotifySearchResult<SpotifyPlaylistTrack> searchTracks(
+        PlatformAccountCredential credential,
+        String query,
+        int limit
+    ) {
+        int clampedLimit = Math.min(Math.max(limit, 1), 10);
+        SpotifySearchTrackEnvelope payload = get(
+            credential,
+            buildApiUri("/search?q=%s&type=track&limit=%d".formatted(
+                URLEncoder.encode(query, StandardCharsets.UTF_8), clampedLimit
+            )),
+            SpotifySearchTrackEnvelope.class
+        );
+
+        SpotifySearchTrackPageResponse trackPage = payload.tracks();
+        List<SpotifyTrackResponse> items = trackPage != null
+            ? Optional.ofNullable(trackPage.items()).orElse(List.of())
+            : List.of();
+
+        List<SpotifyPlaylistTrack> results = items.stream()
+            .filter(track -> track != null && track.id() != null && !track.id().isBlank())
+            .filter(track -> track.isLocal() == null || !track.isLocal())
+            .map(track -> new SpotifyPlaylistTrack(
+                track.id(),
+                track.name() == null || track.name().isBlank() ? "Untitled Spotify Track" : track.name(),
+                firstArtistName(track.artists()),
+                track.album() == null ? null : track.album().name(),
+                firstImageUrl(track.album() == null ? null : track.album().images()),
+                track.href(),
+                spotifyExternalUrl(track.externalUrls()),
+                track.uri(),
+                track.previewUrl(),
+                track.durationMs()
+            ))
+            .toList();
+
+        int total = trackPage != null && trackPage.total() != null
+            ? trackPage.total() : results.size();
+
+        return new SpotifySearchResult<>(results, total);
     }
 
     public SpotifyUserProfile getCurrentUserProfile(PlatformAccountCredential credential) {
@@ -183,6 +273,11 @@ public class SpotifyWebApiClient {
         String uri,
         Class<T> responseType
     ) {
+        log.debug("Spotify API GET uri={} token_prefix={} expires_at={}",
+            uri,
+            credential.accessToken() != null && credential.accessToken().length() > 10
+                ? credential.accessToken().substring(0, 10) + "..." : "null",
+            credential.accessTokenExpiresAt());
         try {
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(uri))
@@ -195,7 +290,10 @@ public class SpotifyWebApiClient {
                 .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            log.debug("Spotify API response status={} body_length={}", response.statusCode(),
+                response.body() != null ? response.body().length() : 0);
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log.warn("Spotify API error status={} body={}", response.statusCode(), response.body());
                 throw new IllegalArgumentException(readErrorMessage(response.statusCode(), response.body()));
             }
 
@@ -334,6 +432,7 @@ public class SpotifyWebApiClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     record SpotifyPlaylistPageResponse(
         List<SpotifyPlaylistItemResponse> items,
+        Integer total,
         String next
     ) {
     }
@@ -368,13 +467,14 @@ public class SpotifyWebApiClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     record SpotifyPlaylistTrackPageResponse(
         List<SpotifyPlaylistTrackItemResponse> items,
+        Integer total,
         String next
     ) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record SpotifyPlaylistTrackItemResponse(
-        SpotifyTrackResponse track
+        @JsonProperty("item") SpotifyTrackResponse track
     ) {
     }
 
@@ -459,6 +559,26 @@ public class SpotifyWebApiClient {
     record SpotifyApiErrorResponse(
         Integer status,
         String message
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SpotifySearchPlaylistEnvelope(
+        SpotifyPlaylistPageResponse playlists
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SpotifySearchTrackEnvelope(
+        SpotifySearchTrackPageResponse tracks
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SpotifySearchTrackPageResponse(
+        List<SpotifyTrackResponse> items,
+        Integer total,
+        String next
     ) {
     }
 }

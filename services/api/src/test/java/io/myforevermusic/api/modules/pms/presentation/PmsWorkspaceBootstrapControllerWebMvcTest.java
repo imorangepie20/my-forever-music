@@ -35,6 +35,9 @@ class PmsWorkspaceBootstrapControllerWebMvcTest {
             .andExpect(jsonPath("$.workspace_defaults.playlist_id").value("playlist-001"))
             .andExpect(jsonPath("$.playlists[0].title").value("Forever Midnight Drive"))
             .andExpect(jsonPath("$.suggested_tracks[0].track_id").value("track-alpha"))
+            .andExpect(jsonPath("$.suggested_tracks[0].audio_feature_track_id").value("sp-track-alpha"))
+            .andExpect(jsonPath("$.suggested_tracks[0].audio_features_filled").value(true))
+            .andExpect(jsonPath("$.suggested_tracks[0].audio_feature_source").value("spotify_api"))
             .andExpect(jsonPath("$.suggested_tracks[0].spotify_audio_features_filled").value(true))
             .andExpect(jsonPath("$.suggested_artists[1].artist_name").value("Artist Two"))
             .andExpect(jsonPath("$.suggested_genres[2].genre").value("indietronica"));
@@ -88,7 +91,10 @@ class PmsWorkspaceBootstrapControllerWebMvcTest {
                     214000,
                     true,
                     "sp-track-alpha",
+                    "sp-track-alpha",
                     true,
+                    true,
+                    "spotify_api",
                     "spotify_api"
                 )
             ),

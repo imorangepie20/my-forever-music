@@ -1,5 +1,5 @@
-import { startTransition, useEffect, useMemo, useState } from 'react'
-import { LibraryBig, RefreshCw, Sparkles } from 'lucide-react'
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
+import { LibraryBig, Plus, RefreshCw, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
@@ -8,8 +8,19 @@ import TrackFeatureCard from '@/components/music/TrackFeatureCard'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { usePlayback } from '@/contexts/PlaybackContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
-import { ApiError, fetchPmsPlaylistImportBootstrap, fetchPmsWorkspaceBootstrap, importPmsPlaylists } from '@/services/api'
-import type { PmsPlaylistImportBootstrapResponse, PmsWorkspaceBootstrapResponse } from '@/types/api'
+import {
+    ApiError,
+    createPmsPersonalPlaylist,
+    fetchPmsPersonalPlaylists,
+    fetchPmsPlaylistImportBootstrap,
+    fetchPmsWorkspaceBootstrap,
+    importPmsPlaylists,
+} from '@/services/api'
+import type {
+    PmsPersonalPlaylistBootstrapResponse,
+    PmsPlaylistImportBootstrapResponse,
+    PmsWorkspaceBootstrapResponse,
+} from '@/types/api'
 
 const splitItems = (value: string) =>
     value
@@ -43,23 +54,20 @@ const PmsPage = () => {
     } = useRecommendationWorkspace()
     const [bootstrap, setBootstrap] = useState<PmsWorkspaceBootstrapResponse | null>(null)
     const [importBootstrap, setImportBootstrap] = useState<PmsPlaylistImportBootstrapResponse | null>(null)
+    const [personalBootstrap, setPersonalBootstrap] = useState<PmsPersonalPlaylistBootstrapResponse | null>(null)
     const [selectedExternalPlaylistIds, setSelectedExternalPlaylistIds] = useState<string[]>([])
+    const [personalPlaylistTitle, setPersonalPlaylistTitle] = useState('My Forever Finds')
+    const [personalPlaylistDescription, setPersonalPlaylistDescription] = useState('Songs saved inside my PMS library.')
     const [isLoading, setIsLoading] = useState(true)
     const [isImporting, setIsImporting] = useState(false)
+    const [isCreatingPersonalPlaylist, setIsCreatingPersonalPlaylist] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [importMessage, setImportMessage] = useState<string | null>(null)
+    const [personalPlaylistMessage, setPersonalPlaylistMessage] = useState<string | null>(null)
 
     const activeUserId = session?.userId
-
-    const hydrateWorkspaceFromBootstrap = (response: PmsWorkspaceBootstrapResponse) => {
-        updateWorkspace({
-            userId: response.workspace_defaults.user_id,
-            playlistId: response.workspace_defaults.playlist_id,
-            seedTrackIdsText: response.workspace_defaults.seed_track_ids.join(', '),
-            seedArtistNamesText: response.workspace_defaults.seed_artist_names.join(', '),
-            seedGenresText: response.workspace_defaults.seed_genres.join(', '),
-        })
-    }
+    const activePlaylistIdRef = useRef(workspace.playlistId)
+    activePlaylistIdRef.current = workspace.playlistId
 
     useEffect(() => {
         const controller = new AbortController()
@@ -69,20 +77,24 @@ const PmsPage = () => {
 
         const load = async () => {
             try {
-                const [workspaceResponse, importResponse] = await Promise.all([
+                const [workspaceResponse, importResponse, personalResponse] = await Promise.all([
                     fetchPmsWorkspaceBootstrap(
                         activeUserId,
-                        workspace.playlistId || undefined,
+                        activePlaylistIdRef.current || undefined,
                         controller.signal,
                     ),
                     activeUserId
                         ? fetchPmsPlaylistImportBootstrap(activeUserId, controller.signal)
+                        : Promise.resolve(null),
+                    activeUserId
+                        ? fetchPmsPersonalPlaylists(activeUserId, controller.signal)
                         : Promise.resolve(null),
                 ])
 
                 startTransition(() => {
                     setBootstrap(workspaceResponse)
                     setImportBootstrap(importResponse)
+                    setPersonalBootstrap(personalResponse)
                     setSelectedExternalPlaylistIds((current) => {
                         const nextAvailable = importResponse?.available_playlists
                             .filter((playlist) => !playlist.already_imported)
@@ -95,12 +107,6 @@ const PmsPage = () => {
                         return nextAvailable.slice(0, 1)
                     })
                     setError(null)
-                })
-
-                hydrateWorkspaceFromBootstrap(workspaceResponse)
-                updateWorkspace({
-                    userId: activeUserId ?? workspaceResponse.workspace_defaults.user_id,
-                    preferredPlatformId: session?.preferredPlatformId ?? workspace.preferredPlatformId,
                 })
             } catch (requestError: unknown) {
                 if (requestError instanceof DOMException && requestError.name === 'AbortError') {
@@ -123,7 +129,7 @@ const PmsPage = () => {
         void load()
 
         return () => controller.abort()
-    }, [activeUserId, session?.preferredPlatformId, updateWorkspace, workspace.playlistId, workspace.preferredPlatformId])
+    }, [activeUserId, session?.preferredPlatformId])
 
     const activePlaylist = useMemo(
         () =>
@@ -139,6 +145,7 @@ const PmsPage = () => {
     )
 
     const importedPlaylists = importBootstrap?.imported_playlists ?? []
+    const personalPlaylists = personalBootstrap?.playlists ?? []
     const reconnectRequired = importBootstrap?.platform_connection.reconnect_required ?? false
     const pmsImportSupported = importBootstrap?.platform_connection.pms_import_supported ?? true
 
@@ -151,20 +158,51 @@ const PmsPage = () => {
     }
 
     const reloadPmsData = async (playlistId?: string) => {
-        const [workspaceResponse, importResponse] = await Promise.all([
+        const [workspaceResponse, importResponse, personalResponse] = await Promise.all([
             fetchPmsWorkspaceBootstrap(activeUserId, playlistId ?? workspace.playlistId ?? undefined),
             activeUserId ? fetchPmsPlaylistImportBootstrap(activeUserId) : Promise.resolve(null),
+            activeUserId ? fetchPmsPersonalPlaylists(activeUserId) : Promise.resolve(null),
         ])
 
         setBootstrap(workspaceResponse)
         setImportBootstrap(importResponse)
+        setPersonalBootstrap(personalResponse)
         setSelectedExternalPlaylistIds(
             importResponse?.available_playlists
                 .filter((playlist) => !playlist.already_imported)
                 .map((playlist) => playlist.external_playlist_id)
                 .slice(0, 1) ?? [],
         )
-        hydrateWorkspaceFromBootstrap(workspaceResponse)
+    }
+
+    const handleCreatePersonalPlaylist = async () => {
+        if (!session) {
+            setError('Create an account before making a personal PMS playlist.')
+            return
+        }
+
+        setIsCreatingPersonalPlaylist(true)
+        setError(null)
+        setPersonalPlaylistMessage(null)
+
+        try {
+            const response = await createPmsPersonalPlaylist({
+                user_id: session.userId,
+                title: personalPlaylistTitle,
+                description: personalPlaylistDescription,
+            })
+            const personalResponse = await fetchPmsPersonalPlaylists(session.userId)
+            setPersonalBootstrap(personalResponse)
+            setPersonalPlaylistMessage(response.next_step_message)
+        } catch (requestError: unknown) {
+            const message =
+                requestError instanceof ApiError
+                    ? requestError.message
+                    : 'Unable to create the personal PMS playlist.'
+            setError(message)
+        } finally {
+            setIsCreatingPersonalPlaylist(false)
+        }
     }
 
     const handleImportPlaylists = async () => {
@@ -359,8 +397,16 @@ const PmsPage = () => {
             <HudCard title="Track Shelf" subtitle="Relevant album art, playable tracks, and one-click seed actions">
                 {bootstrap?.suggested_tracks.length ? (
                     <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-                        {bootstrap.suggested_tracks.map((track) => (
-                            <TrackFeatureCard
+                        {bootstrap.suggested_tracks.map((track) => {
+                            const audioFeaturesFilled =
+                                track.audio_features_filled ?? track.spotify_audio_features_filled
+                            const audioFeatureSource =
+                                track.audio_feature_source ?? track.spotify_audio_feature_source
+                            const audioFeatureTrackId =
+                                track.audio_feature_track_id ?? track.spotify_track_id
+
+                            return (
+                                <TrackFeatureCard
                                 key={track.track_id}
                                 title={track.title}
                                 artistName={track.artist_name}
@@ -370,9 +416,9 @@ const PmsPage = () => {
                                 durationMs={track.duration_ms}
                                 badges={[
                                     track.seed ? 'seed' : 'candidate',
-                                    track.spotify_audio_features_filled ? 'audio ready' : 'pending audio',
+                                    audioFeaturesFilled ? 'audio enriched' : 'audio pending',
                                 ]}
-                                reason={`Audio features resolved by ${track.spotify_audio_feature_source}.`}
+                                reason={`Current audio snapshot source: ${audioFeatureSource}.`}
                                 onPlay={() =>
                                     playItem({
                                         id: `track:${track.track_id}`,
@@ -385,7 +431,7 @@ const PmsPage = () => {
                                         externalUrl: track.platform_external_url,
                                         platformUri: track.platform_uri,
                                         previewUrl: track.preview_url,
-                                        spotifyTrackId: track.spotify_track_id,
+                                        spotifyTrackId: audioFeatureTrackId,
                                         durationMs: track.duration_ms,
                                         supportingText: activePlaylist?.title ?? null,
                                     })
@@ -398,13 +444,101 @@ const PmsPage = () => {
                                 }
                                 onOpenExternal={() => openExternal(track.platform_external_url)}
                             />
-                        ))}
+                            )
+                        })}
                     </div>
                 ) : (
                     <div className="rounded-[24px] border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">
                         Relevant tracks for the selected PMS playlist will appear here.
                     </div>
                 )}
+            </HudCard>
+
+            <HudCard
+                title="Personal Playlists"
+                subtitle="Member-owned PMS playlists that can collect GMS saves and library tracks"
+                action={
+                    isCreatingPersonalPlaylist ? (
+                        <span className="inline-flex items-center gap-2 text-xs text-hud-text-muted">
+                            <RefreshCw size={14} className="animate-spin" />
+                            Creating
+                        </span>
+                    ) : null
+                }
+            >
+                <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+                    <div className="space-y-4">
+                        <div>
+                            <label className="mb-2 block text-sm font-medium text-hud-text-secondary">Playlist Title</label>
+                            <input
+                                value={personalPlaylistTitle}
+                                onChange={(event) => setPersonalPlaylistTitle(event.target.value)}
+                                className="w-full rounded-2xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-sm text-hud-text-primary outline-none transition-hud focus:border-hud-border-primary"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="mb-2 block text-sm font-medium text-hud-text-secondary">Description</label>
+                            <textarea
+                                value={personalPlaylistDescription}
+                                onChange={(event) => setPersonalPlaylistDescription(event.target.value)}
+                                rows={3}
+                                className="w-full rounded-2xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-sm text-hud-text-primary outline-none transition-hud focus:border-hud-border-primary"
+                            />
+                        </div>
+
+                        <Button
+                            type="button"
+                            variant="primary"
+                            glow
+                            disabled={!session || isCreatingPersonalPlaylist}
+                            onClick={handleCreatePersonalPlaylist}
+                        >
+                            <Plus size={18} />
+                            Create Playlist
+                        </Button>
+
+                        {personalPlaylistMessage && (
+                            <div className="rounded-[24px] border border-hud-accent-primary/40 bg-hud-accent-primary/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                                {personalPlaylistMessage}
+                            </div>
+                        )}
+                    </div>
+
+                    <div>
+                        {personalPlaylists.length > 0 ? (
+                            <div className="grid gap-5 lg:grid-cols-2">
+                                {personalPlaylists.map((playlist) => (
+                                    <PlaylistFeatureCard
+                                        key={playlist.playlist_id}
+                                        title={playlist.title}
+                                        sourcePlatform="pms"
+                                        curator="personal playlist"
+                                        trackCount={playlist.track_count}
+                                        description={playlist.description}
+                                        imageUrl={playlist.tracks[0]?.album_image_url ?? null}
+                                        actionLabel={`${playlist.track_count} saved`}
+                                        onPlay={() =>
+                                            playItem({
+                                                id: `personal-playlist:${playlist.playlist_id}`,
+                                                kind: 'playlist',
+                                                title: playlist.title,
+                                                subtitle: `PMS personal · ${playlist.track_count} tracks`,
+                                                sourcePlatform: 'pms',
+                                                imageUrl: playlist.tracks[0]?.album_image_url ?? null,
+                                                supportingText: playlist.description,
+                                            })
+                                        }
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="rounded-[24px] border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">
+                                Personal playlists will appear here after you create one or save a GMS recommendation.
+                            </div>
+                        )}
+                    </div>
+                </div>
             </HudCard>
 
             <HudCard

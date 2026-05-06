@@ -5,81 +5,81 @@ import jakarta.persistence.Embeddable;
 import java.time.Instant;
 
 @Embeddable
-public class PmsTrackSpotifyAudioFeatures {
+public class PmsTrackAudioFeatures {
 
-    @Column(name = "spotify_track_id", length = 100)
-    private String spotifyTrackId;
+    @Column(name = "audio_feature_track_id", length = 100)
+    private String audioFeatureTrackId;
 
-    @Column(name = "spotify_audio_feature_source", nullable = false, length = 50)
+    @Column(name = "audio_feature_source", nullable = false, length = 50)
     private String audioFeatureSource;
 
-    @Column(name = "spotify_audio_features_filled", nullable = false)
+    @Column(name = "audio_features_filled", nullable = false)
     private boolean audioFeaturesFilled;
 
-    @Column(name = "spotify_analysis_url", length = 300)
+    @Column(name = "audio_analysis_url", length = 300)
     private String analysisUrl;
 
-    @Column(name = "spotify_track_href", length = 300)
+    @Column(name = "audio_track_href", length = 300)
     private String trackHref;
 
-    @Column(name = "spotify_uri", length = 200)
-    private String spotifyUri;
+    @Column(name = "audio_track_uri", length = 200)
+    private String audioTrackUri;
 
-    @Column(name = "spotify_feature_type", nullable = false, length = 30)
+    @Column(name = "audio_feature_type", nullable = false, length = 30)
     private String featureType;
 
-    @Column(name = "spotify_duration_ms")
+    @Column(name = "audio_duration_ms")
     private Integer durationMs;
 
-    @Column(name = "spotify_key")
+    @Column(name = "audio_key")
     private Integer musicalKey;
 
-    @Column(name = "spotify_mode")
+    @Column(name = "audio_mode")
     private Integer mode;
 
-    @Column(name = "spotify_time_signature")
+    @Column(name = "audio_time_signature")
     private Integer timeSignature;
 
-    @Column(name = "spotify_acousticness")
+    @Column(name = "audio_acousticness")
     private Double acousticness;
 
-    @Column(name = "spotify_danceability")
+    @Column(name = "audio_danceability")
     private Double danceability;
 
-    @Column(name = "spotify_energy")
+    @Column(name = "audio_energy")
     private Double energy;
 
-    @Column(name = "spotify_instrumentalness")
+    @Column(name = "audio_instrumentalness")
     private Double instrumentalness;
 
-    @Column(name = "spotify_liveness")
+    @Column(name = "audio_liveness")
     private Double liveness;
 
-    @Column(name = "spotify_loudness")
+    @Column(name = "audio_loudness")
     private Double loudness;
 
-    @Column(name = "spotify_speechiness")
+    @Column(name = "audio_speechiness")
     private Double speechiness;
 
-    @Column(name = "spotify_tempo")
+    @Column(name = "audio_tempo")
     private Double tempo;
 
-    @Column(name = "spotify_valence")
+    @Column(name = "audio_valence")
     private Double valence;
 
-    @Column(name = "spotify_resolved_at")
+    @Column(name = "audio_resolved_at")
     private Instant resolvedAt;
 
-    protected PmsTrackSpotifyAudioFeatures() {
+    protected PmsTrackAudioFeatures() {
     }
 
-    public PmsTrackSpotifyAudioFeatures(
-        String spotifyTrackId,
+    public PmsTrackAudioFeatures(
+        String audioFeatureTrackId,
         String audioFeatureSource,
         boolean audioFeaturesFilled,
         String analysisUrl,
         String trackHref,
-        String spotifyUri,
+        String audioTrackUri,
         String featureType,
         Integer durationMs,
         Integer musicalKey,
@@ -96,12 +96,12 @@ public class PmsTrackSpotifyAudioFeatures {
         Double valence,
         Instant resolvedAt
     ) {
-        this.spotifyTrackId = spotifyTrackId;
+        this.audioFeatureTrackId = audioFeatureTrackId;
         this.audioFeatureSource = audioFeatureSource == null ? "unresolved" : audioFeatureSource;
         this.audioFeaturesFilled = audioFeaturesFilled;
         this.analysisUrl = analysisUrl;
         this.trackHref = trackHref;
-        this.spotifyUri = spotifyUri;
+        this.audioTrackUri = audioTrackUri;
         this.featureType = featureType == null ? "audio_features" : featureType;
         this.durationMs = durationMs;
         this.musicalKey = musicalKey;
@@ -119,8 +119,8 @@ public class PmsTrackSpotifyAudioFeatures {
         this.resolvedAt = resolvedAt;
     }
 
-    public static PmsTrackSpotifyAudioFeatures unresolved() {
-        return new PmsTrackSpotifyAudioFeatures(
+    public static PmsTrackAudioFeatures unresolved() {
+        return new PmsTrackAudioFeatures(
             null,
             "unresolved",
             false,
@@ -145,8 +145,12 @@ public class PmsTrackSpotifyAudioFeatures {
         );
     }
 
+    public String getAudioFeatureTrackId() {
+        return audioFeatureTrackId;
+    }
+
     public String getSpotifyTrackId() {
-        return spotifyTrackId;
+        return audioFeatureTrackId;
     }
 
     public String getAudioFeatureSource() {
@@ -166,7 +170,11 @@ public class PmsTrackSpotifyAudioFeatures {
     }
 
     public String getSpotifyUri() {
-        return spotifyUri;
+        return audioTrackUri;
+    }
+
+    public String getAudioTrackUri() {
+        return audioTrackUri;
     }
 
     public String getFeatureType() {
@@ -234,7 +242,6 @@ public class PmsTrackSpotifyAudioFeatures {
             && durationMs != null
             && musicalKey != null
             && mode != null
-            && timeSignature != null
             && acousticness != null
             && danceability != null
             && energy != null

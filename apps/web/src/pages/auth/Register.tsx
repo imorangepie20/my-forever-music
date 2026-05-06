@@ -125,7 +125,7 @@ const Register = () => {
                                 },
                                 {
                                     title: 'Train Your Taste',
-                                    body: 'After import, your tracks and audio features become the first input for your music model.',
+                                    body: 'After import, your tracks and any resolved audio features become the first input for your music model.',
                                 },
                             ].map((item) => (
                                 <div
@@ -349,8 +349,8 @@ const Register = () => {
                                     className="mt-1 h-4 w-4 rounded border-hud-border-secondary bg-hud-bg-primary text-hud-accent-primary focus:ring-hud-accent-primary"
                                 />
                                 <span className="text-sm leading-6 text-hud-text-secondary">
-                                    I agree to the Privacy Policy for storing profile, playlist import, audio feature,
-                                    recommendation, and listening behavior data.
+                                    I agree to the Privacy Policy for storing profile, playlist import, audio feature
+                                    snapshot, recommendation, and listening behavior data.
                                 </span>
                             </label>
 

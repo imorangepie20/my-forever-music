@@ -46,7 +46,7 @@ public class PmsImportedTrackEntity {
     private String previewUrl;
 
     @Embedded
-    private PmsTrackSpotifyAudioFeatures spotifyAudioFeatures;
+    private PmsTrackAudioFeatures audioFeatures;
 
     protected PmsImportedTrackEntity() {
     }
@@ -67,9 +67,9 @@ public class PmsImportedTrackEntity {
         this.platformExternalUrl = state.platformExternalUrl();
         this.platformUri = state.platformUri();
         this.previewUrl = state.previewUrl();
-        this.spotifyAudioFeatures = state.spotifyAudioFeatures() == null
-            ? PmsTrackSpotifyAudioFeatures.unresolved()
-            : state.spotifyAudioFeatures();
+        this.audioFeatures = state.audioFeatures() == null
+            ? PmsTrackAudioFeatures.unresolved()
+            : state.audioFeatures();
     }
 
     public String getTrackId() {
@@ -116,7 +116,7 @@ public class PmsImportedTrackEntity {
         return previewUrl;
     }
 
-    public PmsTrackSpotifyAudioFeatures getSpotifyAudioFeatures() {
-        return spotifyAudioFeatures;
+    public PmsTrackAudioFeatures getAudioFeatures() {
+        return audioFeatures;
     }
 }

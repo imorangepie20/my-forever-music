@@ -57,7 +57,8 @@ class GmsRecommendationPreviewControllerWebMvcTest {
             .andExpect(jsonPath("$.service").value("ai"))
             .andExpect(jsonPath("$.context.strategy").value("gms-hybrid-blend"))
             .andExpect(jsonPath("$.input_summary.limit").value(3))
-            .andExpect(jsonPath("$.items[0].track_id").value("rec-track-alpha-01"));
+            .andExpect(jsonPath("$.items[0].track_id").value("rec-track-alpha-01"))
+            .andExpect(jsonPath("$.items[0].audio_feature_track_id").value("rec-track-alpha-01"));
     }
 
     @Test

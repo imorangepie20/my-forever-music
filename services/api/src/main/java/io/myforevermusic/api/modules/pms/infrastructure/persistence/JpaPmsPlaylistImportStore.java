@@ -108,7 +108,7 @@ public class JpaPmsPlaylistImportStore implements PmsPlaylistImportStore {
             trackEntity.getPreviewUrl(),
             playlistTrackEntity.getSortOrder(),
             playlistTrackEntity.isSeed(),
-            trackEntity.getSpotifyAudioFeatures()
+            trackEntity.getAudioFeatures()
         );
     }
 }

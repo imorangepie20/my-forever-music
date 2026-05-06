@@ -55,8 +55,11 @@ public record PmsWorkspaceBootstrapResponse(
         Integer durationMs,
         boolean seed,
         String spotifyTrackId,
+        String audioFeatureTrackId,
         boolean spotifyAudioFeaturesFilled,
-        String spotifyAudioFeatureSource
+        boolean audioFeaturesFilled,
+        String spotifyAudioFeatureSource,
+        String audioFeatureSource
     ) {
     }
 

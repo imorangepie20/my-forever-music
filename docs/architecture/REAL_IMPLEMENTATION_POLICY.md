@@ -11,12 +11,13 @@
 - `나중에 구현` 전제의 mock 흐름은 제품 플로우에 연결하지 않습니다.
 - 테스트 fixture는 테스트 코드 안에서만 사용합니다.
 - local 개발 편의 기능은 실서비스 시험 경로와 분리합니다.
+- 외부 API 권한 제약으로 사용할 수 없는 기능은 제품 목표에 있더라도 `현재 기본 사용자 경로`로 가정하지 않습니다.
 
 ## 2. 현재 적용 기준
 
 - PMS playlist import의 실제 구현 대상은 현재 `Spotify`입니다.
 - 플랫폼 확장 순서는 `Spotify -> TIDAL -> YouTube Music`입니다.
-- `TIDAL`은 다음 실제 provider 대상이지만, playlist provider와 Spotify audio feature 매칭 검증이 끝날 때까지 가입 기본 플랫폼과 PMS import 대상에서 제외합니다.
+- `TIDAL`은 다음 실제 provider 대상이지만, playlist provider와 provider-neutral audio feature enrichment 검증이 끝날 때까지 가입 기본 플랫폼과 PMS import 대상에서 제외합니다.
 - `YouTube Music`은 TIDAL 안정화 이후 진행합니다.
 - `Apple Music`은 Apple Developer 계정 준비 전까지 보류합니다.
 - `Last.fm`은 스트리밍 구독 플랫폼이 아니라 청취 이력 signal source로만 연결합니다.
@@ -27,7 +28,8 @@
 
 - 단위 테스트와 컨트롤러 테스트의 fixture, fake client, sample response는 허용합니다.
 - 외부 API 장애를 다루기 위한 fallback 로직은 허용하되, 사용자 데이터처럼 보이는 임의 생성값을 저장하지 않습니다.
-- 특히 Spotify 오디오 특성은 공식 API 응답을 확보하지 못하면 `fallback_generated` 값을 만들지 않고 import를 중단합니다.
+- 오디오 특성을 확보하지 못해도 가짜 수치를 만들지 않는 한 `metadata import + unresolved 저장`은 허용합니다.
+- 특히 개인 개발 환경에서는 Spotify audio features를 필수 성공 경로로 두지 않습니다.
 - 문서에는 planned provider를 적을 수 있지만, 구현 완료 전에는 사용자 선택지나 import 가능 상태로 노출하지 않습니다.
 
 ## 4. 새 기능 체크리스트

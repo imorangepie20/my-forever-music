@@ -18,10 +18,12 @@
 8. [PLATFORM_OAUTH_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_OAUTH_API.md)
 9. [PMS_PLAYLIST_IMPORT_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_PLAYLIST_IMPORT_API.md)
 10. [PMS_WORKSPACE_BOOTSTRAP_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_WORKSPACE_BOOTSTRAP_API.md)
-11. [EMS_WORKSPACE_ANALYSIS_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/EMS_WORKSPACE_ANALYSIS_API.md)
-12. [GMS_RECOMMENDATION_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_PREVIEW_API.md)
-13. [AI_RECOMMENDATION_PREVIEW.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AI_RECOMMENDATION_PREVIEW.md)
-14. [PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md)
+11. [PMS_PERSONAL_PLAYLIST_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_PERSONAL_PLAYLIST_API.md)
+12. [EMS_WORKSPACE_ANALYSIS_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/EMS_WORKSPACE_ANALYSIS_API.md)
+13. [GMS_RECOMMENDATION_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_PREVIEW_API.md)
+14. [GMS_RECOMMENDATION_FEEDBACK_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_FEEDBACK_API.md)
+15. [AI_RECOMMENDATION_PREVIEW.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AI_RECOMMENDATION_PREVIEW.md)
+16. [PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md)
 
 ## 문서 분류
 
@@ -39,8 +41,10 @@
 - [PLATFORM_OAUTH_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_OAUTH_API.md)
 - [PMS_PLAYLIST_IMPORT_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_PLAYLIST_IMPORT_API.md)
 - [PMS_WORKSPACE_BOOTSTRAP_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_WORKSPACE_BOOTSTRAP_API.md)
+- [PMS_PERSONAL_PLAYLIST_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_PERSONAL_PLAYLIST_API.md)
 - [EMS_WORKSPACE_ANALYSIS_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/EMS_WORKSPACE_ANALYSIS_API.md)
 - [GMS_RECOMMENDATION_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_PREVIEW_API.md)
+- [GMS_RECOMMENDATION_FEEDBACK_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_FEEDBACK_API.md)
 
 ### 2. 내부 서비스 계약
 
@@ -73,8 +77,12 @@
 | PMS Playlist Import API | `GET` | `/api/v1/pms/import/bootstrap` | `services/api` | 공개 API |
 | PMS Playlist Import API | `POST` | `/api/v1/pms/import/playlists` | `services/api` | 공개 API |
 | PMS Workspace Bootstrap API | `GET` | `/api/v1/pms/workspace/bootstrap` | `services/api` | 공개 API |
+| PMS Personal Playlist API | `GET` | `/api/v1/pms/personal-playlists/bootstrap` | `services/api` | 공개 API |
+| PMS Personal Playlist API | `POST` | `/api/v1/pms/personal-playlists` | `services/api` | 공개 API |
+| PMS Personal Playlist API | `POST` | `/api/v1/pms/personal-playlists/tracks` | `services/api` | 공개 API |
 | EMS Workspace Analysis API | `POST` | `/api/v1/ems/workspace/analysis` | `services/api` | 공개 API |
 | GMS Recommendation Preview API | `POST` | `/api/v1/gms/recommendations/preview` | `services/api` | 공개 API |
+| GMS Recommendation Feedback API | `POST` | `/api/v1/gms/recommendations/feedback` | `services/api` | 공개 API |
 | AI Recommendation Preview API | `POST` | `/v1/recommendations/preview` | `services/ai` | 내부 계약 |
 
 ## 정리 원칙

@@ -3,7 +3,7 @@ package io.myforevermusic.api.modules.pms.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsUserLibraryStore;
-import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackSpotifyAudioFeatures;
+import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -60,12 +60,12 @@ class PmsUserLibrarySyncServiceTest {
         assertThat(savedPlaylists.getFirst().playlistId()).isEqualTo("pms-spotify-playlist-001");
         assertThat(savedPlaylists.getFirst().trackCount()).isEqualTo(1);
         assertThat(savedPlaylists.getFirst().tracks().getFirst().seed()).isTrue();
-        assertThat(savedPlaylists.getFirst().tracks().getFirst().spotifyAudioFeatures().isComplete()).isTrue();
+        assertThat(savedPlaylists.getFirst().tracks().getFirst().audioFeatures().isComplete()).isTrue();
         assertThat(userLibraryStore.findPlaylists("user-001")).hasSize(1);
     }
 
-    private PmsTrackSpotifyAudioFeatures sampleFeatures(String spotifyTrackId) {
-        return new PmsTrackSpotifyAudioFeatures(
+    private PmsTrackAudioFeatures sampleFeatures(String spotifyTrackId) {
+        return new PmsTrackAudioFeatures(
             spotifyTrackId,
             "spotify_api",
             true,

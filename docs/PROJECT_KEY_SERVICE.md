@@ -56,7 +56,11 @@
 
 ## 3. 음악 분석 데이터 기준
 
-음악 분석의 기본 기준은 우선 `Spotify`가 제공하는 오디오 특성 데이터입니다.
+음악 분석의 기본 기준은 특정 플랫폼 하나가 아니라 `provider-neutral audio feature model`입니다.
+
+- `Spotify`는 playlist import, playback target, track metadata source로 계속 중요합니다.
+- 하지만 개인 개발 환경과 Development Mode 제약을 고려하면, `Spotify audio features`를 서비스의 canonical source로 가정하지 않습니다.
+- 현재 조회형 외부 공급원은 `ReccoBeats`를 1차 후보로 검토합니다.
 
 ### 3-1. 오디오 특성
 
@@ -88,20 +92,27 @@
 
 ### 4-1. 우선 기준
 
-- 플레이리스트에 담긴 각 트랙은 가능한 한 `Spotify` 오디오 특성 기준으로 분석합니다.
-- 동일 곡이 다른 플랫폼에 있어도 분석 기준은 먼저 Spotify 특성에 맞춥니다.
+- 플레이리스트에 담긴 각 트랙은 가능한 한 `provider-neutral audio feature snapshot` 기준으로 분석합니다.
+- 특정 플랫폼의 메타데이터와 오디오 특성 공급원은 분리될 수 있습니다.
+- Spotify track id, ISRC, title/artist/duration 같은 식별값은 외부 오디오 특성 공급원 lookup 키로 재사용할 수 있습니다.
 
 ### 4-2. 실제 데이터 원칙
 
-- Spotify에서 오디오 특성을 직접 가져오지 못하는 곡이 있을 수 있습니다.
+- 외부 공급원에서 오디오 특성을 바로 가져오지 못하는 곡이 있을 수 있습니다.
 - 사용자 플로우에서는 이 곡을 가짜 오디오 특성으로 채우지 않습니다.
-- 대신 import를 중단하거나, 이후 명시적인 재시도/부분 제외 정책을 만들어 사용자가 알 수 있게 처리합니다.
+- playlist import 자체를 반드시 중단할 필요는 없습니다.
+- 대신 track metadata는 저장하고, 오디오 특성은 `unresolved` 또는 `unavailable` 상태로 남긴 뒤 재시도/후속 보강 정책으로 처리합니다.
 
 ## 5. 서비스 핵심 흐름
 
 ### 5-1. 사용자 온보딩
 
-플랫폼 연결 구현 순서는 `Spotify -> TIDAL -> YouTube Music`입니다. Apple Music은 Apple Developer 계정 준비 전까지 보류합니다.
+플랫폼 연결 구현 순서와 권장사항:
+
+- **1차 집중**: `Spotify`와 `TIDAL`에 우선
+- **보류**: YouTube Music (공식 API 없음), Apple Music (Developer Program 필요)
+
+현재 사용자 온보딩에서는 **Spotify**와 **TIDAL**만 PMS import를 지원합니다.
 
 1. 회원가입 시 사용자가 구독 중인 스트리밍 서비스를 선택합니다.
 2. 해당 스트리밍 서비스의 API를 통해 사용자의 플레이리스트를 가져옵니다.
@@ -110,11 +121,12 @@
 
 ### 5-2. PMS 분석
 
-1. 플레이리스트의 각 트랙 오디오 특성을 확보합니다.
-2. 사용자의 구독 플랫폼에서 플레이리스트를 가져올 때는 구성 트랙마다 `Spotify 오디오 특성 전체 스냅샷`을 채운 뒤 저장합니다.
-3. Spotify 직접 매칭이나 오디오 특성 조회가 실패하면 임의 값을 저장하지 않고 import를 중단합니다.
-4. 확보한 특성 데이터를 기반으로 플레이리스트와 사용자 취향을 분석합니다.
-5. 이 분석 결과는 seed, mood, 선호도, 추천 모델 입력값으로 이어집니다.
+1. 사용자의 구독 플랫폼에서 playlist와 track metadata를 먼저 가져옵니다.
+2. 각 track의 오디오 특성은 가능한 경우 같은 요청 또는 후속 작업으로 보강합니다.
+3. 오디오 특성 조회가 실패하더라도 임의 값을 저장하지 않고 `unresolved` 상태로 남깁니다.
+4. 확보된 특성 데이터와 행동 데이터를 기반으로 playlist와 사용자 취향을 분석합니다.
+5. unresolved track은 이후 재보강 대상으로 관리합니다.
+6. 이 분석 결과는 seed, mood, 선호도, 추천 모델 입력값으로 이어집니다.
 
 ### 5-3. 개인화 모델 생성
 
@@ -122,8 +134,8 @@
 
 1. 사용자가 구독 플랫폼을 연결하고 playlist를 가져옵니다.
 2. 가져온 playlist와 track을 정식 `PMS user library`로 저장합니다.
-3. 각 track에 Spotify 오디오 특성 전체 스냅샷을 채웁니다.
-4. 약 `10만 곡` 수준의 Spotify 오디오 특성을 가진 기반 트랙 데이터를 준비합니다.
+3. 각 track에 provider-neutral 오디오 특성을 가능한 범위에서 채우고 source를 함께 기록합니다.
+4. 약 `10만 곡` 수준의 provider-neutral 오디오 특성을 가진 기반 트랙 데이터를 준비합니다.
 5. 이 기반 데이터로 먼저 공통 추천 모델을 학습합니다.
 6. 여기에 사용자의 PMS playlist 기반 track을 추가 학습시켜 사용자 고유 모델을 만듭니다.
 7. 사용자의 PMS에 새 playlist가 추가되면 모델을 다시 보강합니다.

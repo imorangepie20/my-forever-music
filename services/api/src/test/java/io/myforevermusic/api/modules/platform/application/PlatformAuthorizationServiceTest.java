@@ -53,7 +53,7 @@ class PlatformAuthorizationServiceTest {
     }
 
     @Test
-    void shouldRejectTidalAuthorizationUntilPlaylistImportProviderIsComplete() {
+    void shouldStartTidalPkceDraftWhenOAuthIsConfigured() {
         InMemoryAuthAccountStore authAccountStore = new InMemoryAuthAccountStore();
         AuthRegistrationService authRegistrationService = new AuthRegistrationService(
             authAccountStore,
@@ -85,9 +85,14 @@ class PlatformAuthorizationServiceTest {
             properties
         );
 
-        assertThatThrownBy(() -> service.startAuthorization(new PlatformAuthorizationStartRequest(userId, "tidal")))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("completed PMS import provider");
+        var start = service.startAuthorization(new PlatformAuthorizationStartRequest(userId, "tidal"));
+
+        assertThat(start.authorization().platformId()).isEqualTo("tidal");
+        assertThat(start.authorization().authorizationMode()).isEqualTo("tidal-pkce-draft");
+        assertThat(start.authorization().externalAuthorizationUrl())
+            .contains("https://login.tidal.com/authorize")
+            .contains("client_id=tidal-client-id")
+            .contains("code_challenge_method=S256");
     }
 
     @Test

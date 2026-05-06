@@ -112,11 +112,14 @@ public class PmsImportedWorkspaceBootstrapSource implements PmsWorkspaceBootstra
             track.platformExternalUrl(),
             track.platformUri(),
             track.previewUrl(),
-            track.spotifyAudioFeatures() == null ? null : track.spotifyAudioFeatures().getDurationMs(),
+            track.audioFeatures() == null ? null : track.audioFeatures().getDurationMs(),
             track.seed(),
-            track.spotifyAudioFeatures() == null ? null : track.spotifyAudioFeatures().getSpotifyTrackId(),
-            track.spotifyAudioFeatures() != null && track.spotifyAudioFeatures().isComplete(),
-            track.spotifyAudioFeatures() == null ? "unresolved" : track.spotifyAudioFeatures().getAudioFeatureSource()
+            track.audioFeatures() == null ? null : track.audioFeatures().getAudioFeatureTrackId(),
+            track.audioFeatures() == null ? null : track.audioFeatures().getAudioFeatureTrackId(),
+            track.audioFeatures() != null && track.audioFeatures().isComplete(),
+            track.audioFeatures() != null && track.audioFeatures().isComplete(),
+            track.audioFeatures() == null ? "unresolved" : track.audioFeatures().getAudioFeatureSource(),
+            track.audioFeatures() == null ? "unresolved" : track.audioFeatures().getAudioFeatureSource()
         );
     }
 

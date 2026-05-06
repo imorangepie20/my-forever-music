@@ -1,0 +1,13 @@
+services:
+  local-nginx:
+    image: nginx:alpine
+    container_name: my-forever-music-local-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/local-dev-https.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../local-certs:/etc/nginx/certs:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

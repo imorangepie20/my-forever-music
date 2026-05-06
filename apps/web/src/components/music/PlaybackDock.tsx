@@ -4,7 +4,11 @@ import MusicArtwork from '@/components/music/MusicArtwork'
 import { usePlayback } from '@/contexts/PlaybackContext'
 import { resolveSpotifyEmbedUrl } from '@/lib/musicPlayback'
 
-const PlaybackDock = () => {
+interface PlaybackDockProps {
+    sidebarCollapsed?: boolean
+}
+
+const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
     const { currentItem, clearItem } = usePlayback()
 
     if (!currentItem) {
@@ -15,7 +19,7 @@ const PlaybackDock = () => {
     const hasAudioPreview = !spotifyEmbedUrl && Boolean(currentItem.previewUrl)
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-hud-border-secondary bg-hud-bg-secondary/95 backdrop-blur-xl">
+        <div className={`fixed bottom-0 right-0 z-40 border-t border-hud-border-secondary bg-hud-bg-secondary/95 backdrop-blur-xl transition-all duration-300 ${sidebarCollapsed ? 'lg:left-24' : 'lg:left-72'}`}>
             <div className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:px-8">
                 <div className="flex items-center gap-4 rounded-[24px] border border-hud-border-secondary bg-hud-bg-primary/85 p-4">
                     <div className="h-20 w-20 overflow-hidden rounded-[20px]">

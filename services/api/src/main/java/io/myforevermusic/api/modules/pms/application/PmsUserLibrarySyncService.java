@@ -46,7 +46,7 @@ public class PmsUserLibrarySyncService {
                         track.previewUrl(),
                         track.sortOrder(),
                         track.seed(),
-                        track.spotifyAudioFeatures()
+                        track.audioFeatures()
                     ))
                     .toList()
             ))

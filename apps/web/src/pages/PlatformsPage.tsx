@@ -29,7 +29,8 @@ const stageLabel: Record<string, string> = {
     'planned-provider-next': 'Next Provider',
     'planned-provider-after-tidal': 'After TIDAL',
     'deferred-developer-account': 'Developer Account Deferred',
-    'priority-analysis-source': 'Priority Analysis Source',
+    'priority-import-source': 'Priority Import Source',
+    'testing-provider': 'Provider Under Test',
     'analysis-signal-source': 'Analysis Signal Source',
 }
 
@@ -81,10 +82,6 @@ const PlatformsPage = () => {
                     setLastFmUsername((current) =>
                         current || bootstrap.user.last_fm_username || '',
                     )
-                    updateWorkspace({
-                        userId: bootstrap.user.user_id,
-                        preferredPlatformId: bootstrap.user.preferred_platform_id,
-                    })
                 }
                 setError(null)
             })
@@ -106,7 +103,7 @@ const PlatformsPage = () => {
             })
 
         return () => controller.abort()
-    }, [session, updateWorkspace])
+    }, [session])
 
     const reloadConnections = async () => {
         if (!session) {
@@ -307,8 +304,8 @@ const PlatformsPage = () => {
                             </h2>
                             <p className="mt-4 max-w-2xl text-base leading-7 text-hud-text-secondary">
                                 This route is the first implementation slice of the onboarding story from
-                                `PROJECT_KEY_SERVICE.md`: choose a subscribed platform, define how audio features
-                                will be resolved, and prepare the PMS import path.
+                                `PROJECT_KEY_SERVICE.md`: choose a subscribed platform, preserve PMS metadata first,
+                                and define how audio features will be enriched afterward.
                             </p>
 
                             <div className="mt-8 flex flex-wrap gap-3">

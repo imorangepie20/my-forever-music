@@ -108,7 +108,7 @@ public class JpaPmsUserLibraryStore implements PmsUserLibraryStore {
             trackEntity.getPreviewUrl(),
             playlistTrackEntity.getSortOrder(),
             playlistTrackEntity.isSeed(),
-            trackEntity.getSpotifyAudioFeatures()
+            trackEntity.getAudioFeatures()
         );
     }
 }

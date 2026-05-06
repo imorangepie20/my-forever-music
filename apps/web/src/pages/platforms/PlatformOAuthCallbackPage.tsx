@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CheckCircle2, Loader, XCircle } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Button from '@/components/common/Button'
@@ -37,6 +37,7 @@ const PlatformOAuthCallbackPage = () => {
     const { updateWorkspace } = useRecommendationWorkspace()
     const [result, setResult] = useState<PlatformAuthorizationCompleteResponse | null>(null)
     const [error, setError] = useState<string | null>(null)
+    const completedRef = useRef(false)
 
     const state = params.get('state')
     const callbackCode = params.get('code')
@@ -45,20 +46,29 @@ const PlatformOAuthCallbackPage = () => {
     const pending = loadPendingAuthorization(state)
 
     useEffect(() => {
+        if (completedRef.current) {
+            return
+        }
+
         if (!state || !pending) {
+            completedRef.current = true
             setError('No pending platform authorization callback was found.')
             return
         }
 
         if (providerError) {
+            completedRef.current = true
             setError(providerErrorDescription ?? providerError)
             return
         }
 
         if (!callbackCode) {
+            completedRef.current = true
             setError('No authorization code was returned in the callback.')
             return
         }
+
+        completedRef.current = true
 
         completePlatformAuthorization({
             user_id: pending.user.user_id,

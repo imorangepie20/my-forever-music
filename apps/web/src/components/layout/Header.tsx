@@ -16,7 +16,7 @@ const pageCopy: Record<string, { title: string; subtitle: string }> = {
     },
     '/platforms': {
         title: 'Platform Intake Workspace',
-        subtitle: 'Choose the streaming source that will feed PMS and define how audio features will be resolved.',
+        subtitle: 'Choose the streaming source that will feed PMS and define how audio features will be enriched.',
     },
     '/platforms/oauth/authorize': {
         title: 'Platform OAuth Approval',
