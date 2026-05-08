@@ -1,4 +1,4 @@
-import { ExternalLink, Play, Plus } from 'lucide-react'
+import { ExternalLink, Play } from 'lucide-react'
 import type { ReactNode } from 'react'
 import Button from '@/components/common/Button'
 import MusicArtwork from '@/components/music/MusicArtwork'
@@ -14,7 +14,6 @@ interface TrackFeatureCardProps {
     reason?: string | null
     badges?: string[]
     onPlay?: () => void
-    onUseAsSeed?: () => void
     onOpenExternal?: () => void
     feedbackActions?: Array<{
         label: string
@@ -35,7 +34,6 @@ const TrackFeatureCard = ({
     reason,
     badges = [],
     onPlay,
-    onUseAsSeed,
     onOpenExternal,
     feedbackActions = [],
 }: TrackFeatureCardProps) => {
@@ -78,12 +76,6 @@ const TrackFeatureCard = ({
                         <Button type="button" variant="primary" onClick={onPlay}>
                             <Play size={18} />
                             Play
-                        </Button>
-                    )}
-                    {onUseAsSeed && (
-                        <Button type="button" variant="outline" onClick={onUseAsSeed}>
-                            <Plus size={18} />
-                            Use as Seed
                         </Button>
                     )}
                     {onOpenExternal && (

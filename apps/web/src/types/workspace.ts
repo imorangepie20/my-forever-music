@@ -5,9 +5,6 @@ export interface RecommendationWorkspaceState {
     preferredPlatformId: WorkspacePlatformId
     userId: string
     playlistId: string
-    seedTrackIdsText: string
-    seedArtistNamesText: string
-    seedGenresText: string
     mood: WorkspaceMood
     energyLevel: number
     familiarityBias: number
@@ -19,9 +16,6 @@ export const defaultRecommendationWorkspace: RecommendationWorkspaceState = {
     preferredPlatformId: 'spotify',
     userId: '',
     playlistId: '',
-    seedTrackIdsText: '',
-    seedArtistNamesText: '',
-    seedGenresText: '',
     mood: 'upbeat',
     energyLevel: 4,
     familiarityBias: 3,

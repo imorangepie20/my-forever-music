@@ -17,12 +17,6 @@ import {
 } from '@/services/api'
 import type { GmsRecommendationFeedbackType, GmsRecommendationPreviewResponse } from '@/types/api'
 
-const splitField = (value: string) =>
-    value
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean)
-
 const openExternal = (url?: string | null) => {
     if (!url) {
         return
@@ -33,7 +27,7 @@ const openExternal = (url?: string | null) => {
 
 const GmsPreviewPage = () => {
     const { session } = useAuthSession()
-    const { workspace, updateWorkspace, seedTrackCount, seedArtistCount, seedGenreCount } = useRecommendationWorkspace()
+    const { workspace, updateWorkspace } = useRecommendationWorkspace()
     const { playItem } = usePlayback()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isContextLoading, setIsContextLoading] = useState(true)
@@ -108,9 +102,6 @@ const GmsPreviewPage = () => {
             energy_level: workspace.energyLevel,
             familiarity_bias: workspace.familiarityBias,
             limit: workspace.limit,
-            seed_track_ids: splitField(workspace.seedTrackIdsText),
-            seed_artist_names: splitField(workspace.seedArtistNamesText),
-            seed_genres: splitField(workspace.seedGenresText),
             include_explanations: workspace.includeExplanations,
         }
 
@@ -196,7 +187,7 @@ const GmsPreviewPage = () => {
         <div className="space-y-6">
             <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
                 <div className="space-y-6">
-                    <HudCard title="GMS Request Tuning" subtitle="Keep the controls compact while the playlist context stays visible">
+                    <HudCard title="GMS Approval Request" subtitle="Generate candidates from PMS and EMS context for final user approval">
                         <form className="space-y-5" onSubmit={handleSubmit}>
                             <div>
                                 <label className="mb-2 block text-sm font-medium text-hud-text-secondary">Mood</label>
@@ -249,36 +240,6 @@ const GmsPreviewPage = () => {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-hud-text-secondary">Seed Track IDs</label>
-                                <textarea
-                                    value={workspace.seedTrackIdsText}
-                                    onChange={(event) => updateWorkspace({ seedTrackIdsText: event.target.value })}
-                                    rows={3}
-                                    className="w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-sm text-hud-text-primary outline-none transition-hud focus:border-hud-border-primary"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-hud-text-secondary">Seed Artist Names</label>
-                                <textarea
-                                    value={workspace.seedArtistNamesText}
-                                    onChange={(event) => updateWorkspace({ seedArtistNamesText: event.target.value })}
-                                    rows={2}
-                                    className="w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-sm text-hud-text-primary outline-none transition-hud focus:border-hud-border-primary"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-2 block text-sm font-medium text-hud-text-secondary">Seed Genres</label>
-                                <textarea
-                                    value={workspace.seedGenresText}
-                                    onChange={(event) => updateWorkspace({ seedGenresText: event.target.value })}
-                                    rows={2}
-                                    className="w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-sm text-hud-text-primary outline-none transition-hud focus:border-hud-border-primary"
-                                />
-                            </div>
-
                             <label className="flex items-center gap-3 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 px-4 py-3 text-sm text-hud-text-secondary">
                                 <input
                                     checked={workspace.includeExplanations}
@@ -291,16 +252,18 @@ const GmsPreviewPage = () => {
 
                             <div className="grid gap-4 sm:grid-cols-3">
                                 <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
-                                    <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Tracks</p>
-                                    <p className="mt-2 text-3xl font-semibold text-hud-text-primary">{seedTrackCount}</p>
+                                    <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">PMS Context</p>
+                                    <p className="mt-2 text-sm font-semibold text-hud-text-primary">
+                                        {activePlaylist ? 'Ready' : 'Missing'}
+                                    </p>
                                 </div>
                                 <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
-                                    <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Artists</p>
-                                    <p className="mt-2 text-3xl font-semibold text-hud-text-primary">{seedArtistCount}</p>
+                                    <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">EMS Signal</p>
+                                    <p className="mt-2 text-sm font-semibold capitalize text-hud-text-primary">{workspace.mood}</p>
                                 </div>
                                 <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
-                                    <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Genres</p>
-                                    <p className="mt-2 text-3xl font-semibold text-hud-text-primary">{seedGenreCount}</p>
+                                    <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Approval Path</p>
+                                    <p className="mt-2 text-sm font-semibold text-hud-text-primary">{'GMS -> PMS'}</p>
                                 </div>
                             </div>
 
@@ -468,14 +431,6 @@ const GmsPreviewPage = () => {
                                                 spotifyTrackId: item.audio_feature_track_id ?? item.spotify_track_id,
                                                 durationMs: item.duration_ms,
                                                 supportingText: item.source_playlist_title ?? activePlaylist?.title ?? null,
-                                            })
-                                        }
-                                        onUseAsSeed={() =>
-                                            updateWorkspace({
-                                                seedTrackIdsText: splitField(workspace.seedTrackIdsText)
-                                                    .concat(item.track_id)
-                                                    .filter((value, index, source) => source.indexOf(value) === index)
-                                                    .join(', '),
                                             })
                                         }
                                         onOpenExternal={() => openExternal(item.platform_external_url)}

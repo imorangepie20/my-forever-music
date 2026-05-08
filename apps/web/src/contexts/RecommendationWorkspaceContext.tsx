@@ -15,20 +15,11 @@ interface RecommendationWorkspaceContextValue {
     workspace: RecommendationWorkspaceState
     updateWorkspace: (patch: Partial<RecommendationWorkspaceState>) => void
     resetWorkspace: () => void
-    seedTrackCount: number
-    seedArtistCount: number
-    seedGenreCount: number
 }
 
 const STORAGE_KEY = 'my-forever-music.recommendation-workspace'
 
 const RecommendationWorkspaceContext = createContext<RecommendationWorkspaceContextValue | null>(null)
-
-const countItems = (value: string) =>
-    value
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean).length
 
 const getInitialWorkspace = (): RecommendationWorkspaceState => {
     if (typeof window === 'undefined') {
@@ -70,9 +61,6 @@ export const RecommendationWorkspaceProvider = ({ children }: { children: ReactN
             resetWorkspace: () => {
                 setWorkspace(defaultRecommendationWorkspace)
             },
-            seedTrackCount: countItems(workspace.seedTrackIdsText),
-            seedArtistCount: countItems(workspace.seedArtistNamesText),
-            seedGenreCount: countItems(workspace.seedGenresText),
         }),
         [workspace],
     )

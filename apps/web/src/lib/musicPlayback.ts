@@ -6,6 +6,7 @@ export interface PlaybackMediaItem {
     title: string
     subtitle: string
     sourcePlatform: string
+    playbackPlatformId?: string | null
     imageUrl?: string | null
     albumTitle?: string | null
     externalUrl?: string | null
@@ -17,6 +18,7 @@ export interface PlaybackMediaItem {
 }
 
 const SPOTIFY_EMBED_BASE = 'https://open.spotify.com/embed'
+const SPOTIFY_TRACK_ID_PATTERN = /^[A-Za-z0-9]{22}$/
 
 const readSpotifyIdFromUri = (platformUri?: string | null) => {
     if (!platformUri || !platformUri.startsWith('spotify:')) {
@@ -28,7 +30,7 @@ const readSpotifyIdFromUri = (platformUri?: string | null) => {
         return null
     }
 
-    return { resourceType, resourceId }
+    return { resourceType, resourceId: normalizeSpotifyTrackId(resourceId) ?? resourceId }
 }
 
 const readSpotifyIdFromUrl = (externalUrl?: string | null) => {
@@ -43,9 +45,67 @@ const readSpotifyIdFromUrl = (externalUrl?: string | null) => {
 
     return {
         resourceType: match[1],
-        resourceId: match[2],
+        resourceId: normalizeSpotifyTrackId(match[2]) ?? match[2],
     }
 }
+
+export const normalizeSpotifyTrackId = (value?: string | null) => {
+    if (!value) {
+        return null
+    }
+
+    const trimmed = value.trim()
+    if (SPOTIFY_TRACK_ID_PATTERN.test(trimmed)) {
+        return trimmed
+    }
+
+    return null
+}
+
+export const extractSpotifyTrackIdFromUrl = (value?: string | null) => {
+    if (!value) {
+        return null
+    }
+
+    const trimmed = value.trim()
+    const uriMatch = trimmed.match(/spotify:track:([A-Za-z0-9]{22})/)
+    if (uriMatch) {
+        return uriMatch[1]
+    }
+
+    const urlMatch = trimmed.match(/open\.spotify\.com\/track\/([A-Za-z0-9]{22})/)
+    if (urlMatch) {
+        return urlMatch[1]
+    }
+
+    return normalizeSpotifyTrackId(trimmed)
+}
+
+export const resolveSpotifyTrackId = (item: PlaybackMediaItem) =>
+    normalizeSpotifyTrackId(item.spotifyTrackId) ??
+    extractSpotifyTrackIdFromUrl(item.platformUri) ??
+    extractSpotifyTrackIdFromUrl(item.externalUrl)
+
+export const resolveSpotifyContextUri = (item: PlaybackMediaItem) => {
+    const fromUri = readSpotifyIdFromUri(item.platformUri)
+    if (fromUri && ['playlist', 'album'].includes(fromUri.resourceType)) {
+        return `spotify:${fromUri.resourceType}:${fromUri.resourceId}`
+    }
+
+    const fromUrl = readSpotifyIdFromUrl(item.externalUrl)
+    if (fromUrl && ['playlist', 'album'].includes(fromUrl.resourceType)) {
+        return `spotify:${fromUrl.resourceType}:${fromUrl.resourceId}`
+    }
+
+    return null
+}
+
+export const resolvePlaybackPlatformId = (item: PlaybackMediaItem, fallbackPlatformId?: string | null) =>
+    item.playbackPlatformId ??
+    (resolveSpotifyTrackId(item) ? 'spotify' : null) ??
+    item.sourcePlatform ??
+    fallbackPlatformId ??
+    null
 
 export const resolveSpotifyEmbedUrl = (item: PlaybackMediaItem) => {
     const fromUri = readSpotifyIdFromUri(item.platformUri)
@@ -58,8 +118,9 @@ export const resolveSpotifyEmbedUrl = (item: PlaybackMediaItem) => {
         return `${SPOTIFY_EMBED_BASE}/${fromUrl.resourceType}/${fromUrl.resourceId}?utm_source=my-forever-music`
     }
 
-    if (item.kind === 'track' && item.spotifyTrackId) {
-        return `${SPOTIFY_EMBED_BASE}/track/${item.spotifyTrackId}?utm_source=my-forever-music`
+    const spotifyTrackId = resolveSpotifyTrackId(item)
+    if (item.kind === 'track' && spotifyTrackId) {
+        return `${SPOTIFY_EMBED_BASE}/track/${spotifyTrackId}?utm_source=my-forever-music`
     }
 
     return null

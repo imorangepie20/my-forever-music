@@ -4,6 +4,8 @@ import EmsPage from './pages/EmsPage'
 import GmsPreviewPage from './pages/GmsPreviewPage'
 import HomePage from './pages/HomePage'
 import NotFoundPage from './pages/NotFoundPage'
+import PlaybackHarnessPage from './pages/PlaybackHarnessPage'
+import PmsPlaylistDetailPage from './pages/PmsPlaylistDetailPage'
 import PmsPage from './pages/PmsPage'
 import PlatformsPage from './pages/PlatformsPage'
 import Login from './pages/auth/Login'
@@ -21,6 +23,8 @@ function App() {
                     <Route path="pms" element={<PmsPage />} />
                     <Route path="ems" element={<EmsPage />} />
                     <Route path="gms-preview" element={<GmsPreviewPage />} />
+                    <Route path="playback-harness" element={<PlaybackHarnessPage />} />
+                    <Route path="playlists/pms/:playlistId" element={<PmsPlaylistDetailPage />} />
                 </Route>
                 <Route path="login" element={<Login />} />
                 <Route path="signin" element={<Login />} />

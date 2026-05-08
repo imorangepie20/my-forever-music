@@ -9,9 +9,15 @@ import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { usePlayback } from '@/contexts/PlaybackContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
 import {
+    buildPmsPlaylistDetailPath,
+    toPmsPlaylistPlaybackItem,
+    toPmsTrackPlaybackItem,
+} from '@/lib/pmsPlayback'
+import {
     ApiError,
     createPmsPersonalPlaylist,
     fetchPmsPersonalPlaylists,
+    fetchPmsPlaylistDetail,
     fetchPmsPlaylistImportBootstrap,
     fetchPmsWorkspaceBootstrap,
     importPmsPlaylists,
@@ -22,16 +28,8 @@ import type {
     PmsWorkspaceBootstrapResponse,
 } from '@/types/api'
 
-const splitItems = (value: string) =>
-    value
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean)
-
-const mergeCsv = (current: string, nextValue: string) => {
-    const merged = [...splitItems(current), nextValue]
-    return Array.from(new Set(merged)).join(', ')
-}
+type PmsShelfPlaylist = PmsWorkspaceBootstrapResponse['playlists'][number]
+type PmsImportedPlaylist = PmsPlaylistImportBootstrapResponse['imported_playlists'][number]
 
 const openExternal = (url?: string | null) => {
     if (!url) {
@@ -43,15 +41,8 @@ const openExternal = (url?: string | null) => {
 
 const PmsPage = () => {
     const { session, updateSession } = useAuthSession()
-    const { playItem } = usePlayback()
-    const {
-        workspace,
-        updateWorkspace,
-        resetWorkspace,
-        seedTrackCount,
-        seedArtistCount,
-        seedGenreCount,
-    } = useRecommendationWorkspace()
+    const { playItem, playQueue } = usePlayback()
+    const { workspace, updateWorkspace } = useRecommendationWorkspace()
     const [bootstrap, setBootstrap] = useState<PmsWorkspaceBootstrapResponse | null>(null)
     const [importBootstrap, setImportBootstrap] = useState<PmsPlaylistImportBootstrapResponse | null>(null)
     const [personalBootstrap, setPersonalBootstrap] = useState<PmsPersonalPlaylistBootstrapResponse | null>(null)
@@ -248,12 +239,51 @@ const PmsPage = () => {
         }
     }
 
+    const handlePlayPmsPlaylist = async (playlist: PmsShelfPlaylist | PmsImportedPlaylist) => {
+        const fallbackPlaylistItem = toPmsPlaylistPlaybackItem({
+            ...playlist,
+            curator: 'curator' in playlist ? playlist.curator : 'pms library',
+            description:
+                'highlight' in playlist
+                    ? playlist.highlight
+                    : `Imported ${new Date(playlist.imported_at).toLocaleString()}`,
+        })
+
+        if (!session?.userId) {
+            setError('Sign in before starting playlist playback.')
+            return
+        }
+
+        setError(null)
+
+        try {
+            const detail = await fetchPmsPlaylistDetail(session.userId, playlist.playlist_id)
+            const playbackItems = detail.tracks
+                .map((track) => toPmsTrackPlaybackItem(track, detail.playlist.title))
+                .filter((item) => item.spotifyTrackId || item.platformUri?.startsWith('spotify:track:'))
+
+            if (playbackItems.length > 0) {
+                await playQueue(playbackItems, 0)
+                return
+            }
+
+            await playItem(fallbackPlaylistItem)
+        } catch (requestError: unknown) {
+            const message =
+                requestError instanceof ApiError
+                    ? requestError.message
+                    : 'Unable to load the PMS playlist tracks for playback.'
+            setError(message)
+            await playItem(fallbackPlaylistItem)
+        }
+    }
+
     return (
         <div className="space-y-6">
             <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
                 <HudCard
                     title="Selected PMS Playlist"
-                    subtitle="The active playlist drives the current track shelf, seed defaults, and later EMS analysis"
+                    subtitle="The active playlist drives playback, library context, and later EMS model analysis"
                     action={
                         isLoading ? (
                             <span className="inline-flex items-center gap-2 text-xs text-hud-text-muted">
@@ -273,19 +303,8 @@ const PmsPage = () => {
                             imageUrl={activePlaylist.cover_image_url}
                             isActive
                             actionLabel="Current Playlist"
-                            onPlay={() =>
-                                playItem({
-                                    id: `playlist:${activePlaylist.playlist_id}`,
-                                    kind: 'playlist',
-                                    title: activePlaylist.title,
-                                    subtitle: `${activePlaylist.curator} · ${activePlaylist.source_platform}`,
-                                    sourcePlatform: activePlaylist.source_platform,
-                                    imageUrl: activePlaylist.cover_image_url,
-                                    externalUrl: activePlaylist.platform_external_url,
-                                    platformUri: activePlaylist.platform_uri,
-                                    supportingText: activePlaylist.highlight,
-                                })
-                            }
+                            detailPath={buildPmsPlaylistDetailPath(activePlaylist.playlist_id)}
+                            onPlay={() => void handlePlayPmsPlaylist(activePlaylist)}
                             onOpenExternal={() => openExternal(activePlaylist.platform_external_url)}
                         />
                     ) : (
@@ -295,58 +314,33 @@ const PmsPage = () => {
                     )}
                 </HudCard>
 
-                <HudCard title="Seed Workspace" subtitle="Editable seeds that flow forward to EMS and GMS">
+                <HudCard title="Library Model Loop" subtitle="PMS stores approved music and feeds the user model automatically">
                     <div className="grid gap-4 sm:grid-cols-3">
                         <div className="rounded-[24px] border border-hud-border-secondary bg-hud-bg-primary/75 p-4">
-                            <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Track Seeds</p>
-                            <p className="mt-2 text-3xl font-semibold text-hud-text-primary">{seedTrackCount}</p>
+                            <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Active Tracks</p>
+                            <p className="mt-2 text-3xl font-semibold text-hud-text-primary">
+                                {activePlaylist?.track_count ?? 0}
+                            </p>
                         </div>
                         <div className="rounded-[24px] border border-hud-border-secondary bg-hud-bg-primary/75 p-4">
-                            <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Artist Seeds</p>
-                            <p className="mt-2 text-3xl font-semibold text-hud-text-primary">{seedArtistCount}</p>
+                            <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Imported Lists</p>
+                            <p className="mt-2 text-3xl font-semibold text-hud-text-primary">{importedPlaylists.length}</p>
                         </div>
                         <div className="rounded-[24px] border border-hud-border-secondary bg-hud-bg-primary/75 p-4">
-                            <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Genre Seeds</p>
-                            <p className="mt-2 text-3xl font-semibold text-hud-text-primary">{seedGenreCount}</p>
+                            <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">Saved Tracks</p>
+                            <p className="mt-2 text-3xl font-semibold text-hud-text-primary">
+                                {personalBootstrap?.summary.saved_track_count ?? 0}
+                            </p>
                         </div>
                     </div>
 
-                    <div className="mt-5 space-y-4">
-                        <div>
-                            <label className="mb-2 block text-sm font-medium text-hud-text-secondary">Seed Track IDs</label>
-                            <textarea
-                                value={workspace.seedTrackIdsText}
-                                onChange={(event) => updateWorkspace({ seedTrackIdsText: event.target.value })}
-                                rows={4}
-                                className="w-full rounded-2xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-sm text-hud-text-primary outline-none transition-hud focus:border-hud-border-primary"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="mb-2 block text-sm font-medium text-hud-text-secondary">Seed Artist Names</label>
-                            <textarea
-                                value={workspace.seedArtistNamesText}
-                                onChange={(event) => updateWorkspace({ seedArtistNamesText: event.target.value })}
-                                rows={3}
-                                className="w-full rounded-2xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-sm text-hud-text-primary outline-none transition-hud focus:border-hud-border-primary"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="mb-2 block text-sm font-medium text-hud-text-secondary">Seed Genres</label>
-                            <textarea
-                                value={workspace.seedGenresText}
-                                onChange={(event) => updateWorkspace({ seedGenresText: event.target.value })}
-                                rows={3}
-                                className="w-full rounded-2xl border border-hud-border-secondary bg-hud-bg-primary px-4 py-3 text-sm text-hud-text-primary outline-none transition-hud focus:border-hud-border-primary"
-                            />
-                        </div>
+                    <div className="mt-5 rounded-[24px] border border-hud-border-secondary bg-hud-bg-primary/75 p-5 text-sm leading-6 text-hud-text-secondary">
+                        GMS saves and feedback return here as PMS library events. EMS/GMS can use the playlist,
+                        track metadata, audio features, and approval history without asking the listener to edit model
+                        internals.
                     </div>
 
                     <div className="mt-6 flex flex-wrap gap-3">
-                        <Button type="button" variant="outline" onClick={resetWorkspace}>
-                            Reset Workspace
-                        </Button>
                         <Link to="/ems">
                             <Button type="button" variant="primary" glow>
                                 Continue to EMS
@@ -369,20 +363,9 @@ const PmsPage = () => {
                                 description={playlist.highlight}
                                 imageUrl={playlist.cover_image_url}
                                 isActive={playlist.playlist_id === workspace.playlistId}
+                                detailPath={buildPmsPlaylistDetailPath(playlist.playlist_id)}
                                 onSelect={() => updateWorkspace({ playlistId: playlist.playlist_id })}
-                                onPlay={() =>
-                                    playItem({
-                                        id: `playlist:${playlist.playlist_id}`,
-                                        kind: 'playlist',
-                                        title: playlist.title,
-                                        subtitle: `${playlist.curator} · ${playlist.source_platform}`,
-                                        sourcePlatform: playlist.source_platform,
-                                        imageUrl: playlist.cover_image_url,
-                                        externalUrl: playlist.platform_external_url,
-                                        platformUri: playlist.platform_uri,
-                                        supportingText: playlist.highlight,
-                                    })
-                                }
+                                onPlay={() => void handlePlayPmsPlaylist(playlist)}
                                 onOpenExternal={() => openExternal(playlist.platform_external_url)}
                             />
                         ))}
@@ -394,7 +377,7 @@ const PmsPage = () => {
                 )}
             </HudCard>
 
-            <HudCard title="Track Shelf" subtitle="Relevant album art, playable tracks, and one-click seed actions">
+            <HudCard title="Track Shelf" subtitle="Album art, metadata, and playable tracks from the selected PMS context">
                 {bootstrap?.suggested_tracks.length ? (
                     <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
                         {bootstrap.suggested_tracks.map((track) => {
@@ -415,10 +398,10 @@ const PmsPage = () => {
                                 imageUrl={track.album_image_url}
                                 durationMs={track.duration_ms}
                                 badges={[
-                                    track.seed ? 'seed' : 'candidate',
+                                    track.seed ? 'library anchor' : 'library track',
                                     audioFeaturesFilled ? 'audio enriched' : 'audio pending',
                                 ]}
-                                reason={`Current audio snapshot source: ${audioFeatureSource}.`}
+                                reason={`Audio feature source: ${audioFeatureSource}. EMS and GMS consume this context automatically.`}
                                 onPlay={() =>
                                     playItem({
                                         id: `track:${track.track_id}`,
@@ -434,12 +417,6 @@ const PmsPage = () => {
                                         spotifyTrackId: audioFeatureTrackId,
                                         durationMs: track.duration_ms,
                                         supportingText: activePlaylist?.title ?? null,
-                                    })
-                                }
-                                onUseAsSeed={() =>
-                                    updateWorkspace({
-                                        seedTrackIdsText: mergeCsv(workspace.seedTrackIdsText, track.track_id),
-                                        seedArtistNamesText: mergeCsv(workspace.seedArtistNamesText, track.artist_name),
                                     })
                                 }
                                 onOpenExternal={() => openExternal(track.platform_external_url)}
@@ -640,20 +617,9 @@ const PmsPage = () => {
                                                 trackCount={playlist.track_count}
                                                 description={`Imported ${new Date(playlist.imported_at).toLocaleString()}`}
                                                 imageUrl={playlist.cover_image_url}
+                                                detailPath={buildPmsPlaylistDetailPath(playlist.playlist_id)}
                                                 onSelect={() => updateWorkspace({ playlistId: playlist.playlist_id })}
-                                                onPlay={() =>
-                                                    playItem({
-                                                        id: `library-playlist:${playlist.playlist_id}`,
-                                                        kind: 'playlist',
-                                                        title: playlist.title,
-                                                        subtitle: `${playlist.source_platform} · PMS library`,
-                                                        sourcePlatform: playlist.source_platform,
-                                                        imageUrl: playlist.cover_image_url,
-                                                        externalUrl: playlist.platform_external_url,
-                                                        platformUri: playlist.platform_uri,
-                                                        supportingText: `Imported ${new Date(playlist.imported_at).toLocaleString()}`,
-                                                    })
-                                                }
+                                                onPlay={() => void handlePlayPmsPlaylist(playlist)}
                                                 onOpenExternal={() => openExternal(playlist.platform_external_url)}
                                             />
                                         ))}

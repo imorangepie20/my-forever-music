@@ -1,96 +1,155 @@
-import { ExternalLink, X } from 'lucide-react'
+import {
+    ExternalLink,
+    Pause,
+    Play,
+    SkipBack,
+    SkipForward,
+    Volume2,
+    X,
+} from 'lucide-react'
 import Button from '@/components/common/Button'
 import MusicArtwork from '@/components/music/MusicArtwork'
 import { usePlayback } from '@/contexts/PlaybackContext'
-import { resolveSpotifyEmbedUrl } from '@/lib/musicPlayback'
+import { formatDuration, resolvePlaybackPlatformId } from '@/lib/musicPlayback'
 
 interface PlaybackDockProps {
     sidebarCollapsed?: boolean
 }
 
 const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
-    const { currentItem, clearItem } = usePlayback()
+    const {
+        currentItem,
+        queue,
+        currentIndex,
+        isPlaying,
+        isLoading,
+        error,
+        positionMs,
+        durationMs,
+        volume,
+        pause,
+        resume,
+        skipNext,
+        skipPrevious,
+        seek,
+        setVolume,
+        clearItem,
+    } = usePlayback()
 
     if (!currentItem) {
         return null
     }
 
-    const spotifyEmbedUrl = resolveSpotifyEmbedUrl(currentItem)
-    const hasAudioPreview = !spotifyEmbedUrl && Boolean(currentItem.previewUrl)
+    const playbackPlatformId = resolvePlaybackPlatformId(currentItem)
+    const totalDuration = durationMs || currentItem.durationMs || 0
+    const progressValue = totalDuration > 0 ? Math.min(positionMs, totalDuration) : 0
+
+    const handleTogglePlayback = () => {
+        if (isPlaying) {
+            void pause()
+            return
+        }
+        void resume()
+    }
 
     return (
         <div className={`fixed bottom-0 right-0 z-40 border-t border-hud-border-secondary bg-hud-bg-secondary/95 backdrop-blur-xl transition-all duration-300 ${sidebarCollapsed ? 'lg:left-24' : 'lg:left-72'}`}>
-            <div className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 lg:grid-cols-[320px_minmax(0,1fr)] lg:px-8">
-                <div className="flex items-center gap-4 rounded-[24px] border border-hud-border-secondary bg-hud-bg-primary/85 p-4">
-                    <div className="h-20 w-20 overflow-hidden rounded-[20px]">
+            <div className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 lg:grid-cols-[minmax(280px,420px)_minmax(0,1fr)_minmax(220px,300px)] lg:px-8">
+                <div className="flex min-w-0 items-center gap-4">
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg">
                         <MusicArtwork
                             imageUrl={currentItem.imageUrl}
                             seed={`${currentItem.sourcePlatform}-${currentItem.title}`}
                             label={currentItem.title}
                         />
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0">
                         <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">
-                            {currentItem.kind} · {currentItem.sourcePlatform}
+                            {currentItem.kind} · {playbackPlatformId ?? currentItem.sourcePlatform}
                         </p>
-                        <h3 className="mt-2 truncate text-lg font-semibold text-hud-text-primary">
+                        <h3 className="mt-1 truncate text-base font-semibold text-hud-text-primary">
                             {currentItem.title}
                         </h3>
-                        <p className="mt-1 truncate text-sm text-hud-text-secondary">{currentItem.subtitle}</p>
-                        {currentItem.supportingText && (
-                            <p className="mt-2 line-clamp-2 text-xs leading-5 text-hud-text-muted">
-                                {currentItem.supportingText}
-                            </p>
-                        )}
+                        <p className="mt-0.5 truncate text-sm text-hud-text-secondary">{currentItem.subtitle}</p>
                     </div>
-                    <Button type="button" variant="ghost" onClick={clearItem}>
-                        <X size={18} />
-                        Close
-                    </Button>
                 </div>
 
-                <div className="overflow-hidden rounded-[24px] border border-hud-border-secondary bg-hud-bg-primary/85 p-3">
-                    {spotifyEmbedUrl ? (
-                        <iframe
-                            title={`Playback for ${currentItem.title}`}
-                            src={spotifyEmbedUrl}
-                            width="100%"
-                            height={currentItem.kind === 'playlist' ? '352' : '152'}
-                            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                            loading="lazy"
-                            className="rounded-[18px] border-0"
+                <div className="min-w-0">
+                    <div className="flex items-center justify-center gap-3">
+                        <button
+                            type="button"
+                            onClick={() => void skipPrevious()}
+                            className="flex h-10 w-10 items-center justify-center rounded-full border border-hud-border-secondary text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
+                            aria-label="Previous track"
+                        >
+                            <SkipBack size={18} />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleTogglePlayback}
+                            disabled={isLoading}
+                            className="flex h-12 w-12 items-center justify-center rounded-full bg-hud-accent-primary text-hud-bg-primary transition-hud hover:bg-hud-accent-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                            aria-label={isPlaying ? 'Pause playback' : 'Resume playback'}
+                        >
+                            {isPlaying ? <Pause size={22} /> : <Play size={22} className="translate-x-0.5" />}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void skipNext()}
+                            className="flex h-10 w-10 items-center justify-center rounded-full border border-hud-border-secondary text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
+                            aria-label="Next track"
+                        >
+                            <SkipForward size={18} />
+                        </button>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-[48px_minmax(0,1fr)_48px] items-center gap-3">
+                        <span className="text-right text-xs text-hud-text-muted">{formatDuration(progressValue)}</span>
+                        <input
+                            type="range"
+                            min={0}
+                            max={Math.max(totalDuration, 1)}
+                            value={progressValue}
+                            onChange={(event) => void seek(Number(event.target.value))}
+                            className="h-1 w-full accent-hud-accent-primary"
                         />
-                    ) : hasAudioPreview ? (
-                        <div className="space-y-3 p-3">
-                            <p className="text-sm text-hud-text-secondary">
-                                Inline preview is available for this track.
-                            </p>
-                            <audio
-                                key={currentItem.previewUrl}
-                                controls
-                                autoPlay
-                                src={currentItem.previewUrl ?? undefined}
-                                className="w-full"
-                            />
-                        </div>
-                    ) : (
-                        <div className="flex h-full min-h-[152px] flex-col items-start justify-center gap-4 rounded-[18px] border border-dashed border-hud-border-secondary bg-hud-bg-primary/75 p-5">
-                            <p className="text-sm leading-6 text-hud-text-secondary">
-                                This item does not have an inline web player yet. Open it in the connected platform to
-                                keep the listening flow moving.
-                            </p>
-                            {currentItem.externalUrl && (
-                                <Button
-                                    type="button"
-                                    variant="primary"
-                                    onClick={() => window.open(currentItem.externalUrl ?? undefined, '_blank', 'noopener,noreferrer')}
-                                >
-                                    <ExternalLink size={18} />
-                                    Open in Platform
-                                </Button>
-                            )}
-                        </div>
+                        <span className="text-xs text-hud-text-muted">{formatDuration(totalDuration)}</span>
+                    </div>
+
+                    {error && (
+                        <p className="mt-2 truncate text-center text-xs font-medium text-amber-300">
+                            {error}
+                        </p>
                     )}
+                </div>
+
+                <div className="flex items-center justify-end gap-3">
+                    <span className="rounded-full border border-hud-border-secondary px-3 py-2 text-xs uppercase tracking-[0.2em] text-hud-text-muted">
+                        Queue {queue.length > 0 ? `${currentIndex + 1}/${queue.length}` : '0/0'}
+                    </span>
+                    <Volume2 size={18} className="text-hud-text-secondary" />
+                    <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={volume}
+                        onChange={(event) => void setVolume(Number(event.target.value))}
+                        className="w-24 accent-hud-accent-primary"
+                    />
+                    {currentItem.externalUrl && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => window.open(currentItem.externalUrl ?? undefined, '_blank', 'noopener,noreferrer')}
+                            aria-label="Open in platform"
+                        >
+                            <ExternalLink size={18} />
+                        </Button>
+                    )}
+                    <Button type="button" variant="ghost" onClick={clearItem} aria-label="Close player">
+                        <X size={18} />
+                    </Button>
                 </div>
             </div>
         </div>

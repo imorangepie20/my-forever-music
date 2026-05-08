@@ -35,7 +35,15 @@ public class PlatformOAuthProperties {
         private String authorizationUri = "https://accounts.spotify.com/authorize";
         private String tokenUri = "https://accounts.spotify.com/api/token";
         private String apiBaseUri = "https://api.spotify.com/v1";
-        private List<String> scopes = List.of("user-read-email", "playlist-read-private", "playlist-read-collaborative");
+        private List<String> scopes = List.of(
+            "user-read-email",
+            "playlist-read-private",
+            "playlist-read-collaborative",
+            "streaming",
+            "user-read-playback-state",
+            "user-modify-playback-state",
+            "user-read-currently-playing"
+        );
 
         public boolean isEnabled() {
             return enabled;

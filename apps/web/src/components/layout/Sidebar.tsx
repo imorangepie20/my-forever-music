@@ -6,6 +6,7 @@ import {
     Globe,
     Home,
     Music2,
+    PlayCircle,
     Radio,
     SlidersHorizontal,
     Sparkles,
@@ -40,22 +41,28 @@ const menuItems: MenuItem[] = [
         path: '/platforms',
     },
     {
-        label: 'PMS Seeds',
-        description: 'Playlist and catalog anchors',
+        label: 'PMS Library',
+        description: 'Playlists and approved saves',
         icon: <Music2 size={20} />,
         path: '/pms',
     },
     {
-        label: 'EMS Signals',
-        description: 'Mood, energy, and familiarity',
+        label: 'EMS Model',
+        description: 'Candidate evaluation signals',
         icon: <SlidersHorizontal size={20} />,
         path: '/ems',
     },
     {
-        label: 'GMS Preview',
-        description: 'Trigger recommendation preview requests',
+        label: 'GMS Approval',
+        description: 'Review and save candidates',
         icon: <Sparkles size={20} />,
         path: '/gms-preview',
+    },
+    {
+        label: 'Playback',
+        description: 'Spotify player harness',
+        icon: <PlayCircle size={20} />,
+        path: '/playback-harness',
     },
 ]
 

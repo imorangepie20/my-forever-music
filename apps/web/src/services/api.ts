@@ -9,6 +9,7 @@ import type {
     PlatformAuthorizationStartResponse,
     PlatformConnectionBootstrapResponse,
     PlatformConnectionCommandResponse,
+    PlatformPlaybackCredentialsResponse,
     PlatformConnectRequest,
     PlatformDisconnectRequest,
     PlatformCatalogResponse,
@@ -28,6 +29,7 @@ import type {
     GmsRecommendationFeedbackRequest,
     GmsRecommendationFeedbackResponse,
     PmsWorkspaceBootstrapResponse,
+    PmsPlaylistDetailResponse,
     PmsPlaylistImportBootstrapResponse,
     PmsPlaylistImportRequest,
     PmsPlaylistImportResponse,
@@ -153,6 +155,12 @@ export const fetchPlatformConnectionBootstrap = (userId: string, signal?: AbortS
         { signal },
     )
 
+export const fetchPlaybackCredentials = (userId: string, platformId: string, signal?: AbortSignal) =>
+    requestJson<PlatformPlaybackCredentialsResponse>(
+        `/api/v1/platforms/playback/credentials?user_id=${encodeURIComponent(userId)}&platform_id=${encodeURIComponent(platformId)}`,
+        { signal },
+    )
+
 export const connectPlatformAccount = (payload: PlatformConnectRequest) =>
     requestJson<PlatformConnectionCommandResponse>('/api/v1/platforms/connections/connect', {
         method: 'POST',
@@ -243,6 +251,16 @@ export const fetchPmsWorkspaceBootstrap = (
     const suffix = searchParams.size > 0 ? `?${searchParams.toString()}` : ''
     return requestJson<PmsWorkspaceBootstrapResponse>(`/api/v1/pms/workspace/bootstrap${suffix}`, { signal })
 }
+
+export const fetchPmsPlaylistDetail = (
+    userId: string,
+    playlistId: string,
+    signal?: AbortSignal,
+) =>
+    requestJson<PmsPlaylistDetailResponse>(
+        `/api/v1/pms/playlists/${encodeURIComponent(playlistId)}?user_id=${encodeURIComponent(userId)}`,
+        { signal },
+    )
 
 export const fetchPmsPlaylistImportBootstrap = (userId: string, signal?: AbortSignal) =>
     requestJson<PmsPlaylistImportBootstrapResponse>(

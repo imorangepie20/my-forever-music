@@ -27,16 +27,16 @@ const pageCopy: Record<string, { title: string; subtitle: string }> = {
         subtitle: 'Finalize provider authorization and move into the next onboarding stage.',
     },
     '/pms': {
-        title: 'PMS Seed Workspace',
-        subtitle: 'Capture playlist and catalog anchors before we shape the emotional signal.',
+        title: 'PMS Library Workspace',
+        subtitle: 'Import playlists, play library tracks, and collect approved GMS saves.',
     },
     '/ems': {
-        title: 'EMS Signal Workspace',
-        subtitle: 'Tune mood, energy, and familiarity before the GMS preview call.',
+        title: 'EMS Model Workspace',
+        subtitle: 'Evaluate candidates against the PMS library and listening signals.',
     },
     '/gms-preview': {
-        title: 'GMS Recommendation Preview',
-        subtitle: 'Call the Spring Boot bridge and inspect the AI preview response end to end.',
+        title: 'GMS Approval Preview',
+        subtitle: 'Review generated candidates, approve saves, and feed PMS learning events.',
     },
 }
 

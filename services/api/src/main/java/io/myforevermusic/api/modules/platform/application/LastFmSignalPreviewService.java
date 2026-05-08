@@ -88,7 +88,7 @@ public class LastFmSignalPreviewService {
                 topTracks.size(),
                 recentTracks.stream().anyMatch(LastFmWebApiClient.LastFmRecentTrack::nowPlaying),
                 countDistinctRecentArtists(recentTracks),
-                "Use top artists as EMS affinity seeds or keep Last.fm as a long-term taste signal source."
+                "Save or sync this profile so EMS/GMS can use Last.fm as a long-term taste signal."
             ),
             insights,
             recentTracks.stream()
@@ -207,7 +207,7 @@ public class LastFmSignalPreviewService {
             insights.add(new LastFmSignalPreviewResponse.SignalInsight(
                 "repeat-familiarity",
                 "Repeat Familiarity Bias",
-                "%s by %s leads the %s chart with %s plays, which is a useful familiarity seed for EMS/GMS ranking.".formatted(
+                "%s by %s leads the %s chart with %s plays, which is a useful familiarity signal for EMS/GMS ranking.".formatted(
                     fallback(topTrack.trackName(), "Unknown Track"),
                     fallback(topTrack.artistName(), "Unknown Artist"),
                     period,

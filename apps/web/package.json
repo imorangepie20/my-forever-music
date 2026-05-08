@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test:playback": "node scripts/playback-regression-harness.mjs",
+    "test:product-flow": "node scripts/product-flow-regression-harness.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

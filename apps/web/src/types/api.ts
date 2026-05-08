@@ -164,6 +164,21 @@ export interface PlatformConnectionCommandResponse {
     }
 }
 
+export interface PlatformPlaybackCredentialsResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string
+    platform_id: WorkspacePlatformId | string
+    access_token: string
+    token_type: string | null
+    scope_summary: string | null
+    scopes: string[]
+    expires_at: string | null
+    external_account_label: string | null
+    authorization_mode: string | null
+}
+
 export interface LastFmProfileConnectRequest {
     user_id: string
     username: string
@@ -398,6 +413,42 @@ export interface PmsWorkspaceBootstrapResponse {
         weight: number
         reason: string
     }>
+}
+
+export interface PmsPlaylistDetailTrack extends RichTrackArtwork {
+    track_id: string
+    external_track_id: string | null
+    title: string
+    artist_name: string
+    source_platform: string
+    primary_genre: string | null
+    sort_order: number
+    seed: boolean
+    spotify_track_id: string | null
+    audio_feature_track_id?: string | null
+    spotify_audio_features_filled: boolean
+    audio_features_filled?: boolean
+    spotify_audio_feature_source: string
+    audio_feature_source?: string
+}
+
+export interface PmsPlaylistDetailResponse {
+    service: string
+    status: string
+    generated_at: string
+    source_collection: string
+    playlist: RichPlaylistArtwork & {
+        playlist_id: string
+        external_playlist_id: string | null
+        title: string
+        source_platform: string
+        track_count: number
+        curator: string
+        description: string
+        imported_at: string | null
+        last_synced_at: string | null
+    }
+    tracks: PmsPlaylistDetailTrack[]
 }
 
 export interface PmsPlaylistImportBootstrapResponse {

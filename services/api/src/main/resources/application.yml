@@ -76,10 +76,7 @@ app:
         authorization-uri: ${SPOTIFY_AUTHORIZATION_URI:https://accounts.spotify.com/authorize}
         token-uri: ${SPOTIFY_TOKEN_URI:https://accounts.spotify.com/api/token}
         api-base-uri: ${SPOTIFY_API_BASE_URI:https://api.spotify.com/v1}
-        scopes:
-          - user-read-email
-          - playlist-read-private
-          - playlist-read-collaborative
+        scopes: ${SPOTIFY_SCOPES:user-read-email,playlist-read-private,playlist-read-collaborative,streaming,user-read-playback-state,user-modify-playback-state,user-read-currently-playing}
       tidal:
         enabled: ${TIDAL_OAUTH_ENABLED:false}
         client-id: ${TIDAL_CLIENT_ID:}

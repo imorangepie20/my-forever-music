@@ -33,12 +33,12 @@ const architectureCards = [
 const deliveryTracks = [
     'Signup and primary platform onboarding',
     'Platform connection and playlist intake',
-    'Spotify audio-feature import without generated placeholders',
+    'PMS approval events feeding EMS and GMS model loops',
 ]
 
 const HomePage = () => {
     const { session } = useAuthSession()
-    const { workspace, seedTrackCount, seedArtistCount, seedGenreCount } = useRecommendationWorkspace()
+    const { workspace } = useRecommendationWorkspace()
     const [systemInfo, setSystemInfo] = useState<SystemInfoResponse | null>(null)
     const [statusError, setStatusError] = useState<string | null>(null)
 
@@ -188,20 +188,20 @@ const HomePage = () => {
 
             <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
                 <StatCard
-                    title="PMS Seeds"
-                    value={seedTrackCount}
+                    title="PMS Context"
+                    value={workspace.playlistId ? 'Ready' : 'Open'}
                     icon={<Activity size={22} />}
                     variant="primary"
                 />
                 <StatCard
-                    title="Artist Seeds"
-                    value={seedArtistCount}
+                    title="EMS Model"
+                    value={`${workspace.energyLevel}/${workspace.familiarityBias}`}
                     icon={<Globe size={22} />}
                     variant="secondary"
                 />
                 <StatCard
-                    title="Genre Seeds"
-                    value={seedGenreCount}
+                    title="GMS Limit"
+                    value={workspace.limit}
                     icon={<Sparkles size={22} />}
                     variant="warning"
                 />

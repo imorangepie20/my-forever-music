@@ -272,20 +272,13 @@ const PlatformsPage = () => {
         }
     }
 
-    const handleUseLastFmArtists = () => {
+    const handleUseLastFmSignal = () => {
         if (!lastFmPreview) {
             return
         }
 
-        const seedArtists = lastFmPreview.top_artists
-            .map((artist) => artist.artist_name)
-            .filter((artistName): artistName is string => Boolean(artistName && artistName.trim()))
-            .slice(0, 5)
-            .join(', ')
-
         updateWorkspace({
             preferredPlatformId: 'last-fm',
-            seedArtistNamesText: seedArtists || workspace.seedArtistNamesText,
         })
     }
 
@@ -647,8 +640,7 @@ const PlatformsPage = () => {
                         {session?.preferredPlatformId === 'last-fm' && (
                             <div className="rounded-2xl border border-hud-accent-primary/30 bg-hud-accent-primary/10 p-4 text-sm leading-6 text-hud-text-secondary">
                                 This account prefers <span className="font-medium text-hud-text-primary">Last.fm</span>.
-                                Load a public signal preview first, then copy top artists into EMS seeds or choose a
-                                separate PMS import source.
+                                Save or sync the profile so EMS/GMS can treat scrobbles as long-term listening signal.
                             </div>
                         )}
 
@@ -694,9 +686,9 @@ const PlatformsPage = () => {
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={handleUseLastFmArtists}
+                                    onClick={handleUseLastFmSignal}
                                 >
-                                    Use Top Artists as EMS Seeds
+                                    Use Last.fm as Signal Source
                                 </Button>
                             )}
                             <Button

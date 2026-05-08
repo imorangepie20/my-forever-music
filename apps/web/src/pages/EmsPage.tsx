@@ -28,17 +28,6 @@ const moods: Array<{ value: WorkspaceMood; label: string; description: string }>
     { value: 'discovery', label: 'Discovery', description: 'Less predictable mood shaping and broader variety.' },
 ]
 
-const splitField = (value: string) =>
-    value
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean)
-
-const mergeCsv = (current: string, nextValue: string) => {
-    const merged = [...splitField(current), nextValue]
-    return Array.from(new Set(merged)).join(', ')
-}
-
 const openExternal = (url?: string | null) => {
     if (!url) {
         return
@@ -77,9 +66,6 @@ const EmsPage = () => {
                 {
                     user_id: workspace.userId || undefined,
                     playlist_id: workspace.playlistId || undefined,
-                    seed_track_ids: splitField(workspace.seedTrackIdsText),
-                    seed_artist_names: splitField(workspace.seedArtistNamesText),
-                    seed_genres: splitField(workspace.seedGenresText),
                 },
                 controller.signal,
             ),
@@ -116,15 +102,7 @@ const EmsPage = () => {
             })
 
         return () => controller.abort()
-    }, [
-        workspace.energyLevel,
-        workspace.familiarityBias,
-        workspace.playlistId,
-        workspace.seedArtistNamesText,
-        workspace.seedGenresText,
-        workspace.seedTrackIdsText,
-        workspace.userId,
-    ])
+    }, [workspace.playlistId, workspace.userId])
 
     // Load collected playlists/tracks on mount
     useEffect(() => {
@@ -385,12 +363,6 @@ const EmsPage = () => {
                                                 supportingText: null,
                                             })
                                         }
-                                        onUseAsSeed={() =>
-                                            updateWorkspace({
-                                                seedTrackIdsText: mergeCsv(workspace.seedTrackIdsText, track.external_track_id),
-                                                seedArtistNamesText: mergeCsv(workspace.seedArtistNamesText, track.artist_name),
-                                            })
-                                        }
                                         onOpenExternal={() => openExternal(track.platform_external_url)}
                                     />
                                 ))}
@@ -410,7 +382,7 @@ const EmsPage = () => {
                 <div className="space-y-6">
                     <HudCard
                         title="Active PMS Context"
-                        subtitle="EMS should never lose sight of the playlist and track imagery that shaped the workspace"
+                        subtitle="EMS evaluates candidates against the selected PMS library context"
                         action={
                             isLoading ? (
                                 <span className="inline-flex items-center gap-2 text-xs text-hud-text-muted">
@@ -452,7 +424,7 @@ const EmsPage = () => {
                         )}
                     </HudCard>
 
-                    <HudCard title="Track Context Shelf" subtitle="Visible track art makes the EMS tuning space feel like a real listening session">
+                    <HudCard title="Track Context Shelf" subtitle="PMS tracks and audio features are model inputs, not manual controls">
                         {bootstrap?.suggested_tracks.length ? (
                             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                                 {bootstrap.suggested_tracks.map((track) => {
@@ -471,14 +443,10 @@ const EmsPage = () => {
                                         imageUrl={track.album_image_url}
                                         durationMs={track.duration_ms}
                                         badges={[
-                                            track.seed ? 'seed' : 'candidate',
+                                            track.seed ? 'library anchor' : 'library track',
                                             audioFeatureSource,
                                         ]}
-                                        reason={
-                                            track.seed
-                                                ? 'Already selected as a PMS anchor track for this EMS session.'
-                                                : 'Useful adjacent track for shaping energy and familiarity.'
-                                        }
+                                        reason="EMS reads this library context automatically while preparing the next GMS candidate set."
                                         onPlay={() =>
                                             playItem({
                                                 id: `track:${track.track_id}`,
@@ -494,12 +462,6 @@ const EmsPage = () => {
                                                 spotifyTrackId: audioFeatureTrackId,
                                                 durationMs: track.duration_ms,
                                                 supportingText: activePlaylist?.title ?? null,
-                                            })
-                                        }
-                                        onUseAsSeed={() =>
-                                            updateWorkspace({
-                                                seedTrackIdsText: mergeCsv(workspace.seedTrackIdsText, track.track_id),
-                                                seedArtistNamesText: mergeCsv(workspace.seedArtistNamesText, track.artist_name),
                                             })
                                         }
                                         onOpenExternal={() => openExternal(track.platform_external_url)}
@@ -664,7 +626,7 @@ const EmsPage = () => {
                         </div>
                     </HudCard>
 
-                    <HudCard title="EMS Analysis Feed" subtitle="What the API inferred from PMS seeds and listening signals">
+                    <HudCard title="EMS Analysis Feed" subtitle="What the API inferred from PMS library and listening signals">
                         {error ? (
                             <div className="rounded-2xl border border-hud-accent-danger/40 bg-hud-accent-danger/10 p-4 text-sm leading-6 text-hud-text-secondary">
                                 {error}

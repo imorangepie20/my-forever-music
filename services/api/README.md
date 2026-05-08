@@ -86,7 +86,7 @@ services/api/
 
 이제 `POST /api/v1/auth/login`도 추가되어, 로컬 시험 서비스 중 기존 계정으로 다시 로그인하고 현재 온보딩 단계(`/platforms` 또는 `/pms`)를 복원할 수 있다.
 
-또한 현재 `Last.fm`은 `PMS import` 플랫폼이 아니라 `장기 청취 신호 플랫폼`으로 다뤄진다. 그래서 `GET /api/v1/platforms/lastfm/preview`는 공개 사용자명 기준으로 recent scrobble, top artist, top track을 읽어와 `EMS/GMS` seed 보강용 preview를 제공한다.
+또한 현재 `Last.fm`은 `PMS import` 플랫폼이 아니라 `장기 청취 신호 플랫폼`으로 다뤄진다. 그래서 `GET /api/v1/platforms/lastfm/preview`는 공개 사용자명 기준으로 recent scrobble, top artist, top track을 읽어와 `EMS/GMS` 장기 취향 preview를 제공한다.
 
 이제 `POST /api/v1/platforms/lastfm/profile`도 추가되어, preview에 사용한 공개 사용자명을 계정에 저장하고 `EMS analysis`가 이 저장값을 바탕으로 `top artist` affinity를 자동 blend 할 수 있다.
 
@@ -104,7 +104,7 @@ TIDAL은 Spotify 다음 provider로 고정되어 있으며, 현재는 TIDAL OAut
 
 현재 `spotify` provider는 실제 사용자 token으로 `GET /me/playlists`, `GET /playlists/{playlist_id}/items`를 호출하고, 트랙별 오디오 특성은 `ReccoBeats GET /v1/audio-features`로 보강한다. 실패하거나 누락된 항목이 있으면 가짜 오디오 특성을 만들지 않고 `unavailable` placeholder로 저장한다.
 
-현재 이 import 경로는 단순 텍스트 seed만 저장하지 않는다. playlist cover image, playlist external URL/URI, track album title, album image, track external URL/URI, preview URL까지 같이 저장한다.
+현재 이 import 경로는 단순 텍스트 입력값만 저장하지 않는다. playlist cover image, playlist external URL/URI, track album title, album image, track external URL/URI, preview URL까지 같이 저장한다.
 
 또한 현재 `spotify` credential은 만료 60초 전부터 refresh token 기반 자동 갱신을 시도한다. Spotify refresh 응답에 새 refresh token이 없으면 기존 refresh token을 유지한다.
 
@@ -116,7 +116,7 @@ refresh 이후에도 usable credential이 확보되지 않으면 `platform conne
 
 또한 `GET /api/v1/pms/workspace/bootstrap`는 현재 raw import snapshot보다 정식 `PMS user library`를 우선 사용한다.
 
-추가로 `GET /api/v1/pms/workspace/bootstrap`는 이제 optional `playlist_id` query parameter를 받으며, 해당 값이 있으면 가능한 경우 그 playlist 기준으로 seed/track/artwork 컨텍스트를 다시 투영한다.
+추가로 `GET /api/v1/pms/workspace/bootstrap`는 이제 optional `playlist_id` query parameter를 받으며, 해당 값이 있으면 가능한 경우 그 playlist 기준으로 library/track/artwork 컨텍스트를 다시 투영한다.
 
 현재 `POST /api/v1/gms/recommendations/preview`는 AI preview 결과를 그대로 보여주는 데서 멈추지 않고, 가능하면 `PMS user library`에서 실제 playable track으로 재매핑한다. 그래서 웹앱은 `GMS` 카드에서도 실제 album art와 platform playback target을 표시할 수 있다.
 
@@ -135,7 +135,7 @@ API 계약 문서 인덱스는 [docs/api/README.md](/Users/woosungjo/music-space
 
 또한 macOS 로컬 개발에서는 `8080` 포트가 Docker나 다른 앱과 자주 충돌하므로, `local` 프로필 기본 포트는 `8081`을 사용한다. 운영/서버 기준 기본 포트는 여전히 `8080`이다.
 
-이 상태에서도 `EMS workspace analysis`는 동작한다. 다만 `local`에서는 입력 텍스트 시드 중심으로 분석하고, `database` 프로필에서는 `PMS` 카탈로그 seed track도 함께 반영한다.
+이 상태에서도 `EMS workspace analysis`는 동작한다. 다만 `local`에서는 요청 컨텍스트 중심으로 분석하고, `database` 프로필에서는 `PMS` 카탈로그와 사용자 라이브러리 신호를 함께 반영한다.
 
 반대로 `database` 같은 DB 활성 프로필로 실행하면 Flyway가 `pms_*` demo bootstrap 테이블과 `pms_imported_*`, `pms_user_*` 영속 테이블을 함께 만들고, 가져온 플레이리스트와 정식 사용자 라이브러리를 DB에 유지한다.
 
