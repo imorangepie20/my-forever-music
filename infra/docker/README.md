@@ -11,6 +11,21 @@
 
 ## 로컬 DB 기동 예시
 
+전체 MacBook 시험 스택을 재시작할 때는 개별 compose 명령보다 아래 스크립트를 우선 사용한다. 이 스크립트는 PostgreSQL/Redis, HTTPS 도메인 프록시, FastAPI AI, Spring Boot API, Vite 웹 서버를 같은 순서로 다시 올린다.
+
+```bash
+cd /Users/woosungjo/music-space/my-forever-music
+./infra/scripts/restart-macbook-stack.sh
+```
+
+옵션:
+
+```bash
+./infra/scripts/restart-macbook-stack.sh --tail
+```
+
+DB/Redis만 직접 기동하려면:
+
 ```bash
 cd /Users/woosungjo/music-space/my-forever-music/infra/docker
 docker compose -f docker-compose.local-db.yml up -d

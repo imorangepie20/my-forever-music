@@ -1,23 +1,68 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { cwd, exit } from 'node:process'
 
 const root = cwd()
 
 const read = (path) => readFileSync(join(root, path), 'utf8')
+const listIfExists = (path) => {
+    const absolutePath = join(root, path)
+    return existsSync(absolutePath) ? readdirSync(absolutePath) : []
+}
 
 const files = {
     playbackContext: read('src/contexts/PlaybackContext.tsx'),
     spotifySdk: read('src/lib/spotifyPlaybackSdk.ts'),
+    tidalSdk: read('src/lib/tidalPlaybackSdk.ts'),
+    tidalStream: read('src/lib/tidalStreamPlayback.ts'),
+    tidalPlaylistTestPage: read('src/pages/TidalPlaylistPlaybackTestPage.tsx'),
+    musicPlayback: read('src/lib/musicPlayback.ts'),
+    pmsPlayback: read('src/lib/pmsPlayback.ts'),
+    app: read('src/App.tsx'),
+    packageJson: read('package.json'),
     applicationYml: read('../../services/api/src/main/resources/application.yml'),
     oauthProperties: read('../../services/api/src/main/java/io/myforevermusic/api/modules/platform/application/PlatformOAuthProperties.java'),
     playbackCredentialController: read('../../services/api/src/main/java/io/myforevermusic/api/modules/platform/presentation/PlatformPlaybackCredentialsController.java'),
+    playbackCredentialResponse: read('../../services/api/src/main/java/io/myforevermusic/api/modules/platform/presentation/PlatformPlaybackCredentialsResponse.java'),
+    tidalPlaybackDiagnosticsController: read('../../services/api/src/main/java/io/myforevermusic/api/modules/platform/presentation/TidalPlaybackDiagnosticsController.java'),
+    tidalPlaybackEventController: read('../../services/api/src/main/java/io/myforevermusic/api/modules/platform/presentation/TidalPlaybackEventController.java'),
+    tidalWebApiClient: read('../../services/api/src/main/java/io/myforevermusic/api/modules/platform/infrastructure/tidal/TidalWebApiClient.java'),
+    tidalTokenRefreshClient: read('../../services/api/src/main/java/io/myforevermusic/api/modules/platform/infrastructure/tidal/TidalTokenRefreshClient.java'),
+    macbookDomainProxyCompose: read('../../infra/docker/docker-compose.macbook-domain-proxy.yml'),
+    macbookDomainHttpsConf: read('../../infra/nginx/macbook.domain.https.conf'),
+    playbackPolicy: read('../../docs/architecture/PLAYBACK_ERROR_HANDLING_POLICY.md'),
 }
+
+const localCertFiles = listIfExists('../../infra/local-certs')
+const playbackCriticalSource = [
+    files.playbackContext,
+    files.spotifySdk,
+    files.tidalSdk,
+    files.tidalStream,
+    files.musicPlayback,
+    files.pmsPlayback,
+    files.playbackCredentialController,
+    files.tidalPlaybackDiagnosticsController,
+    files.tidalPlaybackEventController,
+    files.tidalWebApiClient,
+    files.tidalTokenRefreshClient,
+].join('\n')
 
 const requiredSpotifyScopes = [
     'streaming',
     'user-read-playback-state',
     'user-modify-playback-state',
+]
+
+const requiredTidalSdkScopes = [
+    'playback',
+    'entitlements.read',
+]
+
+const requiredTidalLegacyPlaybackScopes = [
+    'r_usr',
+    'w_usr',
+    'w_sub',
 ]
 
 const checks = []
@@ -27,9 +72,23 @@ const check = (name, passed, detail) => {
 }
 
 check(
-    'PlaybackContext does not delay or suppress Invalid token scopes',
+    'PlaybackContext does not delay or suppress playback auth errors',
     !/TRANSIENT_SPOTIFY_ERROR_DELAY_MS|invalid token scopes|setTimeout\(/i.test(files.playbackContext),
-    'Do not hide scope/authentication errors with timers or special-case message suppression.',
+    'Do not hide scope/authentication errors with timers or special-case message suppression in the shared player context.',
+)
+
+check(
+    'Playback failures require root-cause fixes, not bypasses',
+    /## Root Cause Rule/.test(files.playbackPolicy) &&
+        /fixing the concrete failing boundary/.test(files.playbackPolicy) &&
+        /Do not bypass provider calls/.test(files.playbackPolicy),
+    'The playback policy must explicitly require root-cause fixes at the failing boundary instead of bypassing, suppressing, or redirecting the problem.',
+)
+
+check(
+    'Playback critical path has no workaround markers',
+    !/\b(workaround|quick fix|hack|bypass|temporary cleanup|temporary fix)\b|임시|우회|회피|대충|일단/i.test(playbackCriticalSource),
+    'Playback-critical code must not introduce temporary workaround markers. Fix credentials, queue routing, SDK setup, or provider recovery directly.',
 )
 
 check(
@@ -58,11 +117,170 @@ for (const scope of requiredSpotifyScopes) {
     )
 }
 
+for (const scope of requiredTidalSdkScopes) {
+    check(
+        `application.yml includes TIDAL ${scope}`,
+        files.applicationYml.includes(scope),
+        'Default TIDAL OAuth scopes must request the SDK playback permissions.',
+    )
+    check(
+        `PlatformOAuthProperties includes TIDAL ${scope}`,
+        files.oauthProperties.includes(scope),
+        'Java TIDAL property defaults must include SDK playback scopes.',
+    )
+    check(
+        `Playback credential API enforces TIDAL ${scope}`,
+        files.playbackCredentialController.includes(scope),
+        'Backend playback credentials must fail before browser SDK playback when TIDAL playback scopes are missing.',
+    )
+    check(
+        `TIDAL SDK adapter enforces ${scope}`,
+        files.tidalSdk.includes(scope),
+        'The browser SDK adapter must reject credentials missing required SDK playback scopes before loading media.',
+    )
+}
+
+for (const scope of requiredTidalLegacyPlaybackScopes) {
+    check(
+        `TIDAL legacy playback scope is documented: ${scope}`,
+        files.playbackPolicy.includes(scope) || files.tidalPlaybackDiagnosticsController.includes(scope),
+        'The full-track stream boundary verified from the prior app must remain documented or diagnosed explicitly.',
+    )
+}
+
 check(
     'Playback credential API returns reconnect_required for missing scopes',
     /PlatformReconnectRequiredException/.test(files.playbackCredentialController) &&
         /missingPlaybackScopes/.test(files.playbackCredentialController),
     'Missing scopes should be treated as a reconnect requirement, not as a client-side cosmetic warning.',
+)
+
+check(
+    'TIDAL SDK browser dependencies are installed',
+    /"@tidal-music\/player"/.test(files.packageJson) &&
+        /"@tidal-music\/common"/.test(files.packageJson) &&
+        /"@tidal-music\/event-producer"/.test(files.packageJson),
+    'TIDAL playback must use the official browser SDK packages.',
+)
+
+check(
+    'TIDAL SDK adapter initializes credentials and event sender before playback',
+    /setCredentialsProvider\(activeCredentialsProvider\)/.test(files.tidalSdk) &&
+        /tidalEventProducer\s*\.\s*init/.test(files.tidalSdk) &&
+        /setEventSender\(tidalEventProducer\)/.test(files.tidalSdk) &&
+        /bootstrap\(\{/.test(files.tidalSdk) &&
+        /await setNext/.test(files.tidalSdk) &&
+        /await play\(\)/.test(files.tidalSdk),
+    'The SDK path must configure credentials and event producer at the SDK boundary before load/play.',
+)
+
+check(
+    'PlaybackContext routes TIDAL queues through the verified TIDAL stream adapter',
+    /playbackPlatformId === 'tidal'/.test(files.playbackContext) &&
+        /playTidalMediaItem/.test(files.playbackContext) &&
+        /tidalStreamPlayback/.test(files.playbackContext) &&
+        /resolveTidalTrackId/.test(files.playbackContext),
+    'TIDAL playlists must be queued by TIDAL track ids from PMS detail tracks.',
+)
+
+check(
+    'TIDAL stream adapter requires a FULL provider manifest before playing',
+    /fetchTidalPlaybackStream/.test(files.tidalStream) &&
+        /stream\.asset_presentation !== 'FULL'/.test(files.tidalStream) &&
+        /playDirectStream|playHlsStream/.test(files.tidalStream),
+    'The verified stream boundary must reject provider preview manifests instead of playing 30-second previews.',
+)
+
+check(
+    'TIDAL direct media playback does not force CORS on signed audio URLs',
+    !/crossOrigin\s*=|setAttribute\(\s*['"]crossorigin['"]/i.test(files.tidalStream),
+    'TIDAL signed media URLs reject Origin-bearing CORS media requests; direct audio playback must not set crossOrigin on the HTMLAudioElement.',
+)
+
+check(
+    'TIDAL SDK volume is kept inside the 0-1 range',
+    /const clampVolume01/.test(files.tidalSdk) &&
+        /setVolumeLevel\(toTidalVolumeLevel\(volume\)\)/.test(files.tidalSdk),
+    'The TIDAL SDK receives normalized volume only.',
+)
+
+check(
+    'TIDAL SDK preview transitions are treated as provider failures',
+    /isTidalPreviewSnapshot/.test(files.tidalSdk) &&
+        /describeTidalPreviewFailure/.test(files.tidalSdk) &&
+        /await reset\(\)/.test(files.tidalSdk) &&
+        /tidalPreviewBlockedRef/.test(files.playbackContext),
+    'A 30-second SDK preview must stop playback and surface provider state instead of being treated as successful full-track playback.',
+)
+
+check(
+    'TIDAL playlist stream test page stays isolated from the shared player',
+    /path="tidal-playlist-test"/.test(files.app) &&
+        /playTidalMediaItem/.test(files.tidalPlaylistTestPage) &&
+        /tidalSetNextMediaItem/.test(files.tidalPlaylistTestPage) &&
+        /tidalStreamPlayback/.test(files.tidalPlaylistTestPage) &&
+        /fetchPmsPlaylistDetail/.test(files.tidalPlaylistTestPage) &&
+        !/usePlayback/.test(files.tidalPlaylistTestPage) &&
+        !/fetchTidalPlaybackManifestDiagnostics/.test(files.tidalPlaylistTestPage) &&
+        !/spotify/i.test(files.tidalPlaylistTestPage),
+    'Complex playlist playback bugs need an isolated TIDAL stream page that does not route through the shared Spotify/TIDAL player context or unrelated diagnostics.',
+)
+
+check(
+    'TIDAL playlist stream test page auto-advances on ended',
+    /playAtRef/.test(files.tidalPlaylistTestPage) &&
+        /onEnded:[\s\S]*playAtRef\.current\(endedIndex \+ 1\)/.test(files.tidalPlaylistTestPage),
+    'The isolated TIDAL playlist page must actually start the next track after an ended event, not only log that the current track ended.',
+)
+
+check(
+    'Playback media resolver supports TIDAL track ids',
+    /tidalTrackId/.test(files.musicPlayback) &&
+        /extractTidalTrackIdFromUrl/.test(files.musicPlayback) &&
+        /resolveTidalTrackId/.test(files.musicPlayback),
+    'Imported TIDAL PMS tracks must be recognized from tidal:track URIs, TIDAL URLs, or external ids.',
+)
+
+check(
+    'PMS TIDAL tracks stay on TIDAL when Spotify audio-feature matches exist',
+    /if \(sourcePlatform === 'tidal'\)[\s\S]*return tidalTrackId \? 'tidal' : spotifyTrackId \? 'spotify' : 'tidal'/.test(files.pmsPlayback) &&
+        /track\.source_platform === 'spotify'[\s\S]*extractSpotifyTrackIdFromUrl\(track\.audio_feature_track_id\)/.test(files.pmsPlayback) &&
+        /item\.sourcePlatform === 'tidal' && resolveTidalTrackId\(item\)/.test(files.musicPlayback),
+    'A TIDAL PMS import may have Spotify audio-feature lookup ids, but playback must not silently switch to Spotify when a TIDAL track id is present.',
+)
+
+check(
+    'TIDAL provider account id is recovered from token claims',
+    /profileFromAccessToken/.test(files.tidalWebApiClient) &&
+        /claimAsString\(claims, "uid"\)/.test(files.tidalWebApiClient) &&
+        /profileFromAccessToken\(credential\.accessToken\(\)\)/.test(files.tidalWebApiClient),
+    'Existing TIDAL credentials must recover the provider account id from the JWT uid claim instead of falling back to a local app user id.',
+)
+
+check(
+    'TIDAL country code follows the provider token claim',
+    /countryCodeFromAccessToken/.test(files.playbackCredentialController) &&
+        /countryCodeFromAccessToken\(credential\.accessToken\(\)\)/.test(files.playbackCredentialController) &&
+        /claimFromAccessToken\(accessToken, "cc"\)/.test(files.playbackCredentialController) &&
+        /claimAsString\(claims, "cc"\)/.test(files.tidalWebApiClient),
+    'TIDAL playlist import and SDK playback credentials must use the provider token country claim before the static environment country.',
+)
+
+check(
+    'TIDAL refresh requests use the configured client-auth boundary',
+    /grant_type=refresh_token/.test(files.tidalTokenRefreshClient) &&
+        /applyClientAuthentication/.test(files.tidalTokenRefreshClient) &&
+        /clientIdFormField/.test(files.tidalTokenRefreshClient) &&
+        /getTidal\(\)\.getClientId\(\)/.test(files.tidalTokenRefreshClient),
+    'TIDAL refresh token requests must send Basic auth for confidential clients and client_id form fields for public clients.',
+)
+
+check(
+    'Domain SSL does not use local certificate workarounds',
+    !/mkcert|local-certs|local-dev-https/i.test(files.macbookDomainProxyCompose) &&
+        !/mkcert|local-certs|local-dev-https/i.test(files.macbookDomainHttpsConf) &&
+        localCertFiles.filter((fileName) => /\.(pem|key|crt)$/i.test(fileName)).length === 0,
+    'The public domain proxy must use a real certificate path. Do not commit or generate mkcert/local-certs as a shortcut for imapplepie20.tplinkdns.com.',
 )
 
 const failed = checks.filter((result) => !result.passed)

@@ -1,5 +1,6 @@
 import {
     extractSpotifyTrackIdFromUrl,
+    extractTidalTrackIdFromUrl,
     type PlaybackMediaItem,
 } from '@/lib/musicPlayback'
 import type {
@@ -50,12 +51,49 @@ export const resolvePmsTrackSpotifyId = (track: {
         return fromSpotifyTrackId
     }
 
-    return extractSpotifyTrackIdFromUrl(track.audio_feature_track_id)
+    if (track.source_platform === 'spotify') {
+        return extractSpotifyTrackIdFromUrl(track.audio_feature_track_id)
+    }
+
+    return null
 }
 
-export const resolvePmsPlaybackPlatformId = (sourcePlatform: string, spotifyTrackId?: string | null) => {
-    if (sourcePlatform === 'spotify' || spotifyTrackId) {
+export const resolvePmsTrackTidalId = (track: {
+    source_platform: string
+    external_track_id?: string | null
+    platform_uri?: string | null
+    platform_external_url?: string | null
+}) => {
+    if (track.source_platform !== 'tidal') {
+        return null
+    }
+
+    return (
+        extractTidalTrackIdFromUrl(track.platform_uri) ??
+        extractTidalTrackIdFromUrl(track.platform_external_url) ??
+        extractTidalTrackIdFromUrl(track.external_track_id)
+    )
+}
+
+export const resolvePmsPlaybackPlatformId = (
+    sourcePlatform: string,
+    spotifyTrackId?: string | null,
+    tidalTrackId?: string | null,
+) => {
+    if (sourcePlatform === 'tidal') {
+        return tidalTrackId ? 'tidal' : spotifyTrackId ? 'spotify' : 'tidal'
+    }
+
+    if (sourcePlatform === 'spotify') {
+        return spotifyTrackId ? 'spotify' : tidalTrackId ? 'tidal' : 'spotify'
+    }
+
+    if (spotifyTrackId) {
         return 'spotify'
+    }
+
+    if (tidalTrackId) {
+        return 'tidal'
     }
 
     return sourcePlatform || null
@@ -66,6 +104,7 @@ export const toPmsTrackPlaybackItem = (
     playlistTitle?: string | null,
 ): PlaybackMediaItem => {
     const spotifyTrackId = resolvePmsTrackSpotifyId(track)
+    const tidalTrackId = resolvePmsTrackTidalId(track)
 
     return {
         id: `pms-track:${track.track_id}`,
@@ -73,13 +112,14 @@ export const toPmsTrackPlaybackItem = (
         title: track.title,
         subtitle: `${track.artist_name} · ${track.source_platform}`,
         sourcePlatform: track.source_platform,
-        playbackPlatformId: resolvePmsPlaybackPlatformId(track.source_platform, spotifyTrackId),
+        playbackPlatformId: resolvePmsPlaybackPlatformId(track.source_platform, spotifyTrackId, tidalTrackId),
         imageUrl: track.album_image_url,
         albumTitle: track.album_title,
         externalUrl: track.platform_external_url,
         platformUri: track.platform_uri,
         previewUrl: track.preview_url,
         spotifyTrackId,
+        tidalTrackId,
         durationMs: track.duration_ms,
         supportingText: playlistTitle ?? null,
     }

@@ -17,7 +17,10 @@ public record PlatformPlaybackCredentialsResponse(
     String scopeSummary,
     List<String> scopes,
     Instant expiresAt,
+    String externalUserId,
     String externalAccountLabel,
-    String authorizationMode
+    String authorizationMode,
+    String clientId,
+    String countryCode
 ) {
 }

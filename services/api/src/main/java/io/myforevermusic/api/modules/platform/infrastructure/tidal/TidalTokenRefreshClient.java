@@ -16,6 +16,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -57,10 +58,12 @@ public class TidalTokenRefreshClient implements PlatformTokenRefreshClient {
     @Override
     public PlatformTokenExchangeResult refreshAccessToken(PlatformAccountCredential credential) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(platformOAuthProperties.getTidal().getTokenUri()))
                 .header("Accept", "application/json")
-                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("Content-Type", "application/x-www-form-urlencoded");
+            applyClientAuthentication(requestBuilder);
+            HttpRequest request = requestBuilder
                 .POST(HttpRequest.BodyPublishers.ofString(buildFormBody(credential)))
                 .build();
 
@@ -98,7 +101,35 @@ public class TidalTokenRefreshClient implements PlatformTokenRefreshClient {
 
     private String buildFormBody(PlatformAccountCredential credential) {
         return "grant_type=refresh_token"
+            + clientIdFormField()
             + "&refresh_token=" + encode(credential.refreshToken());
+    }
+
+    private void applyClientAuthentication(HttpRequest.Builder requestBuilder) {
+        if (!hasClientSecret()) {
+            return;
+        }
+
+        String credentials = "%s:%s".formatted(
+            platformOAuthProperties.getTidal().getClientId(),
+            platformOAuthProperties.getTidal().getClientSecret()
+        );
+        requestBuilder.header(
+            "Authorization",
+            "Basic %s".formatted(Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8)))
+        );
+    }
+
+    private String clientIdFormField() {
+        String clientId = platformOAuthProperties.getTidal().getClientId();
+        return hasClientSecret() || clientId == null || clientId.isBlank()
+            ? ""
+            : "&client_id=" + encode(clientId);
+    }
+
+    private boolean hasClientSecret() {
+        String clientSecret = platformOAuthProperties.getTidal().getClientSecret();
+        return clientSecret != null && !clientSecret.isBlank();
     }
 
     private String readErrorMessage(String body, int statusCode) {

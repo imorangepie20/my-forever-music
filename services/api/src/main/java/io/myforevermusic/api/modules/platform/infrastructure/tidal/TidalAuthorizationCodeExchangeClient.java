@@ -16,6 +16,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -56,10 +57,12 @@ public class TidalAuthorizationCodeExchangeClient implements PlatformAuthorizati
         String authorizationCode
     ) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(platformOAuthProperties.getTidal().getTokenUri()))
                 .header("Accept", "application/json")
-                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("Content-Type", "application/x-www-form-urlencoded");
+            applyClientAuthentication(requestBuilder);
+            HttpRequest request = requestBuilder
                 .POST(HttpRequest.BodyPublishers.ofString(buildFormBody(session, authorizationCode)))
                 .build();
 
@@ -97,10 +100,37 @@ public class TidalAuthorizationCodeExchangeClient implements PlatformAuthorizati
 
     private String buildFormBody(PlatformAuthorizationSession session, String authorizationCode) {
         return "grant_type=authorization_code"
-            + "&client_id=" + encode(platformOAuthProperties.getTidal().getClientId())
+            + clientIdFormField()
             + "&code=" + encode(authorizationCode)
             + "&redirect_uri=" + encode(session.redirectUri())
             + "&code_verifier=" + encode(session.pkceCodeVerifier());
+    }
+
+    private void applyClientAuthentication(HttpRequest.Builder requestBuilder) {
+        if (!hasClientSecret()) {
+            return;
+        }
+
+        String credentials = "%s:%s".formatted(
+            platformOAuthProperties.getTidal().getClientId(),
+            platformOAuthProperties.getTidal().getClientSecret()
+        );
+        requestBuilder.header(
+            "Authorization",
+            "Basic %s".formatted(Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8)))
+        );
+    }
+
+    private String clientIdFormField() {
+        String clientId = platformOAuthProperties.getTidal().getClientId();
+        return hasClientSecret() || clientId == null || clientId.isBlank()
+            ? ""
+            : "&client_id=" + encode(clientId);
+    }
+
+    private boolean hasClientSecret() {
+        String clientSecret = platformOAuthProperties.getTidal().getClientSecret();
+        return clientSecret != null && !clientSecret.isBlank();
     }
 
     private String readErrorMessage(String body, int statusCode) {

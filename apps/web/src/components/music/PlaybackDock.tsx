@@ -24,6 +24,7 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
         isPlaying,
         isLoading,
         error,
+        notice,
         positionMs,
         durationMs,
         volume,
@@ -116,9 +117,9 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                         <span className="text-xs text-hud-text-muted">{formatDuration(totalDuration)}</span>
                     </div>
 
-                    {error && (
-                        <p className="mt-2 truncate text-center text-xs font-medium text-amber-300">
-                            {error}
+                    {(error || notice) && (
+                        <p className={`mt-2 truncate text-center text-xs font-medium ${error ? 'text-amber-300' : 'text-hud-accent-primary'}`}>
+                            {error ?? notice}
                         </p>
                     )}
                 </div>

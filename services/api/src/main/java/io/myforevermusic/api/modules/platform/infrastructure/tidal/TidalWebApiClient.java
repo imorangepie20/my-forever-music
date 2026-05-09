@@ -10,6 +10,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +74,11 @@ public class TidalWebApiClient {
      * Get the current user's profile from TIDAL.
      */
     public TidalUserProfile getCurrentUserProfile(PlatformAccountCredential credential) {
+        Optional<TidalUserProfile> tokenProfile = profileFromAccessToken(credential.accessToken());
+        if (tokenProfile.isPresent()) {
+            return tokenProfile.get();
+        }
+
         try {
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("%s/user".formatted(apiBaseUri)))
@@ -105,11 +112,78 @@ public class TidalWebApiClient {
         }
     }
 
+    private Optional<TidalUserProfile> profileFromAccessToken(String accessToken) {
+        return claimsFromAccessToken(accessToken)
+            .flatMap(claims -> {
+                String userId = firstNonBlank(
+                    claimAsString(claims, "uid"),
+                    claimAsString(claims, "user_id"),
+                    claimAsString(claims, "userId"),
+                    claimAsString(claims, "tidalUserId"),
+                    claimAsString(claims, "sub")
+                );
+                if (userId == null) {
+                    return Optional.empty();
+                }
+
+                return Optional.of(new TidalUserProfile(
+                    userId,
+                    claimAsString(claims, "tidalUserId"),
+                    claimAsString(claims, "firstName"),
+                    claimAsString(claims, "lastName"),
+                    claimAsString(claims, "email")
+                ));
+            });
+    }
+
+    private String claimAsString(Map<String, Object> claims, String key) {
+        Object value = claims.get(key);
+        if (value == null) {
+            return null;
+        }
+
+        String stringValue = value.toString().trim();
+        return stringValue.isBlank() ? null : stringValue;
+    }
+
+    private Optional<Map<String, Object>> claimsFromAccessToken(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            return Optional.empty();
+        }
+
+        String[] jwtParts = accessToken.split("\\.");
+        if (jwtParts.length < 2) {
+            return Optional.empty();
+        }
+
+        try {
+            String payload = new String(Base64.getUrlDecoder().decode(jwtParts[1]), StandardCharsets.UTF_8);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> claims = objectMapper.readValue(payload, Map.class);
+            return Optional.of(claims);
+        } catch (RuntimeException | IOException exception) {
+            return Optional.empty();
+        }
+    }
+
+    private String countryCodeForCredential(PlatformAccountCredential credential) {
+        return firstNonBlank(
+            countryCodeFromAccessToken(credential.accessToken()),
+            platformOAuthProperties.getTidal().getCountryCode()
+        );
+    }
+
+    private String countryCodeFromAccessToken(String accessToken) {
+        return claimsFromAccessToken(accessToken)
+            .map(claims -> claimAsString(claims, "cc"))
+            .orElse(null);
+    }
+
     /**
      * Get user's playlists from TIDAL.
      */
     public List<TidalPlaylistSummary> getUserPlaylists(PlatformAccountCredential credential) {
-        String countryCode = platformOAuthProperties.getTidal().getCountryCode();
+        String countryCode = countryCodeForCredential(credential);
         try {
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("%s/userCollectionPlaylists?countryCode=%s&limit=50".formatted(apiBaseUri, countryCode)))
@@ -146,7 +220,7 @@ public class TidalWebApiClient {
         PlatformAccountCredential credential,
         String playlistId
     ) {
-        String countryCode = platformOAuthProperties.getTidal().getCountryCode();
+        String countryCode = countryCodeForCredential(credential);
         try {
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(
@@ -185,7 +259,6 @@ public class TidalWebApiClient {
     }
 
     private TidalPlaylistSummary toPlaylistSummary(JsonApiData data) {
-        @SuppressWarnings("unchecked")
         Map<String, Object> attrs = data.attributes();
         return new TidalPlaylistSummary(
             data.id(),
@@ -304,7 +377,6 @@ public class TidalWebApiClient {
         return null;
     }
 
-    @SuppressWarnings("unchecked")
     private <T> T extractAttribute(Map<String, Object> attributes, String key, Class<T> type, T defaultValue) {
         T value = extractAttribute(attributes, key, type);
         return value != null ? value : defaultValue;
@@ -341,7 +413,6 @@ public class TidalWebApiClient {
         return ids.isEmpty() ? null : ids.get(0);
     }
 
-    @SuppressWarnings("unchecked")
     private List<String> extractRelationshipIds(Map<String, Object> relationships, String relationshipName) {
         if (relationships == null) {
             return List.of();

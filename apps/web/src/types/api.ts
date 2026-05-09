@@ -175,8 +175,80 @@ export interface PlatformPlaybackCredentialsResponse {
     scope_summary: string | null
     scopes: string[]
     expires_at: string | null
+    external_user_id: string | null
     external_account_label: string | null
     authorization_mode: string | null
+    client_id: string | null
+    country_code: string | null
+}
+
+export interface TidalPlaybackManifestDiagnosticsResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string
+    track_id: string
+    token: {
+        client_claim: string | null
+        provider_user_id: string | null
+        country_code: string | null
+        access_token_type: string | null
+        token_type: string | null
+        scopes: string[]
+        has_legacy_streaming_scopes: boolean
+        has_sdk_playback_scopes: boolean
+    }
+    tested_country_codes: string[]
+    tested_qualities: string[]
+    conclusion:
+        | 'provider_returned_full_manifest'
+        | 'provider_returned_preview_manifest'
+        | 'provider_manifest_unresolved'
+        | string
+    probes: Array<{
+        country_code: string
+        requested_quality: string
+        http_status: number
+        asset_presentation: string | null
+        audio_quality: string | null
+        codec: string | null
+        bit_rate: number | null
+        sample_rate: number | null
+        bit_depth: number | null
+        manifest: {
+            present: boolean
+            mime_type: string | null
+            codecs: string | null
+            encryption_type: string | null
+            asset_presentation: string | null
+            duration_seconds: number | null
+            url_count: number
+        }
+        full_playback_available: boolean
+        provider_returned_preview: boolean
+        error: string | null
+    }>
+}
+
+export interface TidalPlaybackStreamResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string
+    track_id: string
+    country_code: string
+    requested_quality: string
+    audio_quality: string | null
+    codec: string | null
+    bit_rate: number | null
+    sample_rate: number | null
+    bit_depth: number | null
+    asset_presentation: string | null
+    manifest_mime_type: string | null
+    manifest_codecs: string | null
+    encryption_type: string | null
+    duration_seconds: number | null
+    stream_url: string
 }
 
 export interface LastFmProfileConnectRequest {
@@ -249,6 +321,51 @@ export interface PlatformAuthorizationCompleteResponse {
         path: string
         message: string
     }
+}
+
+export interface TidalDeviceAuthorizationStartRequest {
+    user_id: string
+}
+
+export interface TidalDeviceAuthorizationStartResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string
+    authorization: {
+        device_code: string
+        user_code: string
+        verification_uri: string
+        verification_uri_complete: string | null
+        expires_at: string
+        interval_seconds: number
+        requested_scopes: string[]
+    }
+}
+
+export interface TidalDeviceAuthorizationPollRequest {
+    user_id: string
+    device_code: string
+}
+
+export interface TidalDeviceAuthorizationPollResponse {
+    service: string
+    status: 'authorization_pending' | 'slow_down' | 'authorization_completed' | string
+    processed_at: string
+    user_id: string
+    requested_scopes: string[]
+    connection?: {
+        user_id: string
+        platform_id: WorkspacePlatformId
+        connected: boolean
+        connection_status: string
+        connection_mode: string
+        external_account_label: string | null
+        scope_summary: string | null
+        sync_ready: boolean
+        connected_at: string | null
+    } | null
+    message?: string | null
 }
 
 export interface LastFmSignalPreviewResponse {

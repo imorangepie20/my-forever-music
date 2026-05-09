@@ -6,15 +6,21 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test:policy": "node scripts/project-policy-regression-harness.mjs",
     "test:playback": "node scripts/playback-regression-harness.mjs",
     "test:product-flow": "node scripts/product-flow-regression-harness.mjs",
+    "test:regression": "npm run test:policy && npm run test:product-flow && npm run test:playback",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.0",
+    "@tidal-music/common": "^0.2.0",
+    "@tidal-music/event-producer": "^2.4.0",
+    "@tidal-music/player": "^0.17.0",
     "@types/navermaps": "^3.9.1",
     "chart.js": "^4.5.1",
+    "hls.js": "^1.6.16",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.3.1",

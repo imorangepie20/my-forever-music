@@ -10,6 +10,7 @@
 - [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md): mock/sandbox 없이 실제 구현된 기능만 사용자 플로우에 노출하는 기준
 - [architecture/MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md): 현재는 MacBook 로컬에서 구현/시험 후 Ubuntu로 이전하는 실행 전략
 - [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md): MacBook 시험 서비스에서 실제 API/저장소/provider만 기본 사용자 경로로 쓰는 정책
+- [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md): 오류를 우회/회피/임시 처리하지 않고 실패 경계와 근본 원인을 수정하는 전 프로젝트 공통 기준
 - [architecture/AUDIO_FEATURE_PROVIDER_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/AUDIO_FEATURE_PROVIDER_STRATEGY.md): Spotify Development Mode 제약 이후 provider-neutral 오디오 특성 전략과 legacy `spotify_*` 호환 규칙
 - [architecture/TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md): 현재 채택 기술 스택
 - [architecture/SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md): Spotify OAuth Redirect URI, env, HTTPS 테스트 기준

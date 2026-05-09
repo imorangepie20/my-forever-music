@@ -15,6 +15,17 @@ export default defineConfig(({ mode }) => {
                 '@': fileURLToPath(new URL('./src', import.meta.url)),
             },
         },
+        build: {
+            target: 'esnext',
+        },
+        esbuild: {
+            target: 'esnext',
+        },
+        optimizeDeps: {
+            esbuildOptions: {
+                target: 'esnext',
+            },
+        },
         server: {
             host: true,
             port: 5173,

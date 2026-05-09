@@ -85,8 +85,9 @@ app:
         authorization-uri: ${TIDAL_AUTHORIZATION_URI:https://login.tidal.com/authorize}
         token-uri: ${TIDAL_TOKEN_URI:https://auth.tidal.com/v1/oauth2/token}
         api-base-uri: ${TIDAL_API_BASE_URI:https://openapi.tidal.com/v2}
+        legacy-api-base-uri: ${TIDAL_LEGACY_API_BASE_URI:https://api.tidal.com/v1}
         country-code: ${TIDAL_COUNTRY_CODE:US}
-        scopes: ${TIDAL_SCOPES:}
+        scopes: ${TIDAL_SCOPES:user.read,collection.read,playlists.read,playback,entitlements.read,search.read}
 
 logging:
   level:

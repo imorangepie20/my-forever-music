@@ -9,6 +9,10 @@ import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { usePlayback } from '@/contexts/PlaybackContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
 import {
+    resolveSpotifyTrackId,
+    resolveTidalTrackId,
+} from '@/lib/musicPlayback'
+import {
     buildPmsPlaylistDetailPath,
     toPmsPlaylistPlaybackItem,
     toPmsTrackPlaybackItem,
@@ -260,7 +264,7 @@ const PmsPage = () => {
             const detail = await fetchPmsPlaylistDetail(session.userId, playlist.playlist_id)
             const playbackItems = detail.tracks
                 .map((track) => toPmsTrackPlaybackItem(track, detail.playlist.title))
-                .filter((item) => item.spotifyTrackId || item.platformUri?.startsWith('spotify:track:'))
+                .filter((item) => resolveSpotifyTrackId(item) || resolveTidalTrackId(item))
 
             if (playbackItems.length > 0) {
                 await playQueue(playbackItems, 0)

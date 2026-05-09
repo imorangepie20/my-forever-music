@@ -60,9 +60,15 @@ const menuItems: MenuItem[] = [
     },
     {
         label: 'Playback',
-        description: 'Spotify player harness',
+        description: 'Spotify and TIDAL player harness',
         icon: <PlayCircle size={20} />,
         path: '/playback-harness',
+    },
+    {
+        label: 'TIDAL Test',
+        description: 'Isolated playlist stream page',
+        icon: <PlayCircle size={20} />,
+        path: '/tidal-playlist-test',
     },
 ]
 

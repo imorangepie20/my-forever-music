@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tidal Test Player</title>
+  <style>
+    :root {
+      --bg-color: #121212;
+      --text-color: #ffffff;
+      --accent-color: #00ffff;
+      --surface-color: #282828;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      padding: 40px;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      width: 100%;
+      max-width: 600px;
+      background-color: var(--surface-color);
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    h1 {
+      text-align: center;
+      margin-top: 0;
+      margin-bottom: 24px;
+    }
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    input, select {
+      padding: 12px;
+      border: 1px solid #444;
+      border-radius: 8px;
+      background-color: #181818;
+      color: white;
+      font-size: 16px;
+    }
+    input {
+      flex: 1;
+    }
+    .btn {
+      padding: 12px 24px;
+      background-color: var(--accent-color);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 16px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn:hover {
+      opacity: 0.8;
+    }
+    .player-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #444;
+      align-items: center;
+    }
+    .status {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Tidal Test Player</h1>
+    <div id="auth-status" class="status">Initializing Authentication...</div>
+
+    <div id="player-container" style="display: none;">
+      <div class="input-group">
+        <select id="media-type">
+          <option value="playlist">Playlist</option>
+          <option value="track">Track</option>
+          <option value="album">Album</option>
+        </select>
+        <input type="text" id="media-id" placeholder="Enter UUID or ID" value="1c5d01ed-4f05-40c4-bd28-0f730f171092">
+      </div>
+      <button class="btn" id="load-btn" style="width: 100%;">Set Media to Play</button>
+
+      <div class="player-controls">
+        <tidal-play-trigger id="play-trigger" product-id="1c5d01ed-4f05-40c4-bd28-0f730f171092" product-type="playlist">
+          <button class="btn">Play with TIDAL</button>
+        </tidal-play-trigger>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as auth from 'https://unpkg.com/@tidal-music/auth/dist';
+    import { setCredentialsProvider } from 'https://unpkg.com/@tidal-music/player-web-components/dist';
+
+    const clientId = 'dsqYXppusCOnvrGn';
+    const clientSecret = '5xZJvqr5S9KTWrFAqISJTNOPqoBwM6cDFrExED5YkXQ=';
+
+    async function initTidal() {
+      try {
+        await auth.init({
+          clientId,
+          clientSecret,
+          credentialsStorageKey: 'tidal-test-session',
+          scopes: [],
+        });
+
+        // The auth provider handles setting tokens for playback
+        setCredentialsProvider(auth.credentialsProvider);
+        
+        document.getElementById('auth-status').innerText = 'Authenticated successfully.';
+        document.getElementById('auth-status').style.color = '#00ff00';
+        document.getElementById('player-container').style.display = 'block';
+
+        const loadBtn = document.getElementById('load-btn');
+        const mediaIdInput = document.getElementById('media-id');
+        const mediaTypeSelect = document.getElementById('media-type');
+        const playTrigger = document.getElementById('play-trigger');
+
+        loadBtn.addEventListener('click', () => {
+          const id = mediaIdInput.value.trim();
+          const type = mediaTypeSelect.value;
+          if (id) {
+            playTrigger.setAttribute('product-id', id);
+            playTrigger.setAttribute('product-type', type);
+            alert(`Set to load ${type}: ${id}. Click 'Play with TIDAL' to start playback.`);
+          }
+        });
+      } catch (err) {
+        document.getElementById('auth-status').innerText = 'Authentication failed: ' + err.message;
+        document.getElementById('auth-status').style.color = '#ff4444';
+        console.error('TIDAL Auth Error:', err);
+      }
+    }
+
+    initTidal();
+  </script>
+</body>
+</html>

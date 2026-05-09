@@ -55,6 +55,7 @@ const PlaybackHarnessPage = () => {
         isPlaying,
         isLoading,
         error,
+        notice,
         positionMs,
         durationMs,
         volume,
@@ -255,9 +256,14 @@ const PlaybackHarnessPage = () => {
                         </div>
                     </div>
 
-                    {(error || missingScopes.length > 0) && (
-                        <div className="mt-4 rounded-lg border border-amber-300/30 bg-amber-300/10 p-4 text-sm leading-6 text-amber-100">
-                            {error ?? `Missing scopes: ${missingScopes.join(', ')}`}
+                    {(error || notice || missingScopes.length > 0) && (
+                        <div className={`mt-4 rounded-lg border p-4 text-sm leading-6 ${
+                            error || missingScopes.length > 0
+                                ? 'border-amber-300/30 bg-amber-300/10 text-amber-100'
+                                : 'border-hud-accent-primary/30 bg-hud-accent-primary/10 text-hud-accent-primary'
+                        }`}
+                        >
+                            {error ?? notice ?? `Missing scopes: ${missingScopes.join(', ')}`}
                         </div>
                     )}
                 </HudCard>

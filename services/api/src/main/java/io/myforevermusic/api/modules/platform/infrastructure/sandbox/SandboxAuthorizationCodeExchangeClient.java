@@ -5,7 +5,7 @@ import io.myforevermusic.api.modules.platform.application.PlatformAuthorizationS
 import io.myforevermusic.api.modules.platform.application.PlatformTokenExchangeResult;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
+
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;

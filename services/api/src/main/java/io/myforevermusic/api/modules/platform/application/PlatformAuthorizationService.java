@@ -30,6 +30,7 @@ public class PlatformAuthorizationService {
     private final PlatformConnectionStore platformConnectionStore;
     private final PlatformCredentialStore platformCredentialStore;
     private final PlatformAuthorizationCodeExchangeRegistry platformAuthorizationCodeExchangeRegistry;
+    private final PlatformAccountProfileResolverRegistry platformAccountProfileResolverRegistry;
     private final PlatformOAuthProperties platformOAuthProperties;
 
     public PlatformAuthorizationService(
@@ -39,6 +40,7 @@ public class PlatformAuthorizationService {
         PlatformConnectionStore platformConnectionStore,
         PlatformCredentialStore platformCredentialStore,
         PlatformAuthorizationCodeExchangeRegistry platformAuthorizationCodeExchangeRegistry,
+        PlatformAccountProfileResolverRegistry platformAccountProfileResolverRegistry,
         PlatformOAuthProperties platformOAuthProperties
     ) {
         this.authAccountStore = authAccountStore;
@@ -47,6 +49,7 @@ public class PlatformAuthorizationService {
         this.platformConnectionStore = platformConnectionStore;
         this.platformCredentialStore = platformCredentialStore;
         this.platformAuthorizationCodeExchangeRegistry = platformAuthorizationCodeExchangeRegistry;
+        this.platformAccountProfileResolverRegistry = platformAccountProfileResolverRegistry;
         this.platformOAuthProperties = platformOAuthProperties;
     }
 
@@ -156,14 +159,40 @@ public class PlatformAuthorizationService {
             .exchangeAuthorizationCode(session, callbackCode);
         PlatformOption platform = findPlatform(session.platformId());
         String scopeSummary = String.join(", ", tokenExchangeResult.grantedScopes());
-        String externalAccountLabel = "%s %s account".formatted(account.displayName(), session.platformDisplayName());
+        String fallbackExternalUserId = "%s:%s".formatted(session.platformId().replace('-', '_'), account.userId());
+        String fallbackExternalAccountLabel = "%s %s account".formatted(account.displayName(), session.platformDisplayName());
+        PlatformAccountCredential provisionalCredential = new PlatformAccountCredential(
+            account.userId(),
+            session.platformId(),
+            session.authorizationMode(),
+            fallbackExternalUserId,
+            fallbackExternalAccountLabel,
+            tokenExchangeResult.accessToken(),
+            tokenExchangeResult.refreshToken(),
+            tokenExchangeResult.tokenType(),
+            scopeSummary,
+            tokenExchangeResult.accessTokenExpiresAt(),
+            now,
+            now
+        );
+        PlatformAccountProfile externalProfile = platformAccountProfileResolverRegistry
+            .resolve(provisionalCredential)
+            .orElse(null);
+        String externalUserId = firstNonBlank(
+            externalProfile == null ? null : externalProfile.externalUserId(),
+            fallbackExternalUserId
+        );
+        String externalAccountLabel = firstNonBlank(
+            externalProfile == null ? null : externalProfile.externalAccountLabel(),
+            fallbackExternalAccountLabel
+        );
 
         platformCredentialStore.save(
             new PlatformAccountCredential(
                 account.userId(),
                 session.platformId(),
                 session.authorizationMode(),
-                "%s:%s".formatted(session.platformId().replace('-', '_'), account.userId()),
+                externalUserId,
                 externalAccountLabel,
                 tokenExchangeResult.accessToken(),
                 tokenExchangeResult.refreshToken(),
@@ -313,6 +342,15 @@ public class PlatformAuthorizationService {
 
     private String encode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private record OAuthStartConfig(

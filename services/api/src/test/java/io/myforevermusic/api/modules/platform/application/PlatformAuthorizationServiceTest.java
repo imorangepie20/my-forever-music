@@ -44,6 +44,7 @@ class PlatformAuthorizationServiceTest {
             new InMemoryPlatformConnectionStore(),
             platformCredentialStore,
             new PlatformAuthorizationCodeExchangeRegistry(List.of(new SandboxAuthorizationCodeExchangeClient())),
+            new PlatformAccountProfileResolverRegistry(List.of()),
             new PlatformOAuthProperties()
         );
 
@@ -82,6 +83,7 @@ class PlatformAuthorizationServiceTest {
             new InMemoryPlatformConnectionStore(),
             new InMemoryPlatformCredentialStore(),
             new PlatformAuthorizationCodeExchangeRegistry(List.of(new SandboxAuthorizationCodeExchangeClient())),
+            new PlatformAccountProfileResolverRegistry(List.of()),
             properties
         );
 
@@ -148,6 +150,7 @@ class PlatformAuthorizationServiceTest {
             new PlatformAuthorizationCodeExchangeRegistry(
                 List.of(new SandboxAuthorizationCodeExchangeClient(), fakeSpotifyClient)
             ),
+            new PlatformAccountProfileResolverRegistry(List.of()),
             properties
         );
 

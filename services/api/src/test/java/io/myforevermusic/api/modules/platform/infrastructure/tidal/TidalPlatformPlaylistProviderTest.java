@@ -8,7 +8,7 @@ import io.myforevermusic.api.modules.platform.application.PlatformAccountCredent
 import io.myforevermusic.api.modules.platform.application.PlatformOAuthProperties;
 import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsAudioFeaturesClient;
 import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsAudioFeaturesClient.ReccoBeatsAudioFeaturesSnapshot;
-import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsAudioFeaturesClient.ReccoBeatsTrackLookupRequest;
+
 import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsProperties;
 import java.net.http.HttpClient;
 import java.time.Instant;

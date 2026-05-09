@@ -10,6 +10,7 @@ import {
     formatDuration,
     resolveSpotifyContextUri,
     resolveSpotifyTrackId,
+    resolveTidalTrackId,
 } from '@/lib/musicPlayback'
 import {
     toPmsPlaylistPlaybackItem,
@@ -24,6 +25,22 @@ const openExternal = (url?: string | null) => {
     }
 
     window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+const resolvePlaybackStatusLabel = (item?: ReturnType<typeof toPmsTrackPlaybackItem>) => {
+    if (!item) {
+        return 'Playback unavailable'
+    }
+
+    if (resolveTidalTrackId(item)) {
+        return 'TIDAL ready'
+    }
+
+    if (resolveSpotifyTrackId(item)) {
+        return 'Spotify ready'
+    }
+
+    return 'Playback unavailable'
 }
 
 const PmsPlaylistDetailPage = () => {
@@ -84,7 +101,7 @@ const PmsPlaylistDetailPage = () => {
     )
 
     const playablePlaybackItems = useMemo(
-        () => playbackItems.filter((item) => resolveSpotifyTrackId(item)),
+        () => playbackItems.filter((item) => resolveSpotifyTrackId(item) || resolveTidalTrackId(item)),
         [playbackItems],
     )
 
@@ -116,7 +133,7 @@ const PmsPlaylistDetailPage = () => {
 
     const handlePlayTrack = (index: number) => {
         const selectedItem = playbackItems[index]
-        if (!selectedItem || !resolveSpotifyTrackId(selectedItem)) {
+        if (!selectedItem || (!resolveSpotifyTrackId(selectedItem) && !resolveTidalTrackId(selectedItem))) {
             return
         }
 
@@ -235,7 +252,7 @@ const PmsPlaylistDetailPage = () => {
 
             <HudCard
                 title="Tracks"
-                subtitle={`${playableCount} playable Spotify tracks`}
+                subtitle={`${playableCount} playable tracks`}
                 action={
                     <Button
                         type="button"
@@ -252,9 +269,9 @@ const PmsPlaylistDetailPage = () => {
                 <div className="divide-y divide-hud-border-secondary overflow-hidden rounded-lg border border-hud-border-secondary">
                     {detail.tracks.map((track, index) => {
                         const durationLabel = formatDuration(track.duration_ms)
-                        const audioFeatureSource = track.audio_feature_source ?? track.spotify_audio_feature_source
                         const playbackItem = playbackItems[index]
-                        const playable = Boolean(playbackItem && resolveSpotifyTrackId(playbackItem))
+                        const playable = Boolean(playbackItem && (resolveSpotifyTrackId(playbackItem) || resolveTidalTrackId(playbackItem)))
+                        const playbackStatusLabel = resolvePlaybackStatusLabel(playbackItem)
 
                         return (
                             <div
@@ -284,8 +301,8 @@ const PmsPlaylistDetailPage = () => {
                                     <p className="truncate text-sm text-hud-text-secondary">
                                         {track.album_title ?? 'Single'}
                                     </p>
-                                    <p className="mt-1 truncate text-xs uppercase tracking-[0.2em] text-hud-text-muted">
-                                        {audioFeatureSource}
+                                    <p className={`mt-1 truncate text-xs uppercase tracking-[0.2em] ${playable ? 'text-hud-accent-primary' : 'text-hud-text-muted'}`}>
+                                        {playbackStatusLabel}
                                     </p>
                                 </div>
 

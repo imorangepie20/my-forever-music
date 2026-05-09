@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, BarChart3, CheckCircle2, Disc3, PlayCircle, Radio, RefreshCw, Sparkles } from 'lucide-react'
+import { ArrowRight, BarChart3, CheckCircle2, Copy, Disc3, ExternalLink, PlayCircle, Radio, RefreshCw, Sparkles } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
@@ -13,6 +13,8 @@ import {
     fetchLastFmSignalPreview,
     fetchPlatformCatalog,
     fetchPlatformConnectionBootstrap,
+    pollTidalDeviceAuthorization,
+    startTidalDeviceAuthorization,
     syncLastFmScrobbles,
     startPlatformAuthorization,
 } from '@/services/api'
@@ -21,6 +23,7 @@ import type {
     LastFmSignalPreviewResponse,
     PlatformCatalogResponse,
     PlatformConnectionBootstrapResponse,
+    TidalDeviceAuthorizationStartResponse,
     WorkspacePlatformId,
 } from '@/types/api'
 
@@ -52,6 +55,9 @@ const PlatformsPage = () => {
     const [lastFmPreviewError, setLastFmPreviewError] = useState<string | null>(null)
     const [isLastFmPreviewLoading, setIsLastFmPreviewLoading] = useState(false)
     const [isLastFmSyncing, setIsLastFmSyncing] = useState(false)
+    const [tidalDeviceAuth, setTidalDeviceAuth] = useState<TidalDeviceAuthorizationStartResponse | null>(null)
+    const [tidalDeviceMessage, setTidalDeviceMessage] = useState<string | null>(null)
+    const [isTidalDeviceChecking, setIsTidalDeviceChecking] = useState(false)
     const preferredConnection = connectionBootstrap?.connections.find((connection) => connection.preferred) ?? null
 
     useEffect(() => {
@@ -152,6 +158,15 @@ const PlatformsPage = () => {
 
                 await reloadConnections()
             } else {
+                if (platformId === 'tidal') {
+                    const response = await startTidalDeviceAuthorization({
+                        user_id: session.userId,
+                    })
+                    setTidalDeviceAuth(response)
+                    setTidalDeviceMessage(null)
+                    return
+                }
+
                 const response = await startPlatformAuthorization({
                     user_id: session.userId,
                     platform_id: platformId,
@@ -186,6 +201,48 @@ const PlatformsPage = () => {
                     : 'Unable to update platform connection state right now.'
             setError(message)
         } finally {
+            setIsMutating(null)
+        }
+    }
+
+    const handleCopyTidalCode = async () => {
+        if (!tidalDeviceAuth?.authorization.user_code || typeof navigator === 'undefined') {
+            return
+        }
+        await navigator.clipboard.writeText(tidalDeviceAuth.authorization.user_code)
+        setTidalDeviceMessage('TIDAL login code copied.')
+    }
+
+    const handlePollTidalDeviceAuthorization = async () => {
+        if (!session || !tidalDeviceAuth) {
+            return
+        }
+
+        setIsTidalDeviceChecking(true)
+        setTidalDeviceMessage(null)
+
+        try {
+            const response = await pollTidalDeviceAuthorization({
+                user_id: session.userId,
+                device_code: tidalDeviceAuth.authorization.device_code,
+            })
+
+            if (response.status === 'authorization_completed') {
+                setTidalDeviceMessage('TIDAL connected with the device-code playback token.')
+                setTidalDeviceAuth(null)
+                await reloadConnections()
+                return
+            }
+
+            setTidalDeviceMessage(response.message ?? 'TIDAL authorization is still pending.')
+        } catch (requestError: unknown) {
+            const message =
+                requestError instanceof ApiError
+                    ? requestError.message
+                    : 'Unable to complete TIDAL device authorization right now.'
+            setTidalDeviceMessage(message)
+        } finally {
+            setIsTidalDeviceChecking(false)
             setIsMutating(null)
         }
     }
@@ -928,6 +985,81 @@ const PlatformsPage = () => {
                     )}
                 </HudCard>
             </section>
+            {tidalDeviceAuth && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-xl rounded-2xl border border-hud-border-primary bg-hud-bg-secondary p-6 shadow-2xl">
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <p className="text-xs uppercase tracking-[0.24em] text-hud-accent-primary">
+                                    TIDAL Device Login
+                                </p>
+                                <h3 className="mt-3 text-2xl font-semibold text-hud-text-primary">
+                                    Enter this code on TIDAL
+                                </h3>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => {
+                                    setTidalDeviceAuth(null)
+                                    setTidalDeviceMessage(null)
+                                    setIsMutating(null)
+                                }}
+                            >
+                                Close
+                            </Button>
+                        </div>
+
+                        <div className="mt-6 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/80 p-5">
+                            <p className="text-xs uppercase tracking-[0.24em] text-hud-text-muted">Login Code</p>
+                            <div className="mt-3 flex flex-wrap items-center gap-3">
+                                <p className="rounded-xl border border-hud-border-primary bg-hud-accent-primary/10 px-4 py-3 font-mono text-3xl font-semibold tracking-[0.18em] text-hud-accent-primary">
+                                    {tidalDeviceAuth.authorization.user_code}
+                                </p>
+                                <Button type="button" variant="outline" onClick={handleCopyTidalCode}>
+                                    <Copy size={16} />
+                                    Copy
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                            <a
+                                href={
+                                    tidalDeviceAuth.authorization.verification_uri_complete ??
+                                    tidalDeviceAuth.authorization.verification_uri
+                                }
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center justify-center gap-2 rounded-lg border border-hud-accent-primary px-4 py-2 text-sm font-medium text-hud-accent-primary transition-hud hover:bg-hud-accent-primary/10"
+                            >
+                                Open TIDAL Login
+                                <ExternalLink size={16} />
+                            </a>
+                            <Button
+                                type="button"
+                                variant="primary"
+                                disabled={isTidalDeviceChecking}
+                                onClick={handlePollTidalDeviceAuthorization}
+                            >
+                                {isTidalDeviceChecking ? 'Checking...' : 'Check Login'}
+                            </Button>
+                        </div>
+
+                        <div className="mt-5 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4 text-sm leading-6 text-hud-text-secondary">
+                            <p>
+                                Requested scopes: {tidalDeviceAuth.authorization.requested_scopes.join(', ')}
+                            </p>
+                            <p className="mt-2">
+                                Expires at {new Date(tidalDeviceAuth.authorization.expires_at).toLocaleTimeString()}.
+                            </p>
+                            {tidalDeviceMessage && (
+                                <p className="mt-3 font-medium text-hud-text-primary">{tidalDeviceMessage}</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

@@ -128,8 +128,16 @@ public class PlatformOAuthProperties {
         private String authorizationUri = "https://login.tidal.com/authorize";
         private String tokenUri = "https://auth.tidal.com/v1/oauth2/token";
         private String apiBaseUri = "https://openapi.tidal.com/v2";
+        private String legacyApiBaseUri = "https://api.tidal.com/v1";
         private String countryCode = "US";
-        private List<String> scopes = List.of();
+        private List<String> scopes = List.of(
+            "user.read",
+            "collection.read",
+            "playlists.read",
+            "playback",
+            "entitlements.read",
+            "search.read"
+        );
 
         public boolean isEnabled() {
             return enabled;
@@ -187,6 +195,14 @@ public class PlatformOAuthProperties {
             this.apiBaseUri = apiBaseUri == null ? "" : apiBaseUri;
         }
 
+        public String getLegacyApiBaseUri() {
+            return legacyApiBaseUri;
+        }
+
+        public void setLegacyApiBaseUri(String legacyApiBaseUri) {
+            this.legacyApiBaseUri = legacyApiBaseUri == null ? "" : legacyApiBaseUri;
+        }
+
         public String getCountryCode() {
             return countryCode;
         }
@@ -210,6 +226,7 @@ public class PlatformOAuthProperties {
                 && !authorizationUri.isBlank()
                 && !tokenUri.isBlank()
                 && !apiBaseUri.isBlank()
+                && !legacyApiBaseUri.isBlank()
                 && !countryCode.isBlank()
                 && !scopes.isEmpty();
         }

@@ -396,7 +396,6 @@ public class ReccoBeatsAudioFeaturesClient {
             .orElse(null);
     }
 
-    @SuppressWarnings("unchecked")
     private String extractArtistName(Object value) {
         if (value instanceof String stringValue) {
             return stringValue;

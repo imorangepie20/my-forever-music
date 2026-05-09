@@ -15,6 +15,8 @@
 
 사용자 플로우에는 mock data나 sandbox provider를 기본값으로 노출하지 않습니다. 실제 구현 기준은 [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md) 를 따릅니다.
 
+오류는 모든 프로젝트 영역에서 우회, 회피, 임시 처리, 에러 숨김으로 넘기지 않습니다. 실패한 경계와 근본 원인을 확인하고 수정하는 기준 역시 [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md) 를 따릅니다.
+
 현재 실행 전략은 [architecture/MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md) 을 따른다. 즉, 먼저 MacBook 로컬에서 실서비스 기능을 구현하고 시험한 뒤 Ubuntu 서버로 이전한다.
 
 ## 1-1. 서비스 핵심 정의
@@ -126,6 +128,7 @@ docs/
 - 구조 결정이 바뀌면 `ADR`를 추가하거나 수정
 - 새 세션이 꼭 알아야 할 공통 방향이 바뀌면 이 `PROJECT_GUIDE.md`를 갱신
 - 루트 구조가 바뀌면 `README.md`도 함께 수정
+- 오류 처리 기준이 바뀌면 `REAL_IMPLEMENTATION_POLICY.md`와 회귀 하네스를 함께 수정
 
 ## 8. 지금 시점의 우선순위
 

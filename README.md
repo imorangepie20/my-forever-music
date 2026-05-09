@@ -150,6 +150,20 @@ my-forever-music/
 
 ## 로컬 데이터베이스 설정
 
+### 전체 MacBook 스택 재시작
+
+Docker DB/Redis, HTTPS 도메인 프록시, FastAPI AI, Spring Boot API, Vite 웹 서버를 함께 다시 시작하려면:
+
+```bash
+./infra/scripts/restart-macbook-stack.sh
+```
+
+실행 후 주요 URL:
+- TIDAL SDK 테스트 페이지: `https://imapplepie20.tplinkdns.com/tidal-playlist-test`
+- API health: `http://127.0.0.1:8081/actuator/health`
+- AI health: `http://127.0.0.1:8000/health`
+- 로컬 실행 로그: `tmp/local-stack/logs/`
+
 ### Docker로 PostgreSQL/Redis 실행
 
 ```bash

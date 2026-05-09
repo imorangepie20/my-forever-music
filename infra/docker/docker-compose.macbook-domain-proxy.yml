@@ -10,4 +10,4 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ../nginx/macbook.domain.https.conf:/etc/nginx/nginx.conf:ro
-      - ../../../humamAppleTeamPreject001/ssl/config:/etc/nginx/ssl/config:ro
+      - ${NGINX_SSL_CONFIG_DIR:-/Users/woosungjo/preProject/humamAppleTeamPreject001/ssl/config}:/etc/nginx/ssl/config:ro

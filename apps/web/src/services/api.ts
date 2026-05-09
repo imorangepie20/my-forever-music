@@ -10,6 +10,12 @@ import type {
     PlatformConnectionBootstrapResponse,
     PlatformConnectionCommandResponse,
     PlatformPlaybackCredentialsResponse,
+    TidalPlaybackManifestDiagnosticsResponse,
+    TidalPlaybackStreamResponse,
+    TidalDeviceAuthorizationPollRequest,
+    TidalDeviceAuthorizationPollResponse,
+    TidalDeviceAuthorizationStartRequest,
+    TidalDeviceAuthorizationStartResponse,
     PlatformConnectRequest,
     PlatformDisconnectRequest,
     PlatformCatalogResponse,
@@ -158,6 +164,27 @@ export const fetchPlatformConnectionBootstrap = (userId: string, signal?: AbortS
 export const fetchPlaybackCredentials = (userId: string, platformId: string, signal?: AbortSignal) =>
     requestJson<PlatformPlaybackCredentialsResponse>(
         `/api/v1/platforms/playback/credentials?user_id=${encodeURIComponent(userId)}&platform_id=${encodeURIComponent(platformId)}`,
+        { signal, cache: 'no-store' },
+    )
+
+export const fetchTidalPlaybackManifestDiagnostics = (
+    userId: string,
+    trackId: string,
+    signal?: AbortSignal,
+) =>
+    requestJson<TidalPlaybackManifestDiagnosticsResponse>(
+        `/api/v1/platforms/playback/tidal/manifest-diagnostics?user_id=${encodeURIComponent(userId)}&track_id=${encodeURIComponent(trackId)}`,
+        { signal },
+    )
+
+export const fetchTidalPlaybackStream = (
+    userId: string,
+    trackId: string,
+    quality = 'LOSSLESS',
+    signal?: AbortSignal,
+) =>
+    requestJson<TidalPlaybackStreamResponse>(
+        `/api/v1/platforms/playback/tidal/tracks/${encodeURIComponent(trackId)}/stream?user_id=${encodeURIComponent(userId)}&quality=${encodeURIComponent(quality)}`,
         { signal },
     )
 
@@ -190,6 +217,24 @@ export const startPlatformAuthorization = (payload: PlatformAuthorizationStartRe
 
 export const completePlatformAuthorization = (payload: PlatformAuthorizationCompleteRequest) =>
     requestJson<PlatformAuthorizationCompleteResponse>('/api/v1/platforms/oauth/complete', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    })
+
+export const startTidalDeviceAuthorization = (payload: TidalDeviceAuthorizationStartRequest) =>
+    requestJson<TidalDeviceAuthorizationStartResponse>('/api/v1/platforms/oauth/tidal/device/start', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    })
+
+export const pollTidalDeviceAuthorization = (payload: TidalDeviceAuthorizationPollRequest) =>
+    requestJson<TidalDeviceAuthorizationPollResponse>('/api/v1/platforms/oauth/tidal/device/poll', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
