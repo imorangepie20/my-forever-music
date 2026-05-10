@@ -8,6 +8,7 @@ import TrackFeatureCard from '@/components/music/TrackFeatureCard'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { usePlayback } from '@/contexts/PlaybackContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
+import { buildPmsPlaylistDetailPath } from '@/lib/pmsPlayback'
 import {
     ApiError,
     fetchPmsWorkspaceBootstrap,
@@ -376,6 +377,7 @@ const GmsPreviewPage = () => {
                                 imageUrl={activePlaylist.cover_image_url}
                                 isActive
                                 actionLabel="Current GMS Basis"
+                                detailPath={buildPmsPlaylistDetailPath(activePlaylist.playlist_id)}
                                 onPlay={() =>
                                     playItem({
                                         id: `playlist:${activePlaylist.playlist_id}`,

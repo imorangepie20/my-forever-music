@@ -1,5 +1,6 @@
 import {
     ExternalLink,
+    Loader2,
     Pause,
     Play,
     SkipBack,
@@ -92,7 +93,13 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                             className="flex h-12 w-12 items-center justify-center rounded-full bg-hud-accent-primary text-hud-bg-primary transition-hud hover:bg-hud-accent-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                             aria-label={isPlaying ? 'Pause playback' : 'Resume playback'}
                         >
-                            {isPlaying ? <Pause size={22} /> : <Play size={22} className="translate-x-0.5" />}
+                            {isLoading ? (
+                                <Loader2 size={22} className="animate-spin" />
+                            ) : isPlaying ? (
+                                <Pause size={22} />
+                            ) : (
+                                <Play size={22} className="translate-x-0.5" />
+                            )}
                         </button>
                         <button
                             type="button"
@@ -117,9 +124,10 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                         <span className="text-xs text-hud-text-muted">{formatDuration(totalDuration)}</span>
                     </div>
 
-                    {(error || notice) && (
-                        <p className={`mt-2 truncate text-center text-xs font-medium ${error ? 'text-amber-300' : 'text-hud-accent-primary'}`}>
-                            {error ?? notice}
+                    {(error || notice || isLoading) && (
+                        <p className={`mt-2 flex items-center justify-center gap-2 truncate text-center text-xs font-medium ${error ? 'text-amber-300' : 'text-hud-accent-primary'}`}>
+                            {isLoading && !error && <Loader2 size={13} className="shrink-0 animate-spin" />}
+                            <span className="truncate">{error ?? notice ?? 'Preparing playback...'}</span>
                         </p>
                     )}
                 </div>

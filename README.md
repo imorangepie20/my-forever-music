@@ -86,7 +86,8 @@ my-forever-music/
 - `apps/web`는 `/platforms` 화면에서 Last.fm username 저장, 최근 scrobble sync, 저장 snapshot 확인까지 제공
 - `apps/web`는 `/pms` 화면에서 사용자별 PMS bootstrap과 platform playlist import를 제공
 - `apps/web`는 `PMS import/bootstrap -> EMS workspace -> GMS preview` 흐름까지 반영 완료
-- `apps/web`의 `EMS` 화면은 Spring Boot `workspace analysis` 결과를 받아 추천값 적용 가능
+- `apps/web`의 `EMS` 화면은 Spring Boot `workspace overview`와 EMS DB 공개 playlist pool을 한 화면에서 표시
+- `apps/web` 공통 플레이어는 새 재생 시작 전 초기화한 뒤 TIDAL resolve/stream 준비 상태를 spinner와 메시지로 표시
 - `apps/desktop`는 향후 Windows 앱 개발을 위한 예약 구조 생성 완료
 - `services/api`는 `GET /api/v1/platforms/catalog` 엔드포인트로 플랫폼 역할과 온보딩 흐름 제공
 - 플랫폼 카탈로그에는 `TIDAL`, `YouTube Music`, `Apple Music`, `Last.fm`까지 포함되며, 확장 순서는 `Spotify -> TIDAL -> YouTube Music`, Apple Music은 개발자 계정 준비 전까지 보류로 고정됨
@@ -110,6 +111,7 @@ my-forever-music/
 - `services/api`의 `PMS workspace bootstrap`는 현재 정식 `PMS user library`를 raw import snapshot보다 우선 사용함
 - `services/api`는 PMS workspace bootstrap과 `services/ai` preview 호출용 GMS 브리지 엔드포인트 생성 완료
 - `services/api`는 PMS seed 기반 `EMS workspace analysis` 엔드포인트 추가 완료
+- `services/api`는 EMS collection browse/detail, EMS overview, TIDAL playback target resolve endpoint를 제공
 - `services/api`는 `local` 프로필 기준으로 DB 없이 로컬 부팅 검증 완료
 - `services/api`의 `PMS bootstrap`과 `GMS preview -> services/ai` 브리지 응답 검증 완료
 - `services/api`는 import 전 PMS workspace가 가짜 seed를 노출하지 않도록 빈 라이브러리 상태를 반환함
@@ -137,7 +139,7 @@ my-forever-music/
 - 사용자 제작 playlist와 추천 결과 저장/평가 도메인 확장
 - 사이트 내부 음악 감상 행동 이벤트 저장
 - EMS 외부 플레이리스트 수집, GMS 추천 통과, 사용자 평가의 PMS 환류
-- 페이지 이동 간 유지되는 공통 음악 플레이어
+- 페이지 이동 간 유지되는 공통 음악 플레이어의 행동 이벤트 저장
 
 ## 다음 추천 작업
 

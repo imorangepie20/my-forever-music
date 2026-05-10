@@ -19,6 +19,7 @@ PID_DIR="${RUNTIME_DIR}/pids"
 DB_COMPOSE_FILE="${DOCKER_DIR}/docker-compose.local-db.yml"
 DOMAIN_PROXY_COMPOSE_FILE="${DOCKER_DIR}/docker-compose.macbook-domain-proxy.yml"
 DOCKER_ENV_FILE="${DOCKER_DIR}/.env.local"
+AI_ENV_FILE="${AI_DIR}/.env.local"
 API_ENV_FILE="${API_DIR}/.env.local"
 WEB_ENV_FILE="${WEB_DIR}/.env.local"
 
@@ -290,6 +291,8 @@ restart_docker_services() {
 }
 
 restart_ai() {
+  source_optional_env_file "${AI_ENV_FILE}"
+
   if [[ ! -x "${AI_DIR}/.venv/bin/uvicorn" ]]; then
     echo "Missing AI virtualenv executable: ${AI_DIR}/.venv/bin/uvicorn" >&2
     echo "Create it with: cd ${AI_DIR} && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements-dev.txt" >&2
@@ -319,7 +322,10 @@ restart_api() {
   local resolved_profile="${SPRING_PROFILES_ACTIVE:-database}"
   local resolved_api_port="${API_PORT:-8081}"
   local resolved_db_port="5433"
-  local resolved_ai_url="${AI_SERVICE_BASE_URL:-http://localhost:${AI_PORT}}"
+  local resolved_ai_url="http://127.0.0.1:${AI_PORT}"
+  if grep -q '^[[:space:]]*AI_SERVICE_BASE_URL=' "${API_ENV_FILE}"; then
+    resolved_ai_url="${AI_SERVICE_BASE_URL:-${resolved_ai_url}}"
+  fi
 
   stop_screen_session "${API_SCREEN_SESSION}" "api"
   stop_port_listener "${resolved_api_port}" "api"

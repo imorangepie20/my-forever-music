@@ -54,9 +54,20 @@ info:
     description: Spring Boot API scaffold for My Forever Music
 
 app:
+  ems:
+    discovery:
+      enabled: ${EMS_DISCOVERY_ENABLED:true}
+      user-id: ${EMS_DISCOVERY_USER_ID:}
+      refresh-interval-ms: ${EMS_DISCOVERY_REFRESH_INTERVAL_MS:21600000}
+      initial-delay-ms: ${EMS_DISCOVERY_INITIAL_DELAY_MS:0}
+      per-query-limit: ${EMS_DISCOVERY_PER_QUERY_LIMIT:5}
+      display-limit: ${EMS_DISCOVERY_DISPLAY_LIMIT:12}
+      platforms: ${EMS_DISCOVERY_PLATFORMS:tidal,spotify}
+      seed-queries: ${EMS_DISCOVERY_SEED_QUERIES:tidal:THE_HITS,tidal:POPULAR_MIXES,tidal:POPULAR_PLAYLISTS,tidal:FROM_OUR_EDITORS,spotify:featured-playlists,spotify:category:toplists}
   ai:
-    base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
+    base-url: ${AI_SERVICE_BASE_URL:http://127.0.0.1:8000}
     recommendation-preview-path: ${AI_RECOMMENDATION_PREVIEW_PATH:/v1/recommendations/preview}
+    ems-overview-path: ${AI_EMS_OVERVIEW_PATH:/v1/ems/overview}
   audio-features:
     reccobeats:
       enabled: ${RECCOBEATS_ENABLED:true}

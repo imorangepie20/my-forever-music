@@ -5,7 +5,6 @@ import io.myforevermusic.api.modules.auth.application.AuthRegisteredAccount;
 import io.myforevermusic.api.modules.ems.presentation.EmsWorkspaceAnalysisRequest;
 import io.myforevermusic.api.modules.ems.presentation.EmsWorkspaceAnalysisResponse;
 import io.myforevermusic.api.modules.platform.application.LastFmScrobbleStore;
-import io.myforevermusic.api.modules.platform.infrastructure.lastfm.LastFmWebApiClient;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsCatalogPlaylistTrackEntity;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsCatalogPlaylistTrackRepository;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsCatalogTrackEntity;
@@ -34,20 +33,17 @@ public class EmsWorkspaceAnalysisService {
     private final Optional<PmsCatalogPlaylistTrackRepository> playlistTrackRepository;
     private final AuthAccountStore authAccountStore;
     private final LastFmScrobbleStore lastFmScrobbleStore;
-    private final Optional<LastFmWebApiClient> lastFmWebApiClient;
 
     public EmsWorkspaceAnalysisService(
         Optional<PmsCatalogTrackRepository> trackRepository,
         Optional<PmsCatalogPlaylistTrackRepository> playlistTrackRepository,
         AuthAccountStore authAccountStore,
-        LastFmScrobbleStore lastFmScrobbleStore,
-        Optional<LastFmWebApiClient> lastFmWebApiClient
+        LastFmScrobbleStore lastFmScrobbleStore
     ) {
         this.trackRepository = trackRepository;
         this.playlistTrackRepository = playlistTrackRepository;
         this.authAccountStore = authAccountStore;
         this.lastFmScrobbleStore = lastFmScrobbleStore;
-        this.lastFmWebApiClient = lastFmWebApiClient;
     }
 
     public EmsWorkspaceAnalysisResponse analyzeWorkspace(EmsWorkspaceAnalysisRequest request) {
@@ -192,28 +188,7 @@ public class EmsWorkspaceAnalysisService {
             return;
         }
 
-        if (lastFmWebApiClient.isEmpty()) {
-            return;
-        }
-
-        try {
-            List<String> topArtists = lastFmWebApiClient.get()
-                .getTopArtists(username, "1month", 5)
-                .stream()
-                .map(LastFmWebApiClient.LastFmTopArtist::artistName)
-                .filter(Objects::nonNull)
-                .toList();
-
-            if (topArtists.isEmpty()) {
-                return;
-            }
-
-            double weight = explicitArtistSeeds.isEmpty() ? 0.9 : 0.45;
-            addSignals(artistSignals, topArtists, weight);
-            notes.add("Linked Last.fm profile '%s' contributed top artist affinity signals to this EMS pass.".formatted(username));
-        } catch (IllegalArgumentException exception) {
-            warnings.add("Last.fm profile signals could not be blended into EMS analysis: %s".formatted(exception.getMessage()));
-        }
+        warnings.add("Last.fm profile '%s' has no stored scrobble snapshot, so EMS skipped live provider lookup.".formatted(username));
     }
 
     private List<String> resolveStoredLastFmArtists(String userId, int limit) {

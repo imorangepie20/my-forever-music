@@ -94,6 +94,62 @@ public class SpotifyWebApiClient {
         return new SpotifySearchResult<>(results, total);
     }
 
+    public SpotifySearchResult<SpotifyPlaylistSummary> getFeaturedPlaylists(
+        PlatformAccountCredential credential,
+        int limit
+    ) {
+        int clampedLimit = Math.min(Math.max(limit, 1), 50);
+        SpotifyBrowsePlaylistEnvelope payload = get(
+            credential,
+            buildApiUri("/browse/featured-playlists?limit=%d".formatted(clampedLimit)),
+            SpotifyBrowsePlaylistEnvelope.class
+        );
+        return toPlaylistSearchResult(payload.playlists());
+    }
+
+    public SpotifySearchResult<SpotifyPlaylistSummary> getCategoryPlaylists(
+        PlatformAccountCredential credential,
+        String categoryId,
+        int limit
+    ) {
+        int clampedLimit = Math.min(Math.max(limit, 1), 50);
+        SpotifyBrowsePlaylistEnvelope payload = get(
+            credential,
+            buildApiUri("/browse/categories/%s/playlists?limit=%d".formatted(
+                URLEncoder.encode(categoryId, StandardCharsets.UTF_8),
+                clampedLimit
+            )),
+            SpotifyBrowsePlaylistEnvelope.class
+        );
+        return toPlaylistSearchResult(payload.playlists());
+    }
+
+    private SpotifySearchResult<SpotifyPlaylistSummary> toPlaylistSearchResult(SpotifyPlaylistPageResponse page) {
+        List<SpotifyPlaylistItemResponse> items = Optional.ofNullable(page)
+            .map(SpotifyPlaylistPageResponse::items)
+            .orElse(List.of());
+
+        List<SpotifyPlaylistSummary> results = items.stream()
+            .filter(item -> item != null && item.id() != null && !item.id().isBlank())
+            .map(item -> new SpotifyPlaylistSummary(
+                item.id(),
+                item.name() == null || item.name().isBlank() ? "Untitled Spotify Playlist" : item.name(),
+                item.description(),
+                item.owner() == null ? null : item.owner().id(),
+                item.owner() == null || item.owner().displayName() == null || item.owner().displayName().isBlank()
+                    ? "Spotify" : item.owner().displayName(),
+                item.collaborative() != null && item.collaborative(),
+                item.tracks() == null || item.tracks().total() == null ? 0 : item.tracks().total(),
+                firstImageUrl(item.images()),
+                spotifyExternalUrl(item.externalUrls()),
+                item.uri()
+            ))
+            .toList();
+
+        int total = page != null && page.total() != null ? page.total() : results.size();
+        return new SpotifySearchResult<>(results, total);
+    }
+
     public SpotifySearchResult<SpotifyPlaylistTrack> searchTracks(
         PlatformAccountCredential credential,
         String query,
@@ -126,6 +182,7 @@ public class SpotifyWebApiClient {
                 spotifyExternalUrl(track.externalUrls()),
                 track.uri(),
                 track.previewUrl(),
+                spotifyIsrc(track.externalIds()),
                 track.durationMs()
             ))
             .toList();
@@ -206,6 +263,7 @@ public class SpotifyWebApiClient {
                     spotifyExternalUrl(track.externalUrls()),
                     track.uri(),
                     track.previewUrl(),
+                    spotifyIsrc(track.externalIds()),
                     track.durationMs()
                 ))
                 .forEach(tracks::add);
@@ -344,6 +402,13 @@ public class SpotifyWebApiClient {
         return externalUrls.spotify();
     }
 
+    private String spotifyIsrc(SpotifyExternalIdsResponse externalIds) {
+        if (externalIds == null || externalIds.isrc() == null || externalIds.isrc().isBlank()) {
+            return null;
+        }
+        return externalIds.isrc().trim().toUpperCase();
+    }
+
     private String readErrorMessage(int statusCode, String body) {
         if (statusCode == 401) {
             return "Spotify access token is invalid or expired. Reconnect Spotify and try again.";
@@ -394,8 +459,35 @@ public class SpotifyWebApiClient {
         String externalUrl,
         String spotifyUri,
         String previewUrl,
+        String isrc,
         Integer durationMs
     ) {
+        public SpotifyPlaylistTrack(
+            String spotifyTrackId,
+            String title,
+            String artistName,
+            String albumTitle,
+            String albumImageUrl,
+            String trackHref,
+            String externalUrl,
+            String spotifyUri,
+            String previewUrl,
+            Integer durationMs
+        ) {
+            this(
+                spotifyTrackId,
+                title,
+                artistName,
+                albumTitle,
+                albumImageUrl,
+                trackHref,
+                externalUrl,
+                spotifyUri,
+                previewUrl,
+                null,
+                durationMs
+            );
+        }
     }
 
     public record SpotifyAudioFeaturesSnapshot(
@@ -486,6 +578,7 @@ public class SpotifyWebApiClient {
         String uri,
         @JsonProperty("external_urls") SpotifyExternalUrlsResponse externalUrls,
         @JsonProperty("preview_url") String previewUrl,
+        @JsonProperty("external_ids") SpotifyExternalIdsResponse externalIds,
         @JsonProperty("duration_ms") Integer durationMs,
         @JsonProperty("is_local") Boolean isLocal,
         SpotifyAlbumResponse album,
@@ -517,6 +610,12 @@ public class SpotifyWebApiClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     record SpotifyExternalUrlsResponse(
         String spotify
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SpotifyExternalIdsResponse(
+        String isrc
     ) {
     }
 
@@ -564,6 +663,13 @@ public class SpotifyWebApiClient {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record SpotifySearchPlaylistEnvelope(
+        SpotifyPlaylistPageResponse playlists
+    ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record SpotifyBrowsePlaylistEnvelope(
+        String message,
         SpotifyPlaylistPageResponse playlists
     ) {
     }

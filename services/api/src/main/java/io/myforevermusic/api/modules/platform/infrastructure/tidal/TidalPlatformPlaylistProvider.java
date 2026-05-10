@@ -177,6 +177,13 @@ public class TidalPlatformPlaylistProvider implements PlatformPlaylistProvider {
             track.externalUrl(),
             track.tidalUri(),
             track.previewUrl(),
+            track.isrc(),
+            audioFeaturesSnapshot == null ? null : audioFeaturesSnapshot.spotifyTrackId(),
+            audioFeaturesSnapshot == null ? null : buildSpotifyUri(audioFeaturesSnapshot.spotifyTrackId()),
+            track.tidalTrackId(),
+            track.tidalUri(),
+            "tidal",
+            "native",
             seed,
             resolveTrackAudioFeatures(track, audioFeaturesSnapshot, resolvedAt)
         );

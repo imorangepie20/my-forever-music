@@ -44,6 +44,13 @@ public class PmsUserLibrarySyncService {
                         track.platformExternalUrl(),
                         track.platformUri(),
                         track.previewUrl(),
+                        track.isrc(),
+                        track.spotifyTrackId(),
+                        track.spotifyUri(),
+                        track.tidalTrackId(),
+                        track.tidalUri(),
+                        track.preferredPlaybackPlatform(),
+                        track.playbackTargetStatus(),
                         track.sortOrder(),
                         track.seed(),
                         track.audioFeatures()

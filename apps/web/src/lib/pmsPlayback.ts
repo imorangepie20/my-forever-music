@@ -28,9 +28,20 @@ export const resolvePmsTrackSpotifyId = (track: {
     external_track_id?: string | null
     spotify_track_id?: string | null
     audio_feature_track_id?: string | null
+    spotify_uri?: string | null
     platform_uri?: string | null
     platform_external_url?: string | null
 }) => {
+    const fromSpotifyUri = extractSpotifyTrackIdFromUrl(track.spotify_uri)
+    if (fromSpotifyUri) {
+        return fromSpotifyUri
+    }
+
+    const fromSpotifyTrackId = extractSpotifyTrackIdFromUrl(track.spotify_track_id)
+    if (fromSpotifyTrackId) {
+        return fromSpotifyTrackId
+    }
+
     const fromPlatformUri = extractSpotifyTrackIdFromUrl(track.platform_uri)
     if (fromPlatformUri) {
         return fromPlatformUri
@@ -46,11 +57,6 @@ export const resolvePmsTrackSpotifyId = (track: {
         return fromExternalTrackId
     }
 
-    const fromSpotifyTrackId = extractSpotifyTrackIdFromUrl(track.spotify_track_id)
-    if (track.source_platform === 'spotify' && fromSpotifyTrackId) {
-        return fromSpotifyTrackId
-    }
-
     if (track.source_platform === 'spotify') {
         return extractSpotifyTrackIdFromUrl(track.audio_feature_track_id)
     }
@@ -61,18 +67,27 @@ export const resolvePmsTrackSpotifyId = (track: {
 export const resolvePmsTrackTidalId = (track: {
     source_platform: string
     external_track_id?: string | null
+    tidal_track_id?: string | null
+    tidal_uri?: string | null
     platform_uri?: string | null
     platform_external_url?: string | null
 }) => {
-    if (track.source_platform !== 'tidal') {
-        return null
+    const fromTidalUri = extractTidalTrackIdFromUrl(track.tidal_uri)
+    if (fromTidalUri) {
+        return fromTidalUri
     }
 
-    return (
+    const fromTidalTrackId = extractTidalTrackIdFromUrl(track.tidal_track_id)
+    if (fromTidalTrackId) {
+        return fromTidalTrackId
+    }
+
+    const nativeTidalTrackId = (
         extractTidalTrackIdFromUrl(track.platform_uri) ??
         extractTidalTrackIdFromUrl(track.platform_external_url) ??
         extractTidalTrackIdFromUrl(track.external_track_id)
     )
+    return track.source_platform === 'tidal' ? nativeTidalTrackId : null
 }
 
 export const resolvePmsPlaybackPlatformId = (
@@ -105,6 +120,9 @@ export const toPmsTrackPlaybackItem = (
 ): PlaybackMediaItem => {
     const spotifyTrackId = resolvePmsTrackSpotifyId(track)
     const tidalTrackId = resolvePmsTrackTidalId(track)
+    const playbackPlatformId =
+        track.preferred_playback_platform ??
+        resolvePmsPlaybackPlatformId(track.source_platform, spotifyTrackId, tidalTrackId)
 
     return {
         id: `pms-track:${track.track_id}`,
@@ -112,7 +130,8 @@ export const toPmsTrackPlaybackItem = (
         title: track.title,
         subtitle: `${track.artist_name} · ${track.source_platform}`,
         sourcePlatform: track.source_platform,
-        playbackPlatformId: resolvePmsPlaybackPlatformId(track.source_platform, spotifyTrackId, tidalTrackId),
+        playbackPlatformId,
+        externalTrackId: track.external_track_id,
         imageUrl: track.album_image_url,
         albumTitle: track.album_title,
         externalUrl: track.platform_external_url,
@@ -120,6 +139,7 @@ export const toPmsTrackPlaybackItem = (
         previewUrl: track.preview_url,
         spotifyTrackId,
         tidalTrackId,
+        isrc: track.isrc,
         durationMs: track.duration_ms,
         supportingText: playlistTitle ?? null,
     }

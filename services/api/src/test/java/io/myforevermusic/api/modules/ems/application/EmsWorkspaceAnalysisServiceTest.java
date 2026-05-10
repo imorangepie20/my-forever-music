@@ -10,9 +10,7 @@ import io.myforevermusic.api.modules.auth.application.AuthRegistrationService;
 import io.myforevermusic.api.modules.auth.infrastructure.local.InMemoryAuthAccountStore;
 import io.myforevermusic.api.modules.ems.presentation.EmsWorkspaceAnalysisRequest;
 import io.myforevermusic.api.modules.ems.presentation.EmsWorkspaceAnalysisResponse;
-import io.myforevermusic.api.modules.platform.application.LastFmProperties;
 import io.myforevermusic.api.modules.platform.application.LastFmScrobbleStore;
-import io.myforevermusic.api.modules.platform.infrastructure.lastfm.LastFmWebApiClient;
 import io.myforevermusic.api.modules.platform.infrastructure.local.InMemoryLastFmScrobbleStore;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsCatalogTrackEntity;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsCatalogTrackRepository;
@@ -31,8 +29,7 @@ class EmsWorkspaceAnalysisServiceTest {
             Optional.empty(),
             Optional.empty(),
             new InMemoryAuthAccountStore(),
-            new InMemoryLastFmScrobbleStore(),
-            Optional.empty()
+            new InMemoryLastFmScrobbleStore()
         );
 
         EmsWorkspaceAnalysisResponse response = service.analyzeWorkspace(
@@ -62,8 +59,7 @@ class EmsWorkspaceAnalysisServiceTest {
             Optional.of(trackRepository),
             Optional.empty(),
             new InMemoryAuthAccountStore(),
-            new InMemoryLastFmScrobbleStore(),
-            Optional.empty()
+            new InMemoryLastFmScrobbleStore()
         );
 
         EmsWorkspaceAnalysisResponse response = service.analyzeWorkspace(
@@ -82,7 +78,7 @@ class EmsWorkspaceAnalysisServiceTest {
     }
 
     @Test
-    void shouldBlendSavedLastFmTopArtistsIntoArtistSignals() {
+    void shouldNotCallLastFmLiveProviderWhenStoredScrobblesAreMissing() {
         InMemoryAuthAccountStore authAccountStore = new InMemoryAuthAccountStore();
         AuthRegistrationService authRegistrationService = new AuthRegistrationService(
             authAccountStore,
@@ -103,8 +99,7 @@ class EmsWorkspaceAnalysisServiceTest {
             Optional.empty(),
             Optional.empty(),
             authAccountStore,
-            new InMemoryLastFmScrobbleStore(),
-            Optional.of(new FakeLastFmWebApiClient())
+            new InMemoryLastFmScrobbleStore()
         );
 
         EmsWorkspaceAnalysisResponse response = service.analyzeWorkspace(
@@ -117,10 +112,8 @@ class EmsWorkspaceAnalysisServiceTest {
             )
         );
 
-        assertThat(response.topSignals()).anyMatch(signal ->
-            signal.type().equals("artist") && signal.label().equals("The Midnight")
-        );
-        assertThat(response.notes()).anyMatch(note -> note.contains("Linked Last.fm profile 'mibeen'"));
+        assertThat(response.topSignals()).noneMatch(signal -> signal.label().equals("The Midnight"));
+        assertThat(response.warnings()).anyMatch(warning -> warning.contains("skipped live provider lookup"));
     }
 
     @Test
@@ -189,8 +182,7 @@ class EmsWorkspaceAnalysisServiceTest {
             Optional.empty(),
             Optional.empty(),
             authAccountStore,
-            scrobbleStore,
-            Optional.of(new FakeLastFmWebApiClient())
+            scrobbleStore
         );
 
         EmsWorkspaceAnalysisResponse response = service.analyzeWorkspace(
@@ -207,20 +199,5 @@ class EmsWorkspaceAnalysisServiceTest {
             signal.type().equals("artist") && signal.label().equals("Tycho")
         );
         assertThat(response.notes()).anyMatch(note -> note.contains("Stored Last.fm scrobble snapshot"));
-    }
-
-    private static final class FakeLastFmWebApiClient extends LastFmWebApiClient {
-
-        private FakeLastFmWebApiClient() {
-            super(new LastFmProperties(), new ObjectMapper());
-        }
-
-        @Override
-        public List<LastFmTopArtist> getTopArtists(String username, String period, int limit) {
-            return List.of(
-                new LastFmTopArtist("The Midnight", 1, 88L, "https://www.last.fm/music/The+Midnight", null),
-                new LastFmTopArtist("M83", 2, 56L, "https://www.last.fm/music/M83", null)
-            );
-        }
     }
 }

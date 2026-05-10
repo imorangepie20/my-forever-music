@@ -2,10 +2,13 @@ package io.myforevermusic.api.modules.platform.infrastructure.tidal;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.myforevermusic.api.modules.platform.application.PlatformAccountCredential;
 import io.myforevermusic.api.modules.platform.application.PlatformOAuthProperties;
 import java.io.IOException;
+import java.time.Duration;
+import java.time.format.DateTimeParseException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -15,6 +18,7 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.net.URLEncoder;
 import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -39,6 +43,12 @@ public class TidalWebApiClient {
 
     private static final Logger log = LoggerFactory.getLogger(TidalWebApiClient.class);
     private static final String ACCEPT_HEADER = "application/vnd.api+json";
+    private static final Map<String, String> HOME_PAGE_TITLES_BY_SOURCE_ID = Map.of(
+        "THE_HITS", "The Hits",
+        "POPULAR_MIXES", "Popular Mixes",
+        "POPULAR_PLAYLISTS", "Popular Playlists",
+        "FROM_OUR_EDITORS", "From our editors"
+    );
 
     private final PlatformOAuthProperties platformOAuthProperties;
     private final ObjectMapper objectMapper;
@@ -180,6 +190,358 @@ public class TidalWebApiClient {
     }
 
     /**
+     * Search public playlists on TIDAL.
+     */
+    public List<TidalPlaylistSummary> searchPlaylists(
+        PlatformAccountCredential credential,
+        String query,
+        int limit
+    ) {
+        String countryCode = countryCodeForCredential(credential);
+        int clampedLimit = Math.min(Math.max(limit, 1), 10);
+        try {
+            String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("%s/search?query=%s&type=playlists&countryCode=%s&limit=%d".formatted(
+                    apiBaseUri, encodedQuery, countryCode, clampedLimit
+                )))
+                .header("Accept", ACCEPT_HEADER)
+                .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
+                .header("Content-Type", "application/vnd.api+json")
+                .GET()
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log.info("TIDAL OpenAPI playlist search unavailable: {}. Falling back to legacy search boundary.", response.statusCode());
+                return searchLegacyPlaylists(credential, query, clampedLimit, countryCode);
+            }
+
+            JsonApiArrayRoot jsonApi = objectMapper.readValue(response.body(), JsonApiArrayRoot.class);
+            return Optional.ofNullable(jsonApi.data())
+                .stream()
+                .flatMap(List::stream)
+                .filter(data -> "playlists".equals(data.type()))
+                .map(this::toPlaylistSummary)
+                .toList();
+        } catch (IOException exception) {
+            throw new IllegalStateException("TIDAL playlist search response could not be parsed.", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("TIDAL playlist search request was interrupted.", exception);
+        }
+    }
+
+    /**
+     * Search tracks on TIDAL.
+     */
+    public List<TidalPlaylistTrack> searchTracks(
+        PlatformAccountCredential credential,
+        String query,
+        int limit
+    ) {
+        String countryCode = countryCodeForCredential(credential);
+        int clampedLimit = Math.min(Math.max(limit, 1), 10);
+        try {
+            String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("%s/search?query=%s&type=tracks&countryCode=%s&limit=%d".formatted(
+                    apiBaseUri, encodedQuery, countryCode, clampedLimit
+                )))
+                .header("Accept", ACCEPT_HEADER)
+                .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
+                .header("Content-Type", "application/vnd.api+json")
+                .GET()
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log.info("TIDAL OpenAPI track search unavailable: {}. Falling back to legacy search boundary.", response.statusCode());
+                return searchLegacyTracks(credential, query, clampedLimit, countryCode);
+            }
+
+            JsonApiArrayWithIncluded jsonApi = objectMapper.readValue(response.body(), JsonApiArrayWithIncluded.class);
+            Map<String, JsonApiData> includedByKey = indexIncluded(jsonApi.included());
+
+            return Optional.ofNullable(jsonApi.data())
+                .stream()
+                .flatMap(List::stream)
+                .filter(data -> "tracks".equals(data.type()))
+                .map(trackData -> toTrackFromSearch(trackData, includedByKey))
+                .toList();
+        } catch (IOException exception) {
+            throw new IllegalStateException("TIDAL track search response could not be parsed.", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("TIDAL track search request was interrupted.", exception);
+        }
+    }
+
+    public List<TidalPlaylistSummary> getHomePagePlaylists(
+        PlatformAccountCredential credential,
+        String sourceId,
+        int limit
+    ) {
+        String countryCode = countryCodeForCredential(credential);
+        int clampedLimit = Math.min(Math.max(limit, 1), 50);
+        String apiPath = sourceId == null ? null : sourceId.trim();
+        if (apiPath == null || apiPath.isBlank()) {
+            throw new IllegalArgumentException("TIDAL page source id is required.");
+        }
+
+        if (!apiPath.startsWith("pages/")) {
+            apiPath = findHomePageModuleApiPath(credential, apiPath, countryCode);
+        }
+        if (apiPath == null || apiPath.isBlank()) {
+            throw new IllegalArgumentException("TIDAL home page source was not found: %s".formatted(sourceId));
+        }
+
+        JsonNode page = getLegacyPage(credential, apiPath, countryCode);
+        java.util.ArrayList<TidalPlaylistSummary> playlists = new java.util.ArrayList<>();
+        collectPlaylistItems(page, playlists);
+        return playlists.stream()
+            .filter(playlist -> playlist.playlistId() != null && !playlist.playlistId().isBlank())
+            .limit(clampedLimit)
+            .toList();
+    }
+
+    private String findHomePageModuleApiPath(
+        PlatformAccountCredential credential,
+        String sourceId,
+        String countryCode
+    ) {
+        String expectedTitle = HOME_PAGE_TITLES_BY_SOURCE_ID.getOrDefault(sourceId.trim(), sourceId.trim());
+        JsonNode homePage = getLegacyPage(credential, "pages/home", countryCode);
+        return findShowMoreApiPath(homePage, expectedTitle);
+    }
+
+    private JsonNode getLegacyPage(
+        PlatformAccountCredential credential,
+        String apiPath,
+        String countryCode
+    ) {
+        try {
+            String cleanPath = apiPath.startsWith("/") ? apiPath.substring(1) : apiPath;
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("%s/%s?countryCode=%s&deviceType=BROWSER".formatted(
+                    legacyApiBaseUri(),
+                    cleanPath,
+                    countryCode
+                )))
+                .header("Accept", "application/json")
+                .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
+                .GET()
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new IllegalArgumentException("TIDAL page request failed (%s): %s"
+                    .formatted(response.statusCode(), response.body()));
+            }
+            return objectMapper.readTree(response.body());
+        } catch (IOException exception) {
+            throw new IllegalStateException("TIDAL page response could not be parsed.", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("TIDAL page request was interrupted.", exception);
+        }
+    }
+
+    private String findShowMoreApiPath(JsonNode node, String expectedTitle) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        if (node.isObject()) {
+            String title = text(node, "title");
+            String apiPath = text(node.path("showMore"), "apiPath");
+            if (title != null && title.equalsIgnoreCase(expectedTitle) && apiPath != null) {
+                return apiPath;
+            }
+            java.util.Iterator<JsonNode> children = node.elements();
+            while (children.hasNext()) {
+                String found = findShowMoreApiPath(children.next(), expectedTitle);
+                if (found != null) {
+                    return found;
+                }
+            }
+        } else if (node.isArray()) {
+            for (JsonNode child : node) {
+                String found = findShowMoreApiPath(child, expectedTitle);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
+    private void collectPlaylistItems(JsonNode node, java.util.List<TidalPlaylistSummary> playlists) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return;
+        }
+        if (node.isObject()) {
+            if ("PLAYLIST_LIST".equals(text(node, "type"))) {
+                JsonNode items = node.path("pagedList").path("items");
+                if (items.isArray()) {
+                    for (JsonNode item : items) {
+                        TidalPlaylistSummary playlist = toLegacyPlaylistSummary(item);
+                        if (playlist != null) {
+                            playlists.add(playlist);
+                        }
+                    }
+                }
+            }
+            java.util.Iterator<JsonNode> children = node.elements();
+            while (children.hasNext()) {
+                collectPlaylistItems(children.next(), playlists);
+            }
+        } else if (node.isArray()) {
+            for (JsonNode child : node) {
+                collectPlaylistItems(child, playlists);
+            }
+        }
+    }
+
+    private List<TidalPlaylistSummary> searchLegacyPlaylists(
+        PlatformAccountCredential credential,
+        String query,
+        int limit,
+        String countryCode
+    ) {
+        try {
+            String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("%s/search/playlists?query=%s&limit=%d&countryCode=%s".formatted(
+                    legacyApiBaseUri(), encodedQuery, limit, countryCode
+                )))
+                .header("Accept", "application/json")
+                .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
+                .GET()
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 404) {
+                log.info("TIDAL legacy playlist search endpoint is unavailable. Continuing with track search only.");
+                return List.of();
+            }
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new IllegalArgumentException("TIDAL legacy playlist search failed (%s): %s"
+                    .formatted(response.statusCode(), response.body()));
+            }
+
+            JsonNode body = objectMapper.readTree(response.body());
+            return jsonItems(body)
+                .map(this::toLegacyPlaylistSummary)
+                .filter(Objects::nonNull)
+                .toList();
+        } catch (IOException exception) {
+            throw new IllegalStateException("TIDAL legacy playlist search response could not be parsed.", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("TIDAL legacy playlist search request was interrupted.", exception);
+        }
+    }
+
+    private List<TidalPlaylistTrack> searchLegacyTracks(
+        PlatformAccountCredential credential,
+        String query,
+        int limit,
+        String countryCode
+    ) {
+        try {
+            String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("%s/search/tracks?query=%s&limit=%d&countryCode=%s".formatted(
+                    legacyApiBaseUri(), encodedQuery, limit, countryCode
+                )))
+                .header("Accept", "application/json")
+                .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
+                .GET()
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new IllegalArgumentException("TIDAL legacy track search failed (%s): %s"
+                    .formatted(response.statusCode(), response.body()));
+            }
+
+            JsonNode body = objectMapper.readTree(response.body());
+            return jsonItems(body)
+                .map(this::toLegacyTrack)
+                .filter(Objects::nonNull)
+                .toList();
+        } catch (IOException exception) {
+            throw new IllegalStateException("TIDAL legacy track search response could not be parsed.", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("TIDAL legacy track search request was interrupted.", exception);
+        }
+    }
+
+    private TidalPlaylistTrack toTrackFromSearch(
+        JsonApiData trackData,
+        Map<String, JsonApiData> includedByKey
+    ) {
+        Map<String, Object> trackAttributes = trackData.attributes();
+        List<String> artistIds = extractRelationshipIds(trackData.relationships(), "artists");
+        List<String> albumIds = extractRelationshipIds(trackData.relationships(), "albums");
+
+        String artistName = artistIds.stream()
+            .map(artistId -> includedByKey.get(resourceKey("artists", artistId)))
+            .filter(Objects::nonNull)
+            .map(JsonApiData::attributes)
+            .map(attributes -> firstNonBlank(
+                extractAttribute(attributes, "name", String.class),
+                extractAttribute(attributes, "artistName", String.class)
+            ))
+            .filter(value -> value != null && !value.isBlank())
+            .distinct()
+            .reduce((left, right) -> left + ", " + right)
+            .orElse("TIDAL Artist");
+
+        JsonApiData albumData = albumIds.stream()
+            .map(albumId -> includedByKey.get(resourceKey("albums", albumId)))
+            .filter(Objects::nonNull)
+            .findFirst()
+            .orElse(null);
+        Map<String, Object> albumAttributes = albumData == null ? null : albumData.attributes();
+
+        int durationSeconds = durationSeconds(trackAttributes);
+        String albumImageId = firstNonBlank(
+            extractAttribute(albumAttributes, "imageId", String.class),
+            extractAttribute(albumAttributes, "cover", String.class),
+            extractAttribute(albumAttributes, "coverImageId", String.class)
+        );
+        String externalUrl = firstNonBlank(
+            extractAttribute(trackAttributes, "url", String.class),
+            extractAttribute(trackAttributes, "shareUrl", String.class),
+            extractAttribute(trackAttributes, "externalUrl", String.class),
+            externalLink(trackAttributes)
+        );
+        String previewUrl = firstNonBlank(
+            extractAttribute(trackAttributes, "previewUrl", String.class),
+            extractAttribute(trackAttributes, "previewURL", String.class)
+        );
+
+        return new TidalPlaylistTrack(
+            trackData.id(),
+            firstNonBlank(extractAttribute(trackAttributes, "title", String.class), "Unknown Track"),
+            artistName,
+            firstNonBlank(
+                extractAttribute(albumAttributes, "title", String.class),
+                extractAttribute(trackAttributes, "albumTitle", String.class),
+                "TIDAL Album"
+            ),
+            buildImageUrl(albumImageId),
+            externalUrl,
+            trackData.id() == null || trackData.id().isBlank() ? null : "tidal:track:%s".formatted(trackData.id()),
+            previewUrl,
+            normalizeIsrc(extractAttribute(trackAttributes, "isrc", String.class)),
+            durationSeconds * 1000
+        );
+    }
+
+    /**
      * Get user's playlists from TIDAL.
      */
     public List<TidalPlaylistSummary> getUserPlaylists(PlatformAccountCredential credential) {
@@ -222,14 +584,44 @@ public class TidalWebApiClient {
     ) {
         String countryCode = countryCodeForCredential(credential);
         try {
+            List<String> trackIds = getPlaylistTrackIds(credential, playlistId, countryCode);
+            if (trackIds.isEmpty()) {
+                log.info("TIDAL OpenAPI playlist item relationship returned no track ids for {}. Falling back to legacy playlist tracks.", playlistId);
+                return getLegacyPlaylistTracks(credential, playlistId, countryCode);
+            }
+
+            List<TidalPlaylistTrack> tracks = trackIds.stream()
+                .map(trackId -> getTrackDetail(credential, trackId, countryCode))
+                .filter(Objects::nonNull)
+                .toList();
+            if (tracks.isEmpty()) {
+                log.info("TIDAL OpenAPI track detail returned no tracks for playlist {}. Falling back to legacy playlist tracks.", playlistId);
+                return getLegacyPlaylistTracks(credential, playlistId, countryCode);
+            }
+            return tracks;
+        } catch (IOException exception) {
+            throw new IllegalStateException("TIDAL playlist tracks response could not be parsed.", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("TIDAL playlist tracks request was interrupted.", exception);
+        }
+    }
+
+    private List<String> getPlaylistTrackIds(
+        PlatformAccountCredential credential,
+        String playlistId,
+        String countryCode
+    ) throws IOException, InterruptedException {
+        URI nextUri = URI.create("%s/playlists/%s/relationships/items?countryCode=%s".formatted(
+            apiBaseUri,
+            URLEncoder.encode(playlistId, StandardCharsets.UTF_8),
+            countryCode
+        ));
+        java.util.ArrayList<String> trackIds = new java.util.ArrayList<>();
+
+        while (nextUri != null) {
             HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(
-                    "%s/playlists/%s?countryCode=%s&include=items,items.artists,items.albums".formatted(
-                        apiBaseUri,
-                        playlistId,
-                        countryCode
-                    )
-                ))
+                .uri(nextUri)
                 .header("Accept", ACCEPT_HEADER)
                 .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
                 .GET()
@@ -237,24 +629,93 @@ public class TidalWebApiClient {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalArgumentException("TIDAL playlist tracks request failed: %s".formatted(response.statusCode()));
+                log.info("TIDAL OpenAPI playlist item relationship unavailable for {}: {}", playlistId, response.statusCode());
+                return List.of();
+            }
+
+            JsonApiArrayRoot jsonApi = objectMapper.readValue(response.body(), JsonApiArrayRoot.class);
+            Optional.ofNullable(jsonApi.data()).orElse(List.of())
+                .stream()
+                .filter(item -> "tracks".equals(item.type()))
+                .map(JsonApiData::id)
+                .filter(id -> id != null && !id.isBlank())
+                .forEach(trackIds::add);
+
+            nextUri = nextPageUri(jsonApi.links());
+        }
+
+        return trackIds;
+    }
+
+    private TidalPlaylistTrack getTrackDetail(
+        PlatformAccountCredential credential,
+        String trackId,
+        String countryCode
+    ) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("%s/tracks/%s?countryCode=%s&include=artists,albums".formatted(
+                    apiBaseUri,
+                    URLEncoder.encode(trackId, StandardCharsets.UTF_8),
+                    countryCode
+                )))
+                .header("Accept", ACCEPT_HEADER)
+                .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
+                .GET()
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log.warn("TIDAL OpenAPI track detail failed for {}: {}", trackId, response.statusCode());
+                return null;
             }
 
             JsonApiWithIncluded jsonApi = objectMapper.readValue(response.body(), JsonApiWithIncluded.class);
-            Map<String, JsonApiData> includedByKey = indexIncluded(jsonApi.included());
-
-            // Get tracks from included items
-            return Optional.ofNullable(jsonApi.included())
-                .stream()
-                .flatMap(List::stream)
-                .filter(data -> "items".equals(data.type()))
-                .map(item -> toPlaylistTrack(item, includedByKey))
-                .toList();
+            if (jsonApi.data() == null) {
+                return null;
+            }
+            return toTrackFromSearch(jsonApi.data(), indexIncluded(jsonApi.included()));
         } catch (IOException exception) {
-            throw new IllegalStateException("TIDAL playlist tracks response could not be parsed.", exception);
+            throw new IllegalStateException("TIDAL track detail response could not be parsed.", exception);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("TIDAL playlist tracks request was interrupted.", exception);
+            throw new IllegalStateException("TIDAL track detail request was interrupted.", exception);
+        }
+    }
+
+    private List<TidalPlaylistTrack> getLegacyPlaylistTracks(
+        PlatformAccountCredential credential,
+        String playlistId,
+        String countryCode
+    ) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("%s/playlists/%s/tracks?countryCode=%s&limit=50".formatted(
+                    legacyApiBaseUri(),
+                    URLEncoder.encode(playlistId, StandardCharsets.UTF_8),
+                    countryCode
+                )))
+                .header("Accept", "application/json")
+                .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
+                .GET()
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new IllegalArgumentException("TIDAL legacy playlist tracks failed (%s): %s"
+                    .formatted(response.statusCode(), response.body()));
+            }
+
+            JsonNode body = objectMapper.readTree(response.body());
+            return jsonItems(body)
+                .map(this::toLegacyTrack)
+                .filter(Objects::nonNull)
+                .toList();
+        } catch (IOException exception) {
+            throw new IllegalStateException("TIDAL legacy playlist tracks response could not be parsed.", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("TIDAL legacy playlist tracks request was interrupted.", exception);
         }
     }
 
@@ -303,7 +764,7 @@ public class TidalWebApiClient {
             .orElse(null);
         Map<String, Object> albumAttributes = albumData == null ? null : albumData.attributes();
 
-        Integer durationSeconds = extractAttribute(trackAttributes, "duration", Integer.class, 0);
+        int durationSeconds = durationSeconds(trackAttributes);
         String albumImageId = firstNonBlank(
             extractAttribute(albumAttributes, "imageId", String.class),
             extractAttribute(albumAttributes, "cover", String.class),
@@ -312,7 +773,8 @@ public class TidalWebApiClient {
         String externalUrl = firstNonBlank(
             extractAttribute(trackAttributes, "url", String.class),
             extractAttribute(trackAttributes, "shareUrl", String.class),
-            extractAttribute(trackAttributes, "externalUrl", String.class)
+            extractAttribute(trackAttributes, "externalUrl", String.class),
+            externalLink(trackAttributes)
         );
         String previewUrl = firstNonBlank(
             extractAttribute(trackAttributes, "previewUrl", String.class),
@@ -333,7 +795,7 @@ public class TidalWebApiClient {
             trackId == null || trackId.isBlank() ? null : "tidal:track:%s".formatted(trackId),
             previewUrl,
             normalizeIsrc(extractAttribute(trackAttributes, "isrc", String.class)),
-            durationSeconds == null ? 0 : durationSeconds * 1000
+            durationSeconds * 1000
         );
     }
 
@@ -389,6 +851,120 @@ public class TidalWebApiClient {
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 
+    private String legacyApiBaseUri() {
+        return trimTrailingSlash(platformOAuthProperties.getTidal().getLegacyApiBaseUri())
+            .replace("https://openapi.tidal.com/v2", "https://api.tidal.com/v1");
+    }
+
+    private java.util.stream.Stream<JsonNode> jsonItems(JsonNode body) {
+        if (body == null) {
+            return java.util.stream.Stream.empty();
+        }
+        JsonNode items = body.path("items");
+        if (!items.isArray()) {
+            items = body.path("data");
+        }
+        if (!items.isArray()) {
+            return java.util.stream.Stream.empty();
+        }
+        return java.util.stream.StreamSupport.stream(items.spliterator(), false);
+    }
+
+    private TidalPlaylistSummary toLegacyPlaylistSummary(JsonNode item) {
+        String id = firstNonBlank(text(item, "uuid"), text(item, "id"));
+        if (id == null) {
+            return null;
+        }
+        String title = firstNonBlank(text(item, "title"), text(item, "name"), "Untitled TIDAL Playlist");
+        String imageId = firstNonBlank(text(item, "squareImage"), text(item, "imageId"), text(item, "image"));
+        String externalUrl = firstNonBlank(
+            text(item, "url"),
+            text(item, "shareUrl"),
+            "https://tidal.com/playlist/%s".formatted(id)
+        );
+        String curator = firstNonBlank(
+            text(item.path("creator"), "name"),
+            text(item.path("owner"), "name"),
+            "TIDAL"
+        );
+        return new TidalPlaylistSummary(
+            id,
+            title,
+            firstNonBlank(text(item, "description"), curator),
+            firstInt(item, "numberOfTracks", "tracksCount", "trackCount"),
+            imageId,
+            buildImageUrl(imageId),
+            externalUrl,
+            id
+        );
+    }
+
+    private TidalPlaylistTrack toLegacyTrack(JsonNode item) {
+        String id = text(item, "id");
+        if (id == null) {
+            return null;
+        }
+        String albumImageId = firstNonBlank(
+            text(item.path("album"), "cover"),
+            text(item.path("album"), "imageId"),
+            text(item, "imageId")
+        );
+        String externalUrl = firstNonBlank(
+            text(item, "url"),
+            text(item, "shareUrl"),
+            "https://tidal.com/browse/track/%s".formatted(id)
+        );
+        int durationSeconds = firstInt(item, "duration");
+        return new TidalPlaylistTrack(
+            id,
+            firstNonBlank(text(item, "title"), "Unknown Track"),
+            firstNonBlank(
+                text(item.path("artist"), "name"),
+                text(item.path("artists").path(0), "name"),
+                "TIDAL Artist"
+            ),
+            firstNonBlank(text(item.path("album"), "title"), text(item, "albumTitle"), "TIDAL Album"),
+            buildImageUrl(albumImageId),
+            externalUrl,
+            "tidal:track:%s".formatted(id),
+            firstNonBlank(text(item, "previewUrl"), text(item, "previewURL")),
+            normalizeIsrc(text(item, "isrc")),
+            durationSeconds <= 0 ? 0 : durationSeconds * 1000
+        );
+    }
+
+    private String text(JsonNode node, String field) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        JsonNode value = node.path(field);
+        if (value.isMissingNode() || value.isNull()) {
+            return null;
+        }
+        String text = value.asText(null);
+        return text == null || text.isBlank() ? null : text.trim();
+    }
+
+    private int firstInt(JsonNode node, String... fields) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return 0;
+        }
+        for (String field : fields) {
+            JsonNode value = node.path(field);
+            if (value.isNumber()) {
+                return value.asInt();
+            }
+            if (value.isTextual()) {
+                try {
+                    return Integer.parseInt(value.asText());
+                } catch (NumberFormatException ignored) {
+                    // Continue to the next field.
+                }
+            }
+        }
+        return 0;
+    }
+
     private Map<String, JsonApiData> indexIncluded(List<JsonApiData> included) {
         Map<String, JsonApiData> indexed = new LinkedHashMap<>();
         if (included == null) {
@@ -402,6 +978,30 @@ public class TidalWebApiClient {
             indexed.put(resourceKey(data.type(), data.id()), data);
         }
         return indexed;
+    }
+
+    private URI nextPageUri(Map<String, Object> links) {
+        if (links == null) {
+            return null;
+        }
+        Object next = links.get("next");
+        if (next == null) {
+            return null;
+        }
+        String href = null;
+        if (next instanceof String value) {
+            href = value;
+        } else if (next instanceof Map<?, ?> nextMap) {
+            Object nestedHref = nextMap.get("href");
+            href = nestedHref == null ? null : nestedHref.toString();
+        }
+        if (href == null || href.isBlank()) {
+            return null;
+        }
+        if (href.startsWith("http://") || href.startsWith("https://")) {
+            return URI.create(href);
+        }
+        return URI.create("%s%s".formatted(apiBaseUri, href.startsWith("/") ? href : "/" + href));
     }
 
     private String resourceKey(String type, String id) {
@@ -442,6 +1042,52 @@ public class TidalWebApiClient {
         return value == null || value.isBlank() ? null : value.trim().toUpperCase();
     }
 
+    private int durationSeconds(Map<String, Object> attributes) {
+        if (attributes == null) {
+            return 0;
+        }
+        Object value = attributes.get("duration");
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String text) {
+            String trimmed = text.trim();
+            if (trimmed.isBlank()) {
+                return 0;
+            }
+            try {
+                return Integer.parseInt(trimmed);
+            } catch (NumberFormatException ignored) {
+                // TIDAL OpenAPI track detail returns ISO-8601 durations like PT40S.
+            }
+            try {
+                return Math.toIntExact(Duration.parse(trimmed).toSeconds());
+            } catch (DateTimeParseException | ArithmeticException ignored) {
+                return 0;
+            }
+        }
+        return 0;
+    }
+
+    private String externalLink(Map<String, Object> attributes) {
+        if (attributes == null) {
+            return null;
+        }
+        Object links = attributes.get("externalLinks");
+        if (!(links instanceof List<?> linkList)) {
+            return null;
+        }
+        return linkList.stream()
+            .filter(Map.class::isInstance)
+            .map(Map.class::cast)
+            .map(link -> link.get("href"))
+            .filter(Objects::nonNull)
+            .map(Object::toString)
+            .filter(value -> !value.isBlank())
+            .findFirst()
+            .orElse(null);
+    }
+
     private String firstNonBlank(String... values) {
         for (String value : values) {
             if (value != null && !value.isBlank()) {
@@ -460,12 +1106,19 @@ public class TidalWebApiClient {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record JsonApiArrayRoot(
-        @JsonProperty("data") List<JsonApiData> data
+        @JsonProperty("data") List<JsonApiData> data,
+        @JsonProperty("links") Map<String, Object> links
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record JsonApiWithIncluded(
         @JsonProperty("data") JsonApiData data,
+        @JsonProperty("included") List<JsonApiData> included
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record JsonApiArrayWithIncluded(
+        @JsonProperty("data") List<JsonApiData> data,
         @JsonProperty("included") List<JsonApiData> included
     ) {}
 

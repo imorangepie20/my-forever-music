@@ -13,6 +13,8 @@
 
 사용자가 이 서비스를 왜 반복적으로 쓰는지에 대한 제품 관점은 [product/USER_MUSIC_HOME_VISION.md](/Users/woosungjo/music-space/my-forever-music/docs/product/USER_MUSIC_HOME_VISION.md) 를 함께 봅니다.
 
+PMS 중심 감상 경험과 EMS 공개 playlist 풀 수집/노출 기준은 [product/MUSIC_DISCOVERY_AND_LISTENING_UX.md](/Users/woosungjo/music-space/my-forever-music/docs/product/MUSIC_DISCOVERY_AND_LISTENING_UX.md) 를 따릅니다.
+
 사용자 플로우에는 mock data나 sandbox provider를 기본값으로 노출하지 않습니다. 실제 구현 기준은 [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md) 를 따릅니다.
 
 오류는 모든 프로젝트 영역에서 우회, 회피, 임시 처리, 에러 숨김으로 넘기지 않습니다. 실패한 경계와 근본 원인을 확인하고 수정하는 기준 역시 [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md) 를 따릅니다.
@@ -107,20 +109,21 @@ docs/
 2. [PROJECT_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_GUIDE.md)
 3. [PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md)
 4. [USER_MUSIC_HOME_VISION.md](/Users/woosungjo/music-space/my-forever-music/docs/product/USER_MUSIC_HOME_VISION.md)
-5. [REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md)
-6. [MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md)
-7. [DATABASE_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DATABASE_SETUP_GUIDE.md)
-8. [TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md)
-9. [AUDIO_FEATURE_PROVIDER_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/AUDIO_FEATURE_PROVIDER_STRATEGY.md)
-10. [DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md)
-11. [SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md)
-12. [HTTPS_DOMAIN_DEV_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/HTTPS_DOMAIN_DEV_SETUP.md)
-13. [ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
-14. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
-15. [docs/api/README.md](/Users/woosungjo/music-space/my-forever-music/docs/api/README.md)
-16. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
-17. [UBUNTU_SERVER_RUNBOOK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_RUNBOOK.md)
-18. [UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
+5. [MUSIC_DISCOVERY_AND_LISTENING_UX.md](/Users/woosungjo/music-space/my-forever-music/docs/product/MUSIC_DISCOVERY_AND_LISTENING_UX.md)
+6. [REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md)
+7. [MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md)
+8. [DATABASE_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DATABASE_SETUP_GUIDE.md)
+9. [TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md)
+10. [AUDIO_FEATURE_PROVIDER_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/AUDIO_FEATURE_PROVIDER_STRATEGY.md)
+11. [DESKTOP_APP_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/DESKTOP_APP_STRATEGY.md)
+12. [SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md)
+13. [HTTPS_DOMAIN_DEV_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/HTTPS_DOMAIN_DEV_SETUP.md)
+14. [ADR-001-backend-stack.md](/Users/woosungjo/music-space/my-forever-music/docs/decisions/ADR-001-backend-stack.md)
+15. [services/api/README.md](/Users/woosungjo/music-space/my-forever-music/services/api/README.md)
+16. [docs/api/README.md](/Users/woosungjo/music-space/my-forever-music/docs/api/README.md)
+17. [services/ai/README.md](/Users/woosungjo/music-space/my-forever-music/services/ai/README.md)
+18. [UBUNTU_SERVER_RUNBOOK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_RUNBOOK.md)
+19. [UBUNTU_SERVER_SETUP_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/UBUNTU_SERVER_SETUP_GUIDE.md)
 
 ## 7. 앞으로 문서를 갱신하는 규칙
 
@@ -182,6 +185,10 @@ docs/
 - `POST /api/v1/gms/recommendations/preview`도 저장된 Last.fm scrobble snapshot의 artist recurrence를 우선 seed artist에 blend 하고, 비어 있으면 live top artist 조회로 fallback 함
 - `GET /api/v1/pms/workspace/bootstrap` 응답 검증 완료
 - `POST /api/v1/ems/workspace/analysis` 응답 경로 추가 완료
+- `POST /api/v1/ems/workspace/overview`는 deterministic EMS 상태와 AI 해석을 묶어 EMS overview 화면에 제공함
+- `GET /api/v1/ems/collection/playlists`와 `GET /api/v1/ems/collection/playlists/{playlistId}`는 EMS DB에 저장된 공개 playlist와 ordered track detail을 표시함
+- `POST /api/v1/ems/collection/search`는 provider 검색 preview만 수행하고, 별도 저장/가져오기 동작 전까지 EMS 테이블에 결과를 넣지 않음
+- `POST /api/v1/platforms/playback/tidal/resolve-track`는 TIDAL 재생 모드에서 타 플랫폼 track metadata를 TIDAL playable target으로 resolve 함
 - `POST /api/v1/gms/recommendations/preview`는 `services/ai`와의 브리지까지 검증 완료
 - `services/api`는 import 전 PMS workspace가 임의 demo playlist/seed를 노출하지 않고 빈 라이브러리 상태를 반환함
 - `pms_track`는 아직 `spotify_*` 이름의 legacy 오디오 특성 저장 구조를 사용하지만, 문서 기준은 provider-neutral 전략으로 전환됨
@@ -194,6 +201,9 @@ docs/
 - `apps/web`는 가입 후 세션을 로컬에 저장하고 `/platforms`에서 Spotify OAuth redirect를 처리할 수 있음
 - `apps/web`는 `/pms`에서 platform playlist import와 사용자별 workspace bootstrap을 사용할 수 있음
 - `apps/web`는 `/pms`, `/ems`, `/gms-preview`에서 playlist cover, album image, playable track card, global playback dock을 공유함
+- `apps/web`의 EMS 화면은 overview와 DB 기반 공개 playlist pool을 탭 없이 한 화면에 표시함
+- `apps/web`는 EMS/PMS playlist 재생 시 DB detail track을 읽어 queue로 넘기고, TIDAL 모드에서는 track별 TIDAL target resolve 후 재생함
+- `apps/web` 공통 player는 새 재생 시작 전 기존 player state를 초기화하고, provider resolve/stream 준비 중 spinner와 상태 메시지를 표시함
 - `GET /api/v1/pms/workspace/bootstrap`는 optional `playlist_id` 기준으로 현재 음악 컨텍스트를 다시 투영함
 - `POST /api/v1/gms/recommendations/preview`는 가능하면 synthetic item 대신 `PMS user library`의 실제 playable track으로 재매핑함
 - `POST /api/v1/gms/recommendations/feedback`는 GMS 추천 후보에 대한 like/dislike/save/skip 평가를 저장함

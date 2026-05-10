@@ -7,6 +7,7 @@
 - [PROJECT_GUIDE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_GUIDE.md): 새 세션과 새 작업자가 먼저 읽어야 하는 통합 가이드
 - [PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md): 서비스 핵심 기능과 장기 제품 흐름의 원문 정의
 - [product/USER_MUSIC_HOME_VISION.md](/Users/woosungjo/music-space/my-forever-music/docs/product/USER_MUSIC_HOME_VISION.md): 사용자가 사이트에 머무는 이유, 플랫폼 이동 후에도 보존되는 음악 취향 홈, 플랫폼 연동 이후 사용자별 음악 학습 모델 개발 순서 정의
+- [product/MUSIC_DISCOVERY_AND_LISTENING_UX.md](/Users/woosungjo/music-space/my-forever-music/docs/product/MUSIC_DISCOVERY_AND_LISTENING_UX.md): PMS 중심 감상 경험, EMS Discovery Pool, 공개 플레이리스트 주기 수집/랜덤 노출 UI 구성 기준
 - [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md): mock/sandbox 없이 실제 구현된 기능만 사용자 플로우에 노출하는 기준
 - [architecture/MACBOOK_LOCAL_FIRST_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/MACBOOK_LOCAL_FIRST_PLAN.md): 현재는 MacBook 로컬에서 구현/시험 후 Ubuntu로 이전하는 실행 전략
 - [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md): MacBook 시험 서비스에서 실제 API/저장소/provider만 기본 사용자 경로로 쓰는 정책
@@ -24,6 +25,7 @@
 
 - [PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md): 플랫폼 연동, 오디오 특성 분석, PMS/EMS/GMS 환류, 플레이어 유지 요구사항을 담은 핵심 서비스 정의
 - [product/USER_MUSIC_HOME_VISION.md](/Users/woosungjo/music-space/my-forever-music/docs/product/USER_MUSIC_HOME_VISION.md): 회원의 반복 사용 목적, 사용자 소유 PMS 라이브러리, 사용자별 음악 학습 모델, 평가/playlist/playback 중심 체류 경험 정의
+- [product/MUSIC_DISCOVERY_AND_LISTENING_UX.md](/Users/woosungjo/music-space/my-forever-music/docs/product/MUSIC_DISCOVERY_AND_LISTENING_UX.md): 사용자의 목적을 `취향 추천 -> PMS 감상`으로 고정하고 EMS 공개 playlist 풀/GMS UI를 보조 흐름으로 정리하는 화면 구성 문서
 
 ## 서비스 가이드
 
@@ -43,6 +45,7 @@
 - [api/PMS_PLAYLIST_IMPORT_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_PLAYLIST_IMPORT_API.md): 실제 플랫폼 playlist import와 PMS 적재 계약
 - [api/AI_RECOMMENDATION_PREVIEW.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AI_RECOMMENDATION_PREVIEW.md): AI 추천 preview 내부 계약
 - [api/EMS_WORKSPACE_ANALYSIS_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/EMS_WORKSPACE_ANALYSIS_API.md): EMS workspace 추천값 분석 계약
+- [api/TIDAL_PLAYBACK_TARGET_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/TIDAL_PLAYBACK_TARGET_API.md): 타 플랫폼 트랙을 TIDAL 재생 target으로 resolve 하고 full stream 재생을 시작하는 계약
 - [api/GMS_RECOMMENDATION_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_PREVIEW_API.md): Spring Boot API의 GMS preview 엔드포인트 초안
 - [api/PLATFORM_CATALOG_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PLATFORM_CATALOG_API.md): 플랫폼 선택과 제품 역할 설명용 카탈로그 계약
 - [api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md): PMS track의 provider-neutral 오디오 특성 저장 기준과 legacy `spotify_*` 호환 규칙

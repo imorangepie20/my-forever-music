@@ -1,6 +1,7 @@
 package io.myforevermusic.api.modules.ems.infrastructure.persistence;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -29,6 +30,9 @@ public class EmsCollectedTrackEntity {
     @Column(name = "source_platform", nullable = false, length = 50)
     private String sourcePlatform;
 
+    @Column(name = "isrc", length = 32)
+    private String isrc;
+
     @Column(name = "album_title", length = 200)
     private String albumTitle;
 
@@ -53,18 +57,23 @@ public class EmsCollectedTrackEntity {
     @Column(name = "collected_at", nullable = false)
     private Instant collectedAt;
 
+    @Embedded
+    private EmsTrackAudioFeatures audioFeatures;
+
     protected EmsCollectedTrackEntity() {}
 
     public EmsCollectedTrackEntity(
         String externalTrackId, String title, String artistName,
-        String sourcePlatform, String albumTitle, String albumImageUrl,
+        String sourcePlatform, String isrc, String albumTitle, String albumImageUrl,
         String platformExternalUrl, String spotifyUri, String previewUrl,
-        Integer durationMs, String collectionSource, Instant collectedAt
+        Integer durationMs, String collectionSource, Instant collectedAt,
+        EmsTrackAudioFeatures audioFeatures
     ) {
         this.externalTrackId = externalTrackId;
         this.title = title;
         this.artistName = artistName;
         this.sourcePlatform = sourcePlatform;
+        this.isrc = isrc;
         this.albumTitle = albumTitle;
         this.albumImageUrl = albumImageUrl;
         this.platformExternalUrl = platformExternalUrl;
@@ -73,6 +82,7 @@ public class EmsCollectedTrackEntity {
         this.durationMs = durationMs;
         this.collectionSource = collectionSource;
         this.collectedAt = collectedAt;
+        this.audioFeatures = audioFeatures;
     }
 
     public Long getId() { return id; }
@@ -80,6 +90,7 @@ public class EmsCollectedTrackEntity {
     public String getTitle() { return title; }
     public String getArtistName() { return artistName; }
     public String getSourcePlatform() { return sourcePlatform; }
+    public String getIsrc() { return isrc; }
     public String getAlbumTitle() { return albumTitle; }
     public String getAlbumImageUrl() { return albumImageUrl; }
     public String getPlatformExternalUrl() { return platformExternalUrl; }
@@ -88,4 +99,5 @@ public class EmsCollectedTrackEntity {
     public Integer getDurationMs() { return durationMs; }
     public String getCollectionSource() { return collectionSource; }
     public Instant getCollectedAt() { return collectedAt; }
+    public EmsTrackAudioFeatures getAudioFeatures() { return audioFeatures; }
 }

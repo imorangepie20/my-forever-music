@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -37,7 +38,9 @@ public class PmsPlaylistImportService {
     private final PlatformPlaylistProviderRegistry platformPlaylistProviderRegistry;
     private final PmsPlaylistImportStore pmsPlaylistImportStore;
     private final PmsUserLibrarySyncService pmsUserLibrarySyncService;
+    private final PmsPlaybackTargetResolverService pmsPlaybackTargetResolverService;
 
+    @Autowired
     public PmsPlaylistImportService(
         AuthAccountStore authAccountStore,
         PlatformCatalogService platformCatalogService,
@@ -45,7 +48,8 @@ public class PmsPlaylistImportService {
         PlatformCredentialService platformCredentialService,
         PlatformPlaylistProviderRegistry platformPlaylistProviderRegistry,
         PmsPlaylistImportStore pmsPlaylistImportStore,
-        PmsUserLibrarySyncService pmsUserLibrarySyncService
+        PmsUserLibrarySyncService pmsUserLibrarySyncService,
+        PmsPlaybackTargetResolverService pmsPlaybackTargetResolverService
     ) {
         this.authAccountStore = authAccountStore;
         this.platformCatalogService = platformCatalogService;
@@ -54,6 +58,28 @@ public class PmsPlaylistImportService {
         this.platformPlaylistProviderRegistry = platformPlaylistProviderRegistry;
         this.pmsPlaylistImportStore = pmsPlaylistImportStore;
         this.pmsUserLibrarySyncService = pmsUserLibrarySyncService;
+        this.pmsPlaybackTargetResolverService = pmsPlaybackTargetResolverService;
+    }
+
+    PmsPlaylistImportService(
+        AuthAccountStore authAccountStore,
+        PlatformCatalogService platformCatalogService,
+        PlatformConnectionStore platformConnectionStore,
+        PlatformCredentialService platformCredentialService,
+        PlatformPlaylistProviderRegistry platformPlaylistProviderRegistry,
+        PmsPlaylistImportStore pmsPlaylistImportStore,
+        PmsUserLibrarySyncService pmsUserLibrarySyncService
+    ) {
+        this(
+            authAccountStore,
+            platformCatalogService,
+            platformConnectionStore,
+            platformCredentialService,
+            platformPlaylistProviderRegistry,
+            pmsPlaylistImportStore,
+            pmsUserLibrarySyncService,
+            null
+        );
     }
 
     public PmsPlaylistImportBootstrapResponse getBootstrap(String userId) {
@@ -219,6 +245,9 @@ public class PmsPlaylistImportService {
             })
             .map(playlist -> toImportedPlaylistState(account.userId(), playlist, importedAt))
             .toList();
+        if (pmsPlaybackTargetResolverService != null) {
+            importedPlaylists = pmsPlaybackTargetResolverService.enrichPlaybackTargets(account.userId(), importedPlaylists);
+        }
 
         pmsPlaylistImportStore.saveImportedPlaylists(account.userId(), importedPlaylists);
         List<PmsUserLibraryStore.LibraryPlaylistState> syncedLibraryPlaylists = pmsUserLibrarySyncService
@@ -352,6 +381,13 @@ public class PmsPlaylistImportService {
                 track.platformExternalUrl(),
                 track.platformUri(),
                 track.previewUrl(),
+                track.isrc(),
+                spotifyTrackId(playlist.sourcePlatform(), track),
+                spotifyUri(playlist.sourcePlatform(), track),
+                tidalTrackId(playlist.sourcePlatform(), track),
+                tidalUri(playlist.sourcePlatform(), track),
+                preferredPlaybackPlatform(playlist.sourcePlatform(), track),
+                track.playbackTargetStatus(),
                 playlist.tracks().indexOf(track) + 1,
                 track.seed(),
                 track.audioFeatures()
@@ -372,5 +408,58 @@ public class PmsPlaylistImportService {
             importedAt,
             tracks
         );
+    }
+
+    private String spotifyTrackId(String sourcePlatform, PmsPlaylistImportCatalogService.ImportCandidateTrack track) {
+        if (hasText(track.spotifyTrackId())) {
+            return track.spotifyTrackId();
+        }
+        if ("spotify".equals(sourcePlatform)) {
+            return track.externalTrackId();
+        }
+        return track.audioFeatures() == null ? null : track.audioFeatures().getAudioFeatureTrackId();
+    }
+
+    private String spotifyUri(String sourcePlatform, PmsPlaylistImportCatalogService.ImportCandidateTrack track) {
+        if (hasText(track.spotifyUri())) {
+            return track.spotifyUri();
+        }
+        if ("spotify".equals(sourcePlatform)) {
+            return track.platformUri();
+        }
+        String spotifyTrackId = spotifyTrackId(sourcePlatform, track);
+        return hasText(spotifyTrackId) ? "spotify:track:%s".formatted(spotifyTrackId) : null;
+    }
+
+    private String tidalTrackId(String sourcePlatform, PmsPlaylistImportCatalogService.ImportCandidateTrack track) {
+        if (hasText(track.tidalTrackId())) {
+            return track.tidalTrackId();
+        }
+        return "tidal".equals(sourcePlatform) ? track.externalTrackId() : null;
+    }
+
+    private String tidalUri(String sourcePlatform, PmsPlaylistImportCatalogService.ImportCandidateTrack track) {
+        if (hasText(track.tidalUri())) {
+            return track.tidalUri();
+        }
+        if ("tidal".equals(sourcePlatform)) {
+            return track.platformUri();
+        }
+        String tidalTrackId = tidalTrackId(sourcePlatform, track);
+        return hasText(tidalTrackId) ? "tidal:track:%s".formatted(tidalTrackId) : null;
+    }
+
+    private String preferredPlaybackPlatform(String sourcePlatform, PmsPlaylistImportCatalogService.ImportCandidateTrack track) {
+        if (hasText(track.preferredPlaybackPlatform())) {
+            return track.preferredPlaybackPlatform();
+        }
+        if ("spotify".equals(sourcePlatform) || "tidal".equals(sourcePlatform)) {
+            return sourcePlatform;
+        }
+        return null;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

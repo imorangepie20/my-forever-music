@@ -106,6 +106,13 @@ public class JpaPmsPlaylistImportStore implements PmsPlaylistImportStore {
             trackEntity.getPlatformExternalUrl(),
             trackEntity.getPlatformUri(),
             trackEntity.getPreviewUrl(),
+            trackEntity.getIsrc(),
+            trackEntity.getSpotifyTrackId(),
+            trackEntity.getSpotifyUri(),
+            trackEntity.getTidalTrackId(),
+            trackEntity.getTidalUri(),
+            trackEntity.getPreferredPlaybackPlatform(),
+            trackEntity.getPlaybackTargetStatus(),
             playlistTrackEntity.getSortOrder(),
             playlistTrackEntity.isSeed(),
             trackEntity.getAudioFeatures()

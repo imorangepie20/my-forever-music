@@ -47,6 +47,9 @@ services/ai/
 - `AI_APP_VERSION`: 서비스 버전, 기본값 `0.1.0`
 - `AI_ENV`: 실행 환경, 기본값 `local`
 - `AI_ROOT_PATH`: Nginx 뒤에서 `/ai/*`로 공개할 때 사용할 prefix
+- `AI_EMS_OVERVIEW_MODEL`: EMS Overview 해석에 사용할 LLM 모델. 비어 있으면 해석을 생성하지 않고 `model_not_configured`를 반환
+- `AI_LLM_API_KEY`: OpenAI-compatible chat completions provider API key
+- `AI_LLM_BASE_URL`: OpenAI-compatible chat completions base URL, 기본값 `https://api.openai.com/v1`
 
 `AI_ROOT_PATH`는 직접 `8000` 포트로 접근할 때는 비워두고, Ubuntu 서버에서 Nginx가 `/ai/`로 프록시할 때는 `/ai`로 주는 것을 권장합니다.
 

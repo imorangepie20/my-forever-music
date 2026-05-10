@@ -40,7 +40,7 @@ const resolvePlaybackStatusLabel = (item?: ReturnType<typeof toPmsTrackPlaybackI
         return 'Spotify ready'
     }
 
-    return 'Playback unavailable'
+    return 'TIDAL searchable'
 }
 
 const PmsPlaylistDetailPage = () => {
@@ -100,11 +100,6 @@ const PmsPlaylistDetailPage = () => {
         [detail],
     )
 
-    const playablePlaybackItems = useMemo(
-        () => playbackItems.filter((item) => resolveSpotifyTrackId(item) || resolveTidalTrackId(item)),
-        [playbackItems],
-    )
-
     const playlistPlaybackItem = useMemo(
         () => detail ? toPmsPlaylistPlaybackItem(detail.playlist) : null,
         [detail],
@@ -116,13 +111,13 @@ const PmsPlaylistDetailPage = () => {
     )
 
     const playableCount = useMemo(
-        () => playablePlaybackItems.length,
-        [playablePlaybackItems],
+        () => playbackItems.length,
+        [playbackItems],
     )
 
     const handlePlayAll = () => {
-        if (playablePlaybackItems.length > 0) {
-            void playQueue(playablePlaybackItems, 0)
+        if (playbackItems.length > 0) {
+            void playQueue(playbackItems, 0)
             return
         }
 
@@ -133,7 +128,7 @@ const PmsPlaylistDetailPage = () => {
 
     const handlePlayTrack = (index: number) => {
         const selectedItem = playbackItems[index]
-        if (!selectedItem || (!resolveSpotifyTrackId(selectedItem) && !resolveTidalTrackId(selectedItem))) {
+        if (!selectedItem) {
             return
         }
 
@@ -220,7 +215,7 @@ const PmsPlaylistDetailPage = () => {
                             <Button
                                 type="button"
                                 onClick={handlePlayAll}
-                                disabled={(playablePlaybackItems.length === 0 && !spotifyContextUri) || playbackLoading}
+                                disabled={(playbackItems.length === 0 && !spotifyContextUri) || playbackLoading}
                                 glow
                             >
                                 <Play size={18} />
@@ -252,14 +247,14 @@ const PmsPlaylistDetailPage = () => {
 
             <HudCard
                 title="Tracks"
-                subtitle={`${playableCount} playable tracks`}
+                subtitle={`${playableCount} stored tracks`}
                 action={
                     <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         onClick={handlePlayAll}
-                        disabled={(playablePlaybackItems.length === 0 && !spotifyContextUri) || playbackLoading}
+                        disabled={(playbackItems.length === 0 && !spotifyContextUri) || playbackLoading}
                     >
                         <Play size={16} />
                         Queue All
@@ -270,7 +265,7 @@ const PmsPlaylistDetailPage = () => {
                     {detail.tracks.map((track, index) => {
                         const durationLabel = formatDuration(track.duration_ms)
                         const playbackItem = playbackItems[index]
-                        const playable = Boolean(playbackItem && (resolveSpotifyTrackId(playbackItem) || resolveTidalTrackId(playbackItem)))
+                        const hasNativePlaybackTarget = Boolean(playbackItem && (resolveSpotifyTrackId(playbackItem) || resolveTidalTrackId(playbackItem)))
                         const playbackStatusLabel = resolvePlaybackStatusLabel(playbackItem)
 
                         return (
@@ -281,7 +276,7 @@ const PmsPlaylistDetailPage = () => {
                                 <button
                                     type="button"
                                     onClick={() => handlePlayTrack(index)}
-                                    disabled={playbackLoading || !playable}
+                                    disabled={playbackLoading || !playbackItem}
                                     className="flex h-12 w-12 items-center justify-center rounded-lg border border-hud-border-secondary text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-accent-primary disabled:cursor-not-allowed disabled:opacity-50"
                                     aria-label={`Play ${track.title}`}
                                 >
@@ -301,7 +296,7 @@ const PmsPlaylistDetailPage = () => {
                                     <p className="truncate text-sm text-hud-text-secondary">
                                         {track.album_title ?? 'Single'}
                                     </p>
-                                    <p className={`mt-1 truncate text-xs uppercase tracking-[0.2em] ${playable ? 'text-hud-accent-primary' : 'text-hud-text-muted'}`}>
+                                    <p className={`mt-1 truncate text-xs uppercase tracking-[0.2em] ${hasNativePlaybackTarget ? 'text-hud-accent-primary' : 'text-hud-text-muted'}`}>
                                         {playbackStatusLabel}
                                     </p>
                                 </div>

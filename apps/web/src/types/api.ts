@@ -251,6 +251,39 @@ export interface TidalPlaybackStreamResponse {
     stream_url: string
 }
 
+export interface TidalPlaybackTargetResolveRequest {
+    user_id: string
+    title: string
+    artist_name: string
+    source_platform?: string | null
+    external_track_id?: string | null
+    platform_uri?: string | null
+    spotify_track_id?: string | null
+    isrc?: string | null
+    duration_ms?: number | null
+}
+
+export interface TidalPlaybackTargetResolveResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string
+    source_platform: string | null
+    source_track_id: string | null
+    tidal_track_id: string
+    tidal_uri: string | null
+    title: string
+    artist_name: string
+    album_title: string | null
+    album_image_url: string | null
+    platform_external_url: string | null
+    preview_url: string | null
+    isrc: string | null
+    duration_ms: number | null
+    match_reason: string
+    match_score: number
+}
+
 export interface LastFmProfileConnectRequest {
     user_id: string
     username: string
@@ -513,7 +546,13 @@ export interface PmsWorkspaceBootstrapResponse {
         artist_name: string
         source_platform: string
         seed: boolean
+        isrc?: string | null
         spotify_track_id: string | null
+        spotify_uri?: string | null
+        tidal_track_id?: string | null
+        tidal_uri?: string | null
+        preferred_playback_platform?: string | null
+        playback_target_status?: string | null
         audio_feature_track_id?: string | null
         spotify_audio_features_filled: boolean
         audio_features_filled?: boolean
@@ -541,7 +580,13 @@ export interface PmsPlaylistDetailTrack extends RichTrackArtwork {
     primary_genre: string | null
     sort_order: number
     seed: boolean
+    isrc?: string | null
     spotify_track_id: string | null
+    spotify_uri?: string | null
+    tidal_track_id?: string | null
+    tidal_uri?: string | null
+    preferred_playback_platform?: string | null
+    playback_target_status?: string | null
     audio_feature_track_id?: string | null
     spotify_audio_features_filled: boolean
     audio_features_filled?: boolean
@@ -657,6 +702,7 @@ export interface PmsPersonalPlaylistTrack {
     title: string
     artist_name: string
     source_platform: string
+    isrc: string | null
     album_title: string | null
     album_image_url: string | null
     platform_external_url: string | null
@@ -818,9 +864,9 @@ export interface EmsCollectionSearchResponse {
     generated_at: string
     platform_id: string
     query: string
-    collected_playlist_count: number
-    collected_track_count: number
-    collected_at: string
+    result_playlist_count: number
+    result_track_count: number
+    searched_at: string
 }
 
 export interface EmsCollectionPlaylistItem {
@@ -832,11 +878,18 @@ export interface EmsCollectionPlaylistItem {
     description: string
     cover_image_url: string | null
     platform_external_url: string | null
+    platform_uri: string | null
     spotify_uri: string | null
     track_count: number
     collection_source: string
-    search_query: string
+    search_query: string | null
     collected_at: string
+    audio_feature_coverage: {
+        track_count: number
+        filled_track_count: number
+        pending_track_count: number
+        coverage_ratio: number
+    }
 }
 
 export interface EmsCollectionPlaylistBrowseResponse {
@@ -847,19 +900,46 @@ export interface EmsCollectionPlaylistBrowseResponse {
     playlists: EmsCollectionPlaylistItem[]
 }
 
+export interface EmsCollectionPlaylistDetailResponse {
+    service: string
+    status: string
+    generated_at: string
+    playlist: EmsCollectionPlaylistItem
+    tracks: EmsCollectionTrackItem[]
+}
+
 export interface EmsCollectionTrackItem {
     id: number
     external_track_id: string
     title: string
     artist_name: string
     source_platform: string
+    isrc: string | null
     album_title: string | null
     album_image_url: string | null
     platform_external_url: string | null
+    platform_uri: string | null
     spotify_uri: string | null
     preview_url: string | null
     duration_ms: number | null
     collected_at: string
+    audio_features: {
+        audio_feature_track_id: string | null
+        audio_feature_source: string
+        audio_features_filled: boolean
+        duration_ms: number | null
+        musical_key: number | null
+        mode: number | null
+        acousticness: number | null
+        danceability: number | null
+        energy: number | null
+        instrumentalness: number | null
+        liveness: number | null
+        loudness: number | null
+        speechiness: number | null
+        tempo: number | null
+        valence: number | null
+    }
 }
 
 export interface EmsCollectionTrackBrowseResponse {
@@ -868,6 +948,63 @@ export interface EmsCollectionTrackBrowseResponse {
     generated_at: string
     playlist_id: number | null
     tracks: EmsCollectionTrackItem[]
+}
+
+export interface EmsOverviewRequest {
+    user_id?: string
+    playlist_id?: string
+}
+
+export interface EmsOverviewResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string | null
+    playlist_id: string | null
+    pipeline_status: {
+        pms_library: string
+        ems_pool: string
+        gms_readiness: string
+    }
+    taste_model_snapshot: {
+        status: string
+        model: string | null
+        summary: string | null
+        confidence: number | null
+    }
+    candidate_direction: {
+        status: string
+        summary: string | null
+        mood: string | null
+        energy_level: number | null
+        familiarity_bias: number | null
+        confidence: number | null
+    }
+    pms_context: {
+        playlist_title: string | null
+        playlist_count: number
+        library_track_count: number
+        seed_track_count: number
+        artist_seed_count: number
+        genre_seed_count: number
+    }
+    ems_pool: {
+        playlist_count: number
+        track_count: number
+        audio_feature_filled_track_count: number
+        audio_feature_coverage_ratio: number
+        providers: Array<{
+            platform_id: string
+            playlist_count: number
+            track_count: number
+            audio_feature_filled_track_count: number
+            audio_feature_coverage_ratio: number
+            last_collected_at: string | null
+        }>
+    }
+    system_attention: string[]
+    evidence: string[]
+    warnings: string[]
 }
 
 export type GmsRecommendationFeedbackType = 'like' | 'dislike' | 'save' | 'skip'

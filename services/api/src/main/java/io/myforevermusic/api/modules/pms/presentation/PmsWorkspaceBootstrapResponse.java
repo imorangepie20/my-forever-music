@@ -54,13 +54,64 @@ public record PmsWorkspaceBootstrapResponse(
         String previewUrl,
         Integer durationMs,
         boolean seed,
+        String isrc,
         String spotifyTrackId,
+        String spotifyUri,
+        String tidalTrackId,
+        String tidalUri,
+        String preferredPlaybackPlatform,
+        String playbackTargetStatus,
         String audioFeatureTrackId,
         boolean spotifyAudioFeaturesFilled,
         boolean audioFeaturesFilled,
         String spotifyAudioFeatureSource,
         String audioFeatureSource
     ) {
+        public TrackSeedSuggestion(
+            String trackId,
+            String title,
+            String artistName,
+            String sourcePlatform,
+            String albumTitle,
+            String albumImageUrl,
+            String platformExternalUrl,
+            String platformUri,
+            String previewUrl,
+            Integer durationMs,
+            boolean seed,
+            String spotifyTrackId,
+            String audioFeatureTrackId,
+            boolean spotifyAudioFeaturesFilled,
+            boolean audioFeaturesFilled,
+            String spotifyAudioFeatureSource,
+            String audioFeatureSource
+        ) {
+            this(
+                trackId,
+                title,
+                artistName,
+                sourcePlatform,
+                albumTitle,
+                albumImageUrl,
+                platformExternalUrl,
+                platformUri,
+                previewUrl,
+                durationMs,
+                seed,
+                null,
+                spotifyTrackId,
+                spotifyTrackId == null ? null : "spotify:track:%s".formatted(spotifyTrackId),
+                null,
+                null,
+                "spotify",
+                spotifyTrackId == null || spotifyTrackId.isBlank() ? "unresolved" : "resolved",
+                audioFeatureTrackId,
+                spotifyAudioFeaturesFilled,
+                audioFeaturesFilled,
+                spotifyAudioFeatureSource,
+                audioFeatureSource
+            );
+        }
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)

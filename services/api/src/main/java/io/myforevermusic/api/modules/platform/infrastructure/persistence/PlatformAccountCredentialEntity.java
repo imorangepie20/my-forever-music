@@ -33,10 +33,10 @@ public class PlatformAccountCredentialEntity {
     @Column(name = "external_account_label", length = 200)
     private String externalAccountLabel;
 
-    @Column(name = "access_token", nullable = false, length = 500)
+    @Column(name = "access_token", nullable = false, length = 4000)
     private String accessToken;
 
-    @Column(name = "refresh_token", length = 500)
+    @Column(name = "refresh_token", length = 4000)
     private String refreshToken;
 
     @Column(name = "token_type", nullable = false, length = 30)

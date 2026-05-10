@@ -78,6 +78,30 @@ public class EmsCollectedPlaylistEntity {
         this.collectedAt = collectedAt;
     }
 
+    public void applyCollectedMetadata(
+        String title,
+        String curator,
+        String description,
+        String coverImageUrl,
+        String platformExternalUrl,
+        String spotifyUri,
+        int trackCount,
+        String collectionSource,
+        String searchQuery,
+        Instant collectedAt
+    ) {
+        this.title = title;
+        this.curator = curator;
+        this.description = description;
+        this.coverImageUrl = coverImageUrl;
+        this.platformExternalUrl = platformExternalUrl;
+        this.spotifyUri = spotifyUri;
+        this.trackCount = trackCount;
+        this.collectionSource = collectionSource;
+        this.searchQuery = searchQuery;
+        this.collectedAt = collectedAt;
+    }
+
     public Long getId() { return id; }
     public String getExternalPlaylistId() { return externalPlaylistId; }
     public String getTitle() { return title; }

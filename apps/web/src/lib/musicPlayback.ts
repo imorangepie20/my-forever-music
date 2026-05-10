@@ -7,6 +7,7 @@ export interface PlaybackMediaItem {
     subtitle: string
     sourcePlatform: string
     playbackPlatformId?: string | null
+    externalTrackId?: string | null
     imageUrl?: string | null
     albumTitle?: string | null
     externalUrl?: string | null
@@ -14,6 +15,7 @@ export interface PlaybackMediaItem {
     previewUrl?: string | null
     spotifyTrackId?: string | null
     tidalTrackId?: string | null
+    isrc?: string | null
     durationMs?: number | null
     supportingText?: string | null
 }
@@ -144,6 +146,14 @@ export const resolveSpotifyContextUri = (item: PlaybackMediaItem) => {
 }
 
 export const resolvePlaybackPlatformId = (item: PlaybackMediaItem, fallbackPlatformId?: string | null) => {
+    if (item.kind === 'track' && fallbackPlatformId === 'tidal') {
+        return 'tidal'
+    }
+
+    if (item.kind === 'track' && fallbackPlatformId === 'spotify' && resolveSpotifyTrackId(item)) {
+        return 'spotify'
+    }
+
     if (item.playbackPlatformId) {
         return item.playbackPlatformId
     }

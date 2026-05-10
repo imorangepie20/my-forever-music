@@ -13,13 +13,16 @@ public class PmsPlaylistDetailService {
 
     private final PmsUserLibraryStore pmsUserLibraryStore;
     private final PmsPlaylistImportStore pmsPlaylistImportStore;
+    private final PmsPersonalPlaylistStore pmsPersonalPlaylistStore;
 
     public PmsPlaylistDetailService(
         PmsUserLibraryStore pmsUserLibraryStore,
-        PmsPlaylistImportStore pmsPlaylistImportStore
+        PmsPlaylistImportStore pmsPlaylistImportStore,
+        PmsPersonalPlaylistStore pmsPersonalPlaylistStore
     ) {
         this.pmsUserLibraryStore = pmsUserLibraryStore;
         this.pmsPlaylistImportStore = pmsPlaylistImportStore;
+        this.pmsPersonalPlaylistStore = pmsPersonalPlaylistStore;
     }
 
     public PmsPlaylistDetailResponse getPlaylistDetail(String userId, String playlistId) {
@@ -40,9 +43,11 @@ public class PmsPlaylistDetailService {
                 .filter(playlist -> playlist.playlistId().equals(playlistId))
                 .findFirst()
                 .map(this::toImportedResponse)
-                .orElseThrow(() -> new ApiResourceNotFoundException(
-                    "PMS playlist was not found for user %s: %s".formatted(userId, playlistId)
-                )));
+                .orElseGet(() -> pmsPersonalPlaylistStore.findPlaylist(userId, playlistId)
+                    .map(this::toPersonalResponse)
+                    .orElseThrow(() -> new ApiResourceNotFoundException(
+                        "PMS playlist was not found for user %s: %s".formatted(userId, playlistId)
+                    ))));
     }
 
     private PmsPlaylistDetailResponse toUserLibraryResponse(PmsUserLibraryStore.LibraryPlaylistState playlist) {
@@ -107,6 +112,37 @@ public class PmsPlaylistDetailService {
         );
     }
 
+    private PmsPlaylistDetailResponse toPersonalResponse(PmsPersonalPlaylistStore.PersonalPlaylistState playlist) {
+        List<PmsPlaylistDetailResponse.TrackDetail> tracks = safePersonalTracks(playlist.tracks())
+            .stream()
+            .sorted(Comparator.comparingInt(PmsPersonalPlaylistStore.PersonalTrackState::sortOrder)
+                .thenComparing(PmsPersonalPlaylistStore.PersonalTrackState::trackId))
+            .map(this::toTrackDetail)
+            .toList();
+
+        return new PmsPlaylistDetailResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            "pms-personal-playlist",
+            new PmsPlaylistDetailResponse.PlaylistDetail(
+                playlist.playlistId(),
+                null,
+                playlist.title(),
+                "pms",
+                tracks.size(),
+                "personal playlist",
+                playlist.description(),
+                tracks.isEmpty() ? null : tracks.get(0).albumImageUrl(),
+                null,
+                null,
+                playlist.createdAt(),
+                playlist.updatedAt()
+            ),
+            tracks
+        );
+    }
+
     private PmsPlaylistDetailResponse.TrackDetail toTrackDetail(PmsUserLibraryStore.LibraryTrackState track) {
         return new PmsPlaylistDetailResponse.TrackDetail(
             track.trackId(),
@@ -123,7 +159,13 @@ public class PmsPlaylistDetailService {
             durationMs(track.audioFeatures()),
             track.sortOrder(),
             track.seed(),
-            spotifyTrackId(track.externalTrackId(), track.audioFeatures()),
+            track.isrc(),
+            spotifyTrackId(track.spotifyTrackId(), track.audioFeatures()),
+            track.spotifyUri(),
+            track.tidalTrackId(),
+            track.tidalUri(),
+            track.preferredPlaybackPlatform(),
+            track.playbackTargetStatus(),
             audioFeatureTrackId(track.audioFeatures()),
             audioFeaturesFilled(track.audioFeatures()),
             audioFeaturesFilled(track.audioFeatures()),
@@ -148,7 +190,13 @@ public class PmsPlaylistDetailService {
             durationMs(track.audioFeatures()),
             track.sortOrder(),
             track.seed(),
-            spotifyTrackId(track.externalTrackId(), track.audioFeatures()),
+            track.isrc(),
+            spotifyTrackId(track.spotifyTrackId(), track.audioFeatures()),
+            track.spotifyUri(),
+            track.tidalTrackId(),
+            track.tidalUri(),
+            track.preferredPlaybackPlatform(),
+            track.playbackTargetStatus(),
             audioFeatureTrackId(track.audioFeatures()),
             audioFeaturesFilled(track.audioFeatures()),
             audioFeaturesFilled(track.audioFeatures()),
@@ -157,9 +205,40 @@ public class PmsPlaylistDetailService {
         );
     }
 
-    private String spotifyTrackId(String externalTrackId, PmsTrackAudioFeatures audioFeatures) {
-        if (externalTrackId != null && !externalTrackId.isBlank()) {
-            return externalTrackId;
+    private PmsPlaylistDetailResponse.TrackDetail toTrackDetail(PmsPersonalPlaylistStore.PersonalTrackState track) {
+        return new PmsPlaylistDetailResponse.TrackDetail(
+            track.trackId(),
+            track.spotifyTrackId(),
+            track.title(),
+            track.artistName(),
+            track.sourcePlatform(),
+            null,
+            track.albumTitle(),
+            track.albumImageUrl(),
+            track.platformExternalUrl(),
+            track.platformUri(),
+            track.previewUrl(),
+            track.durationMs(),
+            track.sortOrder(),
+            false,
+            null,
+            track.spotifyTrackId(),
+            track.platformUri(),
+            null,
+            null,
+            "spotify",
+            "native",
+            track.audioFeatureTrackId(),
+            track.audioFeatureTrackId() != null,
+            track.audioFeatureTrackId() != null,
+            "pms-personal-playlist",
+            "pms-personal-playlist"
+        );
+    }
+
+    private String spotifyTrackId(String spotifyTrackId, PmsTrackAudioFeatures audioFeatures) {
+        if (spotifyTrackId != null && !spotifyTrackId.isBlank()) {
+            return spotifyTrackId;
         }
 
         return audioFeatureTrackId(audioFeatures);
@@ -189,6 +268,12 @@ public class PmsPlaylistDetailService {
 
     private List<PmsPlaylistImportStore.ImportedTrackState> safeImportedTracks(
         List<PmsPlaylistImportStore.ImportedTrackState> tracks
+    ) {
+        return tracks == null ? List.of() : tracks;
+    }
+
+    private List<PmsPersonalPlaylistStore.PersonalTrackState> safePersonalTracks(
+        List<PmsPersonalPlaylistStore.PersonalTrackState> tracks
     ) {
         return tracks == null ? List.of() : tracks;
     }

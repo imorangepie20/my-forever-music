@@ -336,9 +336,95 @@ public class PmsPlaylistImportCatalogService {
         String platformExternalUrl,
         String platformUri,
         String previewUrl,
+        String isrc,
+        String spotifyTrackId,
+        String spotifyUri,
+        String tidalTrackId,
+        String tidalUri,
+        String preferredPlaybackPlatform,
+        String playbackTargetStatus,
         boolean seed,
         PmsTrackAudioFeatures audioFeatures
     ) {
+        public ImportCandidateTrack {
+            spotifyTrackId = firstNonBlank(spotifyTrackId, nativeTrackId(sourcePlatformFromUri(platformUri), externalTrackId, "spotify"));
+            spotifyUri = firstNonBlank(spotifyUri, nativeUri(platformUri, "spotify"));
+            tidalTrackId = firstNonBlank(tidalTrackId, nativeTrackId(sourcePlatformFromUri(platformUri), externalTrackId, "tidal"));
+            tidalUri = firstNonBlank(tidalUri, nativeUri(platformUri, "tidal"));
+            preferredPlaybackPlatform = firstNonBlank(
+                preferredPlaybackPlatform,
+                firstNonBlank(sourcePlatformFromUri(platformUri), firstNonBlank(hasText(tidalTrackId) ? "tidal" : null, hasText(spotifyTrackId) ? "spotify" : null))
+            );
+            playbackTargetStatus = firstNonBlank(
+                playbackTargetStatus,
+                hasText(sourcePlatformFromUri(platformUri)) ? "native" : (hasText(spotifyTrackId) || hasText(tidalTrackId) ? "resolved" : "unresolved")
+            );
+        }
+
+        public ImportCandidateTrack(
+            String externalTrackId,
+            String title,
+            String artistName,
+            String primaryGenre,
+            String albumTitle,
+            String albumImageUrl,
+            String platformExternalUrl,
+            String platformUri,
+            String previewUrl,
+            boolean seed,
+            PmsTrackAudioFeatures audioFeatures
+        ) {
+            this(
+                externalTrackId,
+                title,
+                artistName,
+                primaryGenre,
+                albumTitle,
+                albumImageUrl,
+                platformExternalUrl,
+                platformUri,
+                previewUrl,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                seed,
+                audioFeatures
+            );
+        }
+    }
+
+    private static String sourcePlatformFromUri(String platformUri) {
+        if (platformUri == null || platformUri.isBlank()) {
+            return null;
+        }
+        if (platformUri.startsWith("spotify:")) {
+            return "spotify";
+        }
+        if (platformUri.startsWith("tidal:")) {
+            return "tidal";
+        }
+        return null;
+    }
+
+    private static String nativeTrackId(String sourcePlatform, String externalTrackId, String targetPlatform) {
+        return targetPlatform.equals(sourcePlatform) ? externalTrackId : null;
+    }
+
+    private static String nativeUri(String platformUri, String targetPlatform) {
+        String sourcePlatform = sourcePlatformFromUri(platformUri);
+        return targetPlatform.equals(sourcePlatform) ? platformUri : null;
+    }
+
+    private static String firstNonBlank(String first, String second) {
+        return hasText(first) ? first : (hasText(second) ? second : null);
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private static ImportCandidatePlaylist playlist(

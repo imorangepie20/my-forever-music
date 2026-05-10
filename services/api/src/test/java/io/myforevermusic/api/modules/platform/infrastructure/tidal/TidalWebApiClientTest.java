@@ -19,9 +19,32 @@ class TidalWebApiClientTest {
     @Test
     void shouldParsePlaylistTracksWithIncludedArtistsAlbumsAndIsrc() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/v2/playlists/playlist-001", exchange -> {
+        server.createContext("/v2/playlists/playlist-001/relationships/items", exchange -> {
             String query = exchange.getRequestURI().getQuery();
-            if (query == null || !query.contains("include=items,items.artists,items.albums")) {
+            if (query == null || !query.contains("countryCode=KR")) {
+                exchange.sendResponseHeaders(400, -1);
+                exchange.close();
+                return;
+            }
+
+            byte[] response = """
+                {
+                  "data": [
+                    {
+                      "id": "track-001",
+                      "type": "tracks"
+                    }
+                  ]
+                }
+                """.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/vnd.api+json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.createContext("/v2/tracks/track-001", exchange -> {
+            String query = exchange.getRequestURI().getQuery();
+            if (query == null || !query.contains("countryCode=KR") || !query.contains("include=artists,albums")) {
                 exchange.sendResponseHeaders(400, -1);
                 exchange.close();
                 return;
@@ -30,49 +53,30 @@ class TidalWebApiClientTest {
             byte[] response = """
                 {
                   "data": {
-                    "id": "playlist-001",
-                    "type": "playlists",
+                    "id": "track-001",
+                    "type": "tracks",
                     "attributes": {
-                      "creatorId": "user-001"
+                      "title": "Midnight Receiver",
+                      "duration": 218,
+                      "isrc": "USRC17607839",
+                      "url": "https://tidal.com/browse/track/track-001",
+                      "previewUrl": "https://cdn.tidal.com/preview/track-001.mp3"
+                    },
+                    "relationships": {
+                      "artists": {
+                        "data": [
+                          {"id": "artist-001", "type": "artists"},
+                          {"id": "artist-002", "type": "artists"}
+                        ]
+                      },
+                      "albums": {
+                        "data": [
+                          {"id": "album-001", "type": "albums"}
+                        ]
+                      }
                     }
                   },
                   "included": [
-                    {
-                      "id": "item-001",
-                      "type": "items",
-                      "relationships": {
-                        "track": {
-                          "data": {
-                            "id": "track-001",
-                            "type": "tracks"
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "id": "track-001",
-                      "type": "tracks",
-                      "attributes": {
-                        "title": "Midnight Receiver",
-                        "duration": 218,
-                        "isrc": "USRC17607839",
-                        "url": "https://tidal.com/browse/track/track-001",
-                        "previewUrl": "https://cdn.tidal.com/preview/track-001.mp3"
-                      },
-                      "relationships": {
-                        "artists": {
-                          "data": [
-                            {"id": "artist-001", "type": "artists"},
-                            {"id": "artist-002", "type": "artists"}
-                          ]
-                        },
-                        "albums": {
-                          "data": [
-                            {"id": "album-001", "type": "albums"}
-                          ]
-                        }
-                      }
-                    },
                     {
                       "id": "artist-001",
                       "type": "artists",
@@ -133,6 +137,109 @@ class TidalWebApiClientTest {
             assertThat(tracks.get(0).durationMs()).isEqualTo(218000);
             assertThat(tracks.get(0).albumImageUrl())
                 .isEqualTo("https://resources.tidal.com/images/ab12cd34/ef56/7890/ab12/cd34ef567890/750x750.jpg");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void shouldParseHomePagePlaylistsFromTidalModuleSource() throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/pages/home", exchange -> {
+            String query = exchange.getRequestURI().getQuery();
+            if (query == null || !query.contains("countryCode=KR") || !query.contains("deviceType=BROWSER")) {
+                exchange.sendResponseHeaders(400, -1);
+                exchange.close();
+                return;
+            }
+
+            byte[] response = """
+                {
+                  "title": "Home",
+                  "rows": [
+                    {
+                      "modules": [
+                        {
+                          "type": "PLAYLIST_LIST",
+                          "title": "The Hits",
+                          "showMore": {
+                            "apiPath": "pages/single-module-page/home/7/hits/1"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.createContext("/v1/pages/single-module-page/home/7/hits/1", exchange -> {
+            String query = exchange.getRequestURI().getQuery();
+            if (query == null || !query.contains("countryCode=KR") || !query.contains("deviceType=BROWSER")) {
+                exchange.sendResponseHeaders(400, -1);
+                exchange.close();
+                return;
+            }
+
+            byte[] response = """
+                {
+                  "title": "The Hits",
+                  "rows": [
+                    {
+                      "modules": [
+                        {
+                          "type": "PLAYLIST_LIST",
+                          "pagedList": {
+                            "items": [
+                              {
+                                "uuid": "playlist-001",
+                                "title": "TIDAL's Top Hits",
+                                "description": "Editorial hits.",
+                                "url": "https://tidal.com/browse/playlist/playlist-001",
+                                "squareImage": "ab12cd34-ef56-7890-ab12-cd34ef567890",
+                                "numberOfTracks": 100
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+
+        try {
+            PlatformOAuthProperties properties = new PlatformOAuthProperties();
+            properties.getTidal().setCountryCode("KR");
+            properties.getTidal().setApiBaseUri("http://127.0.0.1:%d/v2".formatted(server.getAddress().getPort()));
+            properties.getTidal().setLegacyApiBaseUri("http://127.0.0.1:%d/v1".formatted(server.getAddress().getPort()));
+            TidalWebApiClient client = new TidalWebApiClient(
+                properties,
+                new ObjectMapper(),
+                HttpClient.newHttpClient(),
+                properties.getTidal().getApiBaseUri()
+            );
+
+            List<TidalWebApiClient.TidalPlaylistSummary> playlists = client.getHomePagePlaylists(
+                tidalCredential(),
+                "THE_HITS",
+                5
+            );
+
+            assertThat(playlists).hasSize(1);
+            assertThat(playlists.get(0).playlistId()).isEqualTo("playlist-001");
+            assertThat(playlists.get(0).name()).isEqualTo("TIDAL's Top Hits");
+            assertThat(playlists.get(0).trackCount()).isEqualTo(100);
+            assertThat(playlists.get(0).externalUrl()).isEqualTo("https://tidal.com/browse/playlist/playlist-001");
         } finally {
             server.stop(0);
         }

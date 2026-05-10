@@ -8,6 +8,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "app.ai")
 public record AiServiceProperties(
     @NotBlank String baseUrl,
-    @NotBlank String recommendationPreviewPath
+    @NotBlank String recommendationPreviewPath,
+    @NotBlank String emsOverviewPath
 ) {
 }

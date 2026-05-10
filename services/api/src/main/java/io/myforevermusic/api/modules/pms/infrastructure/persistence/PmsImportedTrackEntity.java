@@ -45,6 +45,27 @@ public class PmsImportedTrackEntity {
     @Column(name = "preview_url", length = 500)
     private String previewUrl;
 
+    @Column(name = "isrc", length = 32)
+    private String isrc;
+
+    @Column(name = "spotify_track_id", length = 100)
+    private String spotifyTrackId;
+
+    @Column(name = "spotify_uri", length = 200)
+    private String spotifyUri;
+
+    @Column(name = "tidal_track_id", length = 100)
+    private String tidalTrackId;
+
+    @Column(name = "tidal_uri", length = 200)
+    private String tidalUri;
+
+    @Column(name = "preferred_playback_platform", length = 50)
+    private String preferredPlaybackPlatform;
+
+    @Column(name = "playback_target_status", nullable = false, length = 50)
+    private String playbackTargetStatus;
+
     @Embedded
     private PmsTrackAudioFeatures audioFeatures;
 
@@ -67,6 +88,13 @@ public class PmsImportedTrackEntity {
         this.platformExternalUrl = state.platformExternalUrl();
         this.platformUri = state.platformUri();
         this.previewUrl = state.previewUrl();
+        this.isrc = state.isrc();
+        this.spotifyTrackId = state.spotifyTrackId();
+        this.spotifyUri = state.spotifyUri();
+        this.tidalTrackId = state.tidalTrackId();
+        this.tidalUri = state.tidalUri();
+        this.preferredPlaybackPlatform = state.preferredPlaybackPlatform();
+        this.playbackTargetStatus = state.playbackTargetStatus();
         this.audioFeatures = state.audioFeatures() == null
             ? PmsTrackAudioFeatures.unresolved()
             : state.audioFeatures();
@@ -114,6 +142,34 @@ public class PmsImportedTrackEntity {
 
     public String getPreviewUrl() {
         return previewUrl;
+    }
+
+    public String getIsrc() {
+        return isrc;
+    }
+
+    public String getSpotifyTrackId() {
+        return spotifyTrackId;
+    }
+
+    public String getSpotifyUri() {
+        return spotifyUri;
+    }
+
+    public String getTidalTrackId() {
+        return tidalTrackId;
+    }
+
+    public String getTidalUri() {
+        return tidalUri;
+    }
+
+    public String getPreferredPlaybackPlatform() {
+        return preferredPlaybackPlatform;
+    }
+
+    public String getPlaybackTargetStatus() {
+        return playbackTargetStatus;
     }
 
     public PmsTrackAudioFeatures getAudioFeatures() {

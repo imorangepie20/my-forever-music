@@ -1,6 +1,6 @@
 import Hls from 'hls.js'
-import { resolveTidalTrackId, type PlaybackMediaItem } from '@/lib/musicPlayback'
-import { fetchTidalPlaybackStream } from '@/services/api'
+import { resolveSpotifyTrackId, resolveTidalTrackId, type PlaybackMediaItem } from '@/lib/musicPlayback'
+import { fetchTidalPlaybackStream, resolveTidalPlaybackTarget } from '@/services/api'
 import type { TidalPlaybackStreamResponse } from '@/types/api'
 
 const TIDAL_STREAM_DEVICE_ID = 'tidal-stream-player'
@@ -85,6 +85,38 @@ const errorMessage = (error: unknown, fallback: string) => {
         return error
     }
     return fallback
+}
+
+export const resolveTidalPlayableItem = async (userId: string, item: PlaybackMediaItem): Promise<PlaybackMediaItem> => {
+    if (resolveTidalTrackId(item)) {
+        return item
+    }
+
+    const target = await resolveTidalPlaybackTarget({
+        user_id: userId,
+        title: item.title,
+        artist_name: item.subtitle.split(' · ')[0] || item.subtitle || item.title,
+        source_platform: item.sourcePlatform,
+        external_track_id: item.externalTrackId,
+        platform_uri: item.platformUri,
+        spotify_track_id: resolveSpotifyTrackId(item),
+        isrc: item.isrc,
+        duration_ms: item.durationMs,
+    })
+
+    return {
+        ...item,
+        playbackPlatformId: 'tidal',
+        externalUrl: target.platform_external_url ?? item.externalUrl,
+        platformUri: target.tidal_uri ?? item.platformUri,
+        previewUrl: target.preview_url ?? item.previewUrl,
+        tidalTrackId: target.tidal_track_id,
+        isrc: target.isrc ?? item.isrc,
+        durationMs: target.duration_ms ?? item.durationMs,
+        albumTitle: target.album_title ?? item.albumTitle,
+        imageUrl: target.album_image_url ?? item.imageUrl,
+        supportingText: item.supportingText ?? `TIDAL match: ${target.match_reason}`,
+    }
 }
 
 const ensureAudioElement = () => {
@@ -206,7 +238,8 @@ export const playTidalMediaItem = async (
     callbacks: TidalPlayerCallbacks = {},
 ) => {
     await ensureTidalWebPlayer(userId, callbacks)
-    const tidalTrackId = resolveTidalTrackId(item)
+    const playableItem = await resolveTidalPlayableItem(userId, item)
+    const tidalTrackId = resolveTidalTrackId(playableItem)
     if (!tidalTrackId) {
         throw new Error(`TIDAL track id is missing for "${item.title}".`)
     }
@@ -215,7 +248,7 @@ export const playTidalMediaItem = async (
     resetSource()
     currentProductId = tidalTrackId
     currentPresentation = null
-    lastDurationMs = item.durationMs ?? 0
+    lastDurationMs = playableItem.durationMs ?? 0
     emitState('NOT_PLAYING')
 
     try {

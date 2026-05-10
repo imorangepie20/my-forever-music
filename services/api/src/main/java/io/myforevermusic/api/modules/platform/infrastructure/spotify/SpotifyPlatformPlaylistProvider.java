@@ -194,6 +194,13 @@ public class SpotifyPlatformPlaylistProvider implements PlatformPlaylistProvider
                     track.externalUrl(),
                     track.spotifyUri(),
                     track.previewUrl(),
+                    track.isrc(),
+                    track.spotifyTrackId(),
+                    track.spotifyUri(),
+                    null,
+                    null,
+                    "spotify",
+                    "native",
                     index < 2,
                     resolveTrackAudioFeatures(track, audioFeaturesByTrackId.get(track.spotifyTrackId()), resolvedAt)
                 );

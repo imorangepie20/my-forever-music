@@ -27,6 +27,7 @@ import {
     getTidalDeviceId,
     isTidalPreviewSnapshot,
     playTidalMediaItem,
+    resolveTidalPlayableItem,
     tidalPause,
     tidalReset,
     tidalResume,
@@ -65,6 +66,30 @@ const clampIndex = (index: number, length: number) => Math.min(Math.max(0, index
 const toSpotifyUri = (item: PlaybackMediaItem) => {
     const spotifyTrackId = resolveSpotifyTrackId(item)
     return spotifyTrackId ? `spotify:track:${spotifyTrackId}` : null
+}
+
+const resolveTidalQueue = async (
+    userId: string,
+    items: PlaybackMediaItem[],
+    selectedIndex: number,
+) => {
+    const resolvedEntries: Array<{ item: PlaybackMediaItem; originalIndex: number; tidalTrackId: string }> = []
+
+    for (const [originalIndex, item] of items.entries()) {
+        try {
+            const resolvedItem = await resolveTidalPlayableItem(userId, item)
+            const tidalTrackId = resolveTidalTrackId(resolvedItem)
+            if (tidalTrackId) {
+                resolvedEntries.push({ item: resolvedItem, originalIndex, tidalTrackId })
+            }
+        } catch (resolveError) {
+            if (originalIndex === selectedIndex) {
+                throw resolveError
+            }
+        }
+    }
+
+    return resolvedEntries
 }
 
 export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
@@ -235,14 +260,41 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
             const safeStartIndex = clampIndex(startIndex, items.length)
             const selectedItem = items[safeStartIndex]
             const playbackPlatformId = resolvePlaybackPlatformId(selectedItem, session?.preferredPlatformId)
+            const pendingItems = items.map((item, index) =>
+                index === safeStartIndex ? { ...item, playbackPlatformId } : item
+            )
+            const pendingSelectedItem = pendingItems[safeStartIndex]
+            const previousItem = currentItem
 
             setIsLoading(true)
             clearPlaybackError()
             setNotice(null)
+            setQueue([])
+            setCurrentIndex(0)
+            setCurrentItem(null)
+            setPositionMs(0)
+            setDurationMs(0)
+            setIsPlaying(false)
             tidalPreviewBlockedRef.current = false
 
             try {
+                if (previousItem) {
+                    const previousPlatformId = resolvePlaybackPlatformId(previousItem, session?.preferredPlatformId)
+                    if (previousPlatformId === 'tidal') {
+                        await tidalReset()
+                    } else if (previousPlatformId === 'spotify') {
+                        await spotifyPause(userId)
+                    }
+                }
+
+                setQueue(pendingItems)
+                setCurrentIndex(safeStartIndex)
+                setCurrentItem(pendingSelectedItem)
+                setPositionMs(0)
+                setDurationMs(pendingSelectedItem.durationMs ?? 0)
+
                 if (playbackPlatformId === 'spotify') {
+                    setNotice('Preparing Spotify playback...')
                     await ensureSpotifyWebPlayer(userId, spotifyCallbacks)
                     await spotifySetVolume(userId, volumeState)
 
@@ -287,20 +339,16 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 if (playbackPlatformId === 'tidal') {
+                    setNotice('Preparing TIDAL playback...')
                     await ensureTidalWebPlayer(userId, tidalCallbacks)
                     await tidalSetVolume(volumeState)
 
-                    const tidalEntries = items
-                        .map((item, originalIndex) => ({
-                            item,
-                            originalIndex,
-                            tidalTrackId: resolveTidalTrackId(item),
-                        }))
-                        .filter((entry): entry is { item: PlaybackMediaItem; originalIndex: number; tidalTrackId: string } => Boolean(entry.tidalTrackId))
+                    setNotice('Searching TIDAL for playable tracks...')
+                    const tidalEntries = await resolveTidalQueue(userId, items, safeStartIndex)
 
                     const selectedEntry = tidalEntries.find((entry) => entry.originalIndex === safeStartIndex)
                     if (!selectedEntry) {
-                        throw new Error('Selected track does not have a valid TIDAL track id or URI.')
+                        throw new Error('Selected track could not be resolved to a playable TIDAL track.')
                     }
 
                     const nextQueue = tidalEntries.map((entry) => entry.item)
@@ -312,6 +360,7 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
                     setCurrentItem(nextQueue[nextIndex])
                     setPositionMs(0)
                     setDurationMs(nextQueue[nextIndex]?.durationMs ?? 0)
+                    setNotice('Starting TIDAL stream...')
                     await playTidalMediaItem(userId, nextQueue[nextIndex], nextQueue[nextIndex + 1], tidalCallbacks)
                     setIsPlaying(true)
                     clearPlaybackError()
@@ -328,7 +377,7 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
                 setIsLoading(false)
             }
         },
-        [clearPlaybackError, requireUserId, session?.preferredPlatformId, spotifyCallbacks, tidalCallbacks, volumeState],
+        [clearPlaybackError, currentItem, requireUserId, session?.preferredPlatformId, spotifyCallbacks, tidalCallbacks, volumeState],
     )
 
     const playItem = useCallback((item: PlaybackMediaItem) => playQueue([item], 0), [playQueue])

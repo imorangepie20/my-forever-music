@@ -9,10 +9,6 @@ import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { usePlayback } from '@/contexts/PlaybackContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
 import {
-    resolveSpotifyTrackId,
-    resolveTidalTrackId,
-} from '@/lib/musicPlayback'
-import {
     buildPmsPlaylistDetailPath,
     toPmsPlaylistPlaybackItem,
     toPmsTrackPlaybackItem,
@@ -56,6 +52,7 @@ const PmsPage = () => {
     const [isLoading, setIsLoading] = useState(true)
     const [isImporting, setIsImporting] = useState(false)
     const [isCreatingPersonalPlaylist, setIsCreatingPersonalPlaylist] = useState(false)
+    const [preparingPlaylistId, setPreparingPlaylistId] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [importMessage, setImportMessage] = useState<string | null>(null)
     const [personalPlaylistMessage, setPersonalPlaylistMessage] = useState<string | null>(null)
@@ -259,12 +256,12 @@ const PmsPage = () => {
         }
 
         setError(null)
+        setPreparingPlaylistId(playlist.playlist_id)
 
         try {
             const detail = await fetchPmsPlaylistDetail(session.userId, playlist.playlist_id)
             const playbackItems = detail.tracks
                 .map((track) => toPmsTrackPlaybackItem(track, detail.playlist.title))
-                .filter((item) => resolveSpotifyTrackId(item) || resolveTidalTrackId(item))
 
             if (playbackItems.length > 0) {
                 await playQueue(playbackItems, 0)
@@ -279,6 +276,8 @@ const PmsPage = () => {
                     : 'Unable to load the PMS playlist tracks for playback.'
             setError(message)
             await playItem(fallbackPlaylistItem)
+        } finally {
+            setPreparingPlaylistId(null)
         }
     }
 
@@ -368,6 +367,7 @@ const PmsPage = () => {
                                 imageUrl={playlist.cover_image_url}
                                 isActive={playlist.playlist_id === workspace.playlistId}
                                 detailPath={buildPmsPlaylistDetailPath(playlist.playlist_id)}
+                                isPlayLoading={preparingPlaylistId === playlist.playlist_id}
                                 onSelect={() => updateWorkspace({ playlistId: playlist.playlist_id })}
                                 onPlay={() => void handlePlayPmsPlaylist(playlist)}
                                 onOpenExternal={() => openExternal(playlist.platform_external_url)}
@@ -389,8 +389,11 @@ const PmsPage = () => {
                                 track.audio_features_filled ?? track.spotify_audio_features_filled
                             const audioFeatureSource =
                                 track.audio_feature_source ?? track.spotify_audio_feature_source
-                            const audioFeatureTrackId =
-                                track.audio_feature_track_id ?? track.spotify_track_id
+                            const spotifyTrackId =
+                                track.spotify_track_id ?? track.audio_feature_track_id
+                            const playbackPlatformId =
+                                track.preferred_playback_platform ??
+                                (track.tidal_track_id ? 'tidal' : track.spotify_track_id ? 'spotify' : track.source_platform)
 
                             return (
                                 <TrackFeatureCard
@@ -418,7 +421,9 @@ const PmsPage = () => {
                                         externalUrl: track.platform_external_url,
                                         platformUri: track.platform_uri,
                                         previewUrl: track.preview_url,
-                                        spotifyTrackId: audioFeatureTrackId,
+                                        playbackPlatformId,
+                                        spotifyTrackId,
+                                        tidalTrackId: track.tidal_track_id,
                                         durationMs: track.duration_ms,
                                         supportingText: activePlaylist?.title ?? null,
                                     })
@@ -499,6 +504,7 @@ const PmsPage = () => {
                                         description={playlist.description}
                                         imageUrl={playlist.tracks[0]?.album_image_url ?? null}
                                         actionLabel={`${playlist.track_count} saved`}
+                                        detailPath={buildPmsPlaylistDetailPath(playlist.playlist_id)}
                                         onPlay={() =>
                                             playItem({
                                                 id: `personal-playlist:${playlist.playlist_id}`,
@@ -622,6 +628,7 @@ const PmsPage = () => {
                                                 description={`Imported ${new Date(playlist.imported_at).toLocaleString()}`}
                                                 imageUrl={playlist.cover_image_url}
                                                 detailPath={buildPmsPlaylistDetailPath(playlist.playlist_id)}
+                                                isPlayLoading={preparingPlaylistId === playlist.playlist_id}
                                                 onSelect={() => updateWorkspace({ playlistId: playlist.playlist_id })}
                                                 onPlay={() => void handlePlayPmsPlaylist(playlist)}
                                                 onOpenExternal={() => openExternal(playlist.platform_external_url)}

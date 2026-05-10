@@ -168,7 +168,7 @@ class GmsRecommendationPreviewServiceTest {
         private GmsRecommendationPreviewRequest capturedRequest;
 
         private CapturingAiRecommendationPreviewClient() {
-            super(new io.myforevermusic.api.modules.gms.infrastructure.ai.AiServiceProperties("http://localhost:8000", "/v1/recommendations/preview"), new ObjectMapper());
+            super(new io.myforevermusic.api.modules.gms.infrastructure.ai.AiServiceProperties("http://localhost:8000", "/v1/recommendations/preview", "/v1/ems/overview"), new ObjectMapper());
         }
 
         @Override

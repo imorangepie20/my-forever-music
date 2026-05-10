@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.myforevermusic.api.modules.ems.application.EmsOverviewService;
 import io.myforevermusic.api.modules.ems.application.EmsWorkspaceAnalysisService;
 import java.time.Instant;
 import java.util.List;
@@ -30,6 +31,9 @@ class EmsWorkspaceAnalysisControllerWebMvcTest {
 
     @MockBean
     private EmsWorkspaceAnalysisService emsWorkspaceAnalysisService;
+
+    @MockBean
+    private EmsOverviewService emsOverviewService;
 
     @Test
     void shouldReturnWorkspaceAnalysis() throws Exception {

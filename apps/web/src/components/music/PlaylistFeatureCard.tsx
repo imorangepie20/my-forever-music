@@ -1,4 +1,4 @@
-import { ExternalLink, Music4, Play } from 'lucide-react'
+import { ExternalLink, Loader2, Music4, Play } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import MusicArtwork from '@/components/music/MusicArtwork'
@@ -9,12 +9,14 @@ interface PlaylistFeatureCardProps {
     curator: string
     trackCount: number
     description: string
+    supportingText?: string
     imageUrl?: string | null
     isActive?: boolean
     onSelect?: () => void
     onPlay?: () => void
     onOpenExternal?: () => void
     actionLabel?: string
+    isPlayLoading?: boolean
     detailPath?: string
 }
 
@@ -24,12 +26,14 @@ const PlaylistFeatureCard = ({
     curator,
     trackCount,
     description,
+    supportingText,
     imageUrl,
     isActive = false,
     onSelect,
     onPlay,
     onOpenExternal,
     actionLabel = 'Use Playlist',
+    isPlayLoading = false,
     detailPath,
 }: PlaylistFeatureCardProps) => {
     const navigate = useNavigate()
@@ -86,6 +90,11 @@ const PlaylistFeatureCard = ({
                     </div>
 
                     <p className="text-sm leading-6 text-hud-text-secondary">{description}</p>
+                    {supportingText && (
+                        <p className="text-xs uppercase tracking-[0.18em] text-hud-accent-primary">
+                            {supportingText}
+                        </p>
+                    )}
 
                     <div className="flex flex-wrap gap-3">
                         {onSelect && (
@@ -105,13 +114,14 @@ const PlaylistFeatureCard = ({
                             <Button
                                 type="button"
                                 variant="outline"
+                                disabled={isPlayLoading}
                                 onClick={(event) => {
                                     event.stopPropagation()
                                     onPlay()
                                 }}
                             >
-                                <Play size={18} />
-                                Play
+                                {isPlayLoading ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
+                                {isPlayLoading ? 'Preparing' : 'Play'}
                             </Button>
                         )}
                         {onOpenExternal && (
