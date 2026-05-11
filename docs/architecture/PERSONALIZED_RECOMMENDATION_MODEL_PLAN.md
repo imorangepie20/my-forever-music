@@ -626,12 +626,14 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - snapshot에는 `affinity_score`, `novelty_score`, `coherence_score`, `redundancy_penalty`, `confidence_score`, `rank`, `feature_snapshot_id`를 저장
 - `PlaylistQualityEvaluator` 추가
 - GMS preview 후보 리스트 전체를 기준으로 playlist-level `coherence_score`, `diversity_score`, `redundancy_penalty`를 계산해 snapshot에 반영
+- `GET /api/v1/recommendations/datasets/users/{userId}/sequence` dataset exporter 추가
+- exporter는 `user_music_event`와 `recommendation_snapshot`을 시간순 sequence item으로 합쳐 AI service 학습/검증 입력 경계로 제공
 
 아직 남은 범위:
 
 - PMS/GMS 외 화면의 명시적 저장/좋아요/반복 재생 이벤트 확장
 - playlist-level 6축 evaluator의 API 노출과 운영 dashboard 연결
-- AI service dataset exporter
+- AI service 쪽 dataset import harness와 SASRec MVP 학습 스크립트
 
 ## 14. 내부 참고 문서
 

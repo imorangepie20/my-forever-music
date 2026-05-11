@@ -13,6 +13,7 @@
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | `POST` | `/api/v1/recommendations/events` | 사용자 음악 행동 이벤트 적재 |
+| `GET` | `/api/v1/recommendations/datasets/users/{userId}/sequence` | 사용자 이벤트와 추천 스냅샷을 모델 학습 sequence로 export |
 
 ## 요청
 
@@ -107,13 +108,16 @@
 ## 현재 구현 메모
 
 - DB migration: `V23__create_user_music_event.sql`
+- 추천 스냅샷 migration: `V24__create_recommendation_snapshot.sql`
 - 저장소: local profile은 in-memory, non-local profile은 JPA/PostgreSQL
 - 웹 플레이어는 현재 `play_started`, `play_paused`, `play_resumed`, `play_completed`, `skip_next`, `skip_previous`를 적재합니다.
 - PMS 개인 플레이리스트 저장은 `added_to_playlist`를 적재합니다.
 - GMS feedback은 `like -> recommendation_liked`, `dislike -> recommendation_rejected`, `save -> track_saved`, `skip -> ignored_recommendation`으로 함께 적재합니다.
+- GMS preview 결과는 `recommendation_snapshot`에 저장되며, playlist-level `coherence_score`, `diversity_score`, `redundancy_penalty`가 함께 남습니다.
+- dataset exporter는 `user_music_event`와 `recommendation_snapshot`을 시간순 `sequence`로 합쳐 AI service 학습/검증 경계에 제공합니다.
 - 적재 실패는 재생을 막지 않습니다. 추천 학습 로그는 제품 사용 흐름보다 후순위입니다.
 
 ## 다음 연결 지점
 
-- playlist-level 6축 evaluator 추가
-- AI service dataset exporter 추가
+- AI service dataset import harness 추가
+- SASRec MVP 학습 스크립트 추가
