@@ -13,6 +13,7 @@
 - [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md): MacBook 시험 서비스에서 실제 API/저장소/provider만 기본 사용자 경로로 쓰는 정책
 - [architecture/REAL_IMPLEMENTATION_POLICY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/REAL_IMPLEMENTATION_POLICY.md): 오류를 우회/회피/임시 처리하지 않고 실패 경계와 근본 원인을 수정하는 전 프로젝트 공통 기준
 - [architecture/AUDIO_FEATURE_PROVIDER_STRATEGY.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/AUDIO_FEATURE_PROVIDER_STRATEGY.md): Spotify Development Mode 제약 이후 provider-neutral 오디오 특성 전략과 legacy `spotify_*` 호환 규칙
+- [architecture/PERSONALIZED_RECOMMENDATION_MODEL_PLAN.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/PERSONALIZED_RECOMMENDATION_MODEL_PLAN.md): 메타데이터와 행동 신호 기반 개인화 음악 추천 모델 기획, feature store, scoring engine, feedback loop 설계
 - [architecture/TECH_STACK.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/TECH_STACK.md): 현재 채택 기술 스택
 - [architecture/SPOTIFY_OAUTH_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/SPOTIFY_OAUTH_SETUP.md): Spotify OAuth Redirect URI, env, HTTPS 테스트 기준
 - [architecture/HTTPS_DOMAIN_DEV_SETUP.md](/Users/woosungjo/music-space/my-forever-music/docs/architecture/HTTPS_DOMAIN_DEV_SETUP.md): `imapplepie20.tplinkdns.com` 기준 HTTPS reverse proxy와 Certbot 적용 절차

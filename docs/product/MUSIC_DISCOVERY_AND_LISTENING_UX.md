@@ -50,16 +50,16 @@ GMS에서 사용자는 추천 결과를 빠르게 듣고, 저장하거나 거절
 
 ## 3. EMS 화면 재구성 원칙
 
-현재 EMS 화면은 탭으로 나누지 않고, 하나의 화면에서 `Overview`와 `Public Playlist Pool`을 함께 보여줍니다.
+현재 EMS 화면은 탭으로 나누지 않고, 하나의 화면에서 `Provider Search`와 `Public Playlist Pool`을 함께 보여줍니다.
 
 이 결정의 목적:
 
-- Overview LLM 해석과 deterministic 상태를 같은 콘텐츠 타일 안에서 빠르게 확인
+- 연결된 provider의 공개 playlist/track 검색 결과를 바로 확인하고 재생 가능한 후보로 들어감
 - DB에 저장된 공개 playlist 후보를 바로 확인
 - 검색/수집 로그/개별 트랙 관리 UI가 EMS 화면의 주인공이 되는 상황 방지
 - playlist card -> detail tracks -> playback queue 흐름을 단순하게 유지
 
-사용자 검색으로 공개 playlist pool을 만드는 흐름은 기본 사용자 경험에서 제외합니다.
+사용자 검색은 공개 playlist pool을 만드는 흐름이 아니라, provider 결과를 즉시 탐색하고 트랙 목록에서 재생해보는 흐름입니다.
 
 ### 3-1. Public Playlist Pool의 목적
 
@@ -82,7 +82,7 @@ Public Playlist Pool은 이미 EMS DB에 저장된 외부 공개 플레이리스
 - 검색 결과 저장 상태가 주요 UI처럼 보입니다.
 - 최종 감상은 PMS에서 해야 하므로 EMS에서 트랙 수집 목록을 크게 보여줄 필요가 없습니다.
 
-개별 트랙 데이터는 내부 후보 데이터와 playlist detail 화면에서만 사용하고, 기본 EMS overview 화면에는 노출하지 않습니다.
+개별 트랙 데이터는 내부 후보 데이터, 검색 playlist detail 화면, DB playlist detail 화면에서만 사용하고, 기본 EMS 화면의 관리 대상 목록처럼 노출하지 않습니다.
 
 ### 3-3. 검색 결과 저장 금지
 
@@ -90,7 +90,8 @@ Public Playlist Pool은 이미 EMS DB에 저장된 외부 공개 플레이리스
 
 - 검색 결과는 사용자가 별도 저장/가져오기 동작을 실행하기 전까지 EMS 테이블에 넣지 않습니다.
 - 검색 결과를 기본 EMS playlist pool과 섞지 않습니다.
-- EMS 화면에서 표시되는 playlist와 track detail은 검색 preview가 아니라 DB에 저장된 데이터입니다.
+- 검색 결과 playlist의 track detail은 provider에서 즉시 조회해 재생할 수 있지만, EMS canonical data가 아닙니다.
+- EMS Public Playlist Pool에서 표시되는 playlist와 track detail은 DB에 저장된 데이터입니다.
 
 ## 4. 공개 플레이리스트 수집과 노출
 

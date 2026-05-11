@@ -100,4 +100,8 @@ public class EmsCollectedTrackEntity {
     public String getCollectionSource() { return collectionSource; }
     public Instant getCollectedAt() { return collectedAt; }
     public EmsTrackAudioFeatures getAudioFeatures() { return audioFeatures; }
+
+    public void applyAudioFeatures(EmsTrackAudioFeatures audioFeatures) {
+        this.audioFeatures = audioFeatures;
+    }
 }

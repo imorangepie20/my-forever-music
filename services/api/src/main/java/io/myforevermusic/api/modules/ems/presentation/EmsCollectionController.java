@@ -3,7 +3,9 @@ package io.myforevermusic.api.modules.ems.presentation;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService;
+import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsAudioFeatureBackfillResult;
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsAudioFeatureCoverage;
+import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPlaylistTracksPreview;
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPreviewResult;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler.EmsPublicPlaylistDiscoveryRun;
@@ -43,13 +45,81 @@ public class EmsCollectionController {
         EmsCollectionSearchPreviewResult result = emsCollectionService.previewSearch(
             request.userId(),
             request.platformId(),
-            request.query(),
-            request.limit() != null ? request.limit() : 10
+            request.query()
         );
         return new EmsCollectionSearchResponse(
             "api", "ems_search_previewed", Instant.now(),
             result.platformId(), result.query(),
             result.resultPlaylistCount(), result.resultTrackCount(),
+            result.playlists().stream()
+                .map(playlist -> new EmsCollectionSearchPlaylistItem(
+                    playlist.externalPlaylistId(),
+                    playlist.title(),
+                    playlist.sourcePlatform(),
+                    playlist.curator(),
+                    playlist.description(),
+                    playlist.coverImageUrl(),
+                    playlist.platformExternalUrl(),
+                    playlist.platformUri(),
+                    spotifyUriFor(playlist.sourcePlatform(), playlist.platformUri()),
+                    playlist.trackCount()
+                ))
+                .toList(),
+            result.tracks().stream()
+                .map(track -> new EmsCollectionSearchTrackItem(
+                    track.externalTrackId(),
+                    track.title(),
+                    track.artistName(),
+                    track.sourcePlatform(),
+                    track.isrc(),
+                    track.albumTitle(),
+                    track.albumImageUrl(),
+                    track.platformExternalUrl(),
+                    track.platformUri(),
+                    spotifyUriFor(track.sourcePlatform(), track.platformUri()),
+                    track.previewUrl(),
+                    track.durationMs()
+                ))
+                .toList(),
+            result.searchedAt()
+        );
+    }
+
+    @Operation(summary = "Preview tracks for a provider playlist search result without storing results in EMS")
+    @GetMapping("/search/playlists/{platformId}/{externalPlaylistId}/tracks")
+    public EmsCollectionSearchPlaylistTracksResponse getSearchPlaylistTracks(
+        @PathVariable String platformId,
+        @PathVariable String externalPlaylistId,
+        @RequestParam("user_id") String userId
+    ) {
+        EmsCollectionSearchPlaylistTracksPreview result = emsCollectionService.getSearchPlaylistTracks(
+            userId,
+            platformId,
+            externalPlaylistId
+        );
+        return new EmsCollectionSearchPlaylistTracksResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            result.platformId(),
+            result.externalPlaylistId(),
+            result.trackCount(),
+            result.tracks().stream()
+                .map(track -> new EmsCollectionSearchTrackItem(
+                    track.externalTrackId(),
+                    track.title(),
+                    track.artistName(),
+                    track.sourcePlatform(),
+                    track.isrc(),
+                    track.albumTitle(),
+                    track.albumImageUrl(),
+                    track.platformExternalUrl(),
+                    track.platformUri(),
+                    spotifyUriFor(track.sourcePlatform(), track.platformUri()),
+                    track.previewUrl(),
+                    track.durationMs()
+                ))
+                .toList(),
             result.searchedAt()
         );
     }
@@ -114,6 +184,32 @@ public class EmsCollectionController {
             "api", "ok", Instant.now(),
             toPlaylistItem(playlist),
             tracks.stream().map(EmsCollectionController::toTrackItem).toList()
+        );
+    }
+
+    @Operation(summary = "Backfill audio features for a collected EMS playlist")
+    @PostMapping("/playlists/{playlistId}/audio-features/backfill")
+    public EmsAudioFeatureBackfillResponse backfillPlaylistAudioFeatures(@PathVariable Long playlistId) {
+        EmsAudioFeatureBackfillResult result = emsCollectionService.backfillAudioFeaturesForPlaylist(playlistId);
+        return new EmsAudioFeatureBackfillResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            result.playlistId(),
+            result.playlistTitle(),
+            result.sourcePlatform(),
+            result.trackCount(),
+            result.filledTrackCountBefore(),
+            result.pendingTrackCountBefore(),
+            result.eligibleTrackCount(),
+            result.missingIsrcTrackCount(),
+            result.matchedSnapshotCount(),
+            result.updatedTrackCount(),
+            result.newlyFilledTrackCount(),
+            result.filledTrackCountAfter(),
+            result.pendingTrackCountAfter(),
+            result.coverageRatioAfter(),
+            result.backfilledAt()
         );
     }
 
@@ -198,9 +294,8 @@ public class EmsCollectionController {
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record EmsCollectionSearchRequest(
         @NotBlank String userId,
-        @NotBlank String platformId,
-        @NotBlank String query,
-        Integer limit
+        String platformId,
+        @NotBlank String query
     ) {}
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
@@ -208,6 +303,50 @@ public class EmsCollectionController {
         String service, String status, Instant generatedAt,
         String platformId, String query,
         int resultPlaylistCount, int resultTrackCount,
+        List<EmsCollectionSearchPlaylistItem> playlists,
+        List<EmsCollectionSearchTrackItem> tracks,
+        Instant searchedAt
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsCollectionSearchPlaylistItem(
+        String externalPlaylistId,
+        String title,
+        String sourcePlatform,
+        String curator,
+        String description,
+        String coverImageUrl,
+        String platformExternalUrl,
+        String platformUri,
+        String spotifyUri,
+        int trackCount
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsCollectionSearchTrackItem(
+        String externalTrackId,
+        String title,
+        String artistName,
+        String sourcePlatform,
+        String isrc,
+        String albumTitle,
+        String albumImageUrl,
+        String platformExternalUrl,
+        String platformUri,
+        String spotifyUri,
+        String previewUrl,
+        Integer durationMs
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsCollectionSearchPlaylistTracksResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        String platformId,
+        String externalPlaylistId,
+        int trackCount,
+        List<EmsCollectionSearchTrackItem> tracks,
         Instant searchedAt
     ) {}
 
@@ -297,6 +436,28 @@ public class EmsCollectionController {
         long filledTrackCount,
         long pendingTrackCount,
         double coverageRatio
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAudioFeatureBackfillResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        Long playlistId,
+        String playlistTitle,
+        String sourcePlatform,
+        long trackCount,
+        long filledTrackCountBefore,
+        long pendingTrackCountBefore,
+        int eligibleTrackCount,
+        int missingIsrcTrackCount,
+        int matchedSnapshotCount,
+        int updatedTrackCount,
+        int newlyFilledTrackCount,
+        long filledTrackCountAfter,
+        long pendingTrackCountAfter,
+        double coverageRatioAfter,
+        Instant backfilledAt
     ) {}
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)

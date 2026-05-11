@@ -14,6 +14,8 @@ import type {
     TidalPlaybackStreamResponse,
     TidalPlaybackTargetResolveRequest,
     TidalPlaybackTargetResolveResponse,
+    SpotifyPlaybackTargetResolveRequest,
+    SpotifyPlaybackTargetResolveResponse,
     TidalDeviceAuthorizationPollRequest,
     TidalDeviceAuthorizationPollResponse,
     TidalDeviceAuthorizationStartRequest,
@@ -31,6 +33,7 @@ import type {
     EmsCollectionPlaylistBrowseResponse,
     EmsCollectionPlaylistDetailResponse,
     EmsCollectionTrackBrowseResponse,
+    EmsCollectionSearchPlaylistTracksResponse,
     EmsOverviewRequest,
     EmsOverviewResponse,
     EmsWorkspaceAnalysisRequest,
@@ -39,6 +42,8 @@ import type {
     GmsRecommendationPreviewResponse,
     GmsRecommendationFeedbackRequest,
     GmsRecommendationFeedbackResponse,
+    UserMusicEventRequest,
+    UserMusicEventResponse,
     PmsWorkspaceBootstrapResponse,
     PmsPlaylistDetailResponse,
     PmsPlaylistImportBootstrapResponse,
@@ -195,6 +200,16 @@ export const fetchTidalPlaybackStream = (
 
 export const resolveTidalPlaybackTarget = (payload: TidalPlaybackTargetResolveRequest, signal?: AbortSignal) =>
     requestJson<TidalPlaybackTargetResolveResponse>('/api/v1/platforms/playback/tidal/resolve-track', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal,
+    })
+
+export const resolveSpotifyPlaybackTarget = (payload: SpotifyPlaybackTargetResolveRequest, signal?: AbortSignal) =>
+    requestJson<SpotifyPlaybackTargetResolveResponse>('/api/v1/platforms/playback/spotify/resolve-track', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -370,6 +385,17 @@ export const searchEmsCollection = (payload: EmsCollectionSearchRequest) =>
         body: JSON.stringify(payload),
     })
 
+export const fetchEmsSearchPlaylistTracks = (
+    platformId: string,
+    externalPlaylistId: string,
+    userId: string,
+    signal?: AbortSignal,
+) =>
+    requestJson<EmsCollectionSearchPlaylistTracksResponse>(
+        `/api/v1/ems/collection/search/playlists/${encodeURIComponent(platformId)}/${encodeURIComponent(externalPlaylistId)}/tracks?user_id=${encodeURIComponent(userId)}`,
+        { signal },
+    )
+
 export const fetchEmsCollectedPlaylists = (platformId: string = 'spotify', signal?: AbortSignal, limit: number = 12) =>
     requestJson<EmsCollectionPlaylistBrowseResponse>(
         `/api/v1/ems/collection/playlists?platform_id=${encodeURIComponent(platformId)}&limit=${encodeURIComponent(String(limit))}&random=true`,
@@ -413,6 +439,15 @@ export const fetchEmsOverview = (payload: EmsOverviewRequest, signal?: AbortSign
         },
         body: JSON.stringify(payload),
         signal,
+    })
+
+export const recordUserMusicEvent = (payload: UserMusicEventRequest) =>
+    requestJson<UserMusicEventResponse>('/api/v1/recommendations/events', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
     })
 
 export const previewGmsRecommendations = (payload: GmsRecommendationPreviewRequest) =>

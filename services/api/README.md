@@ -72,6 +72,8 @@ services/api/
 - PMS import 명령 엔드포인트: `POST /api/v1/pms/import/playlists`
 - PMS workspace bootstrap 엔드포인트: `GET /api/v1/pms/workspace/bootstrap`
 - EMS workspace analysis 엔드포인트: `POST /api/v1/ems/workspace/analysis`
+- EMS provider search 엔드포인트: `POST /api/v1/ems/collection/search`
+- EMS search playlist track preview 엔드포인트: `GET /api/v1/ems/collection/search/playlists/{platformId}/{externalPlaylistId}/tracks`
 - GMS AI preview 브리지 엔드포인트: `POST /api/v1/gms/recommendations/preview`
 - GMS feedback 저장 엔드포인트: `POST /api/v1/gms/recommendations/feedback`
 - PMS personal playlist 엔드포인트: `GET /api/v1/pms/personal-playlists/bootstrap`, `POST /api/v1/pms/personal-playlists`, `POST /api/v1/pms/personal-playlists/tracks`

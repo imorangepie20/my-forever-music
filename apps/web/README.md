@@ -48,10 +48,10 @@
   - seed track / artist / genre / playlist 입력
   - bootstrap track별 album image, playback target, Spotify 오디오 특성 readiness 표시
 - `/ems`
-  - mood / energy / familiarity / limit 조정
-  - `POST /api/v1/ems/workspace/analysis` 자동 호출
-  - 현재 PMS playlist와 track shelf를 그대로 유지
-  - API 추천값을 현재 workspace에 바로 적용 가능
+  - 연결된 provider 전체 검색
+  - playlist/track 검색 결과 페이지 유지
+  - 검색 playlist 클릭 후 track detail 페이지에서 전체/개별 재생
+  - EMS DB public playlist pool 표시와 저장된 playlist 재생
 - `/gms-preview`
   - `POST /api/v1/gms/recommendations/preview` 호출
   - PMS/EMS workspace 값을 바탕으로 요청 생성

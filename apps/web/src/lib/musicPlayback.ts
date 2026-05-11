@@ -146,16 +146,12 @@ export const resolveSpotifyContextUri = (item: PlaybackMediaItem) => {
 }
 
 export const resolvePlaybackPlatformId = (item: PlaybackMediaItem, fallbackPlatformId?: string | null) => {
-    if (item.kind === 'track' && fallbackPlatformId === 'tidal') {
-        return 'tidal'
-    }
-
-    if (item.kind === 'track' && fallbackPlatformId === 'spotify' && resolveSpotifyTrackId(item)) {
-        return 'spotify'
-    }
-
     if (item.playbackPlatformId) {
         return item.playbackPlatformId
+    }
+
+    if (item.kind === 'track' && (fallbackPlatformId === 'tidal' || fallbackPlatformId === 'spotify')) {
+        return fallbackPlatformId
     }
 
     if (item.sourcePlatform === 'tidal' && resolveTidalTrackId(item)) {

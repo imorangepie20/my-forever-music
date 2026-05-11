@@ -9,6 +9,7 @@ import io.myforevermusic.api.modules.platform.application.LastFmScrobbleStore;
 import io.myforevermusic.api.modules.platform.infrastructure.lastfm.LastFmWebApiClient;
 import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
+import io.myforevermusic.api.modules.recommendation.application.RecommendationSnapshotService;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -29,19 +30,22 @@ public class GmsRecommendationPreviewService {
     private final LastFmScrobbleStore lastFmScrobbleStore;
     private final PmsUserLibraryStore pmsUserLibraryStore;
     private final Optional<LastFmWebApiClient> lastFmWebApiClient;
+    private final RecommendationSnapshotService recommendationSnapshotService;
 
     public GmsRecommendationPreviewService(
         AiRecommendationPreviewClient aiRecommendationPreviewClient,
         AuthAccountStore authAccountStore,
         LastFmScrobbleStore lastFmScrobbleStore,
         PmsUserLibraryStore pmsUserLibraryStore,
-        Optional<LastFmWebApiClient> lastFmWebApiClient
+        Optional<LastFmWebApiClient> lastFmWebApiClient,
+        RecommendationSnapshotService recommendationSnapshotService
     ) {
         this.aiRecommendationPreviewClient = aiRecommendationPreviewClient;
         this.authAccountStore = authAccountStore;
         this.lastFmScrobbleStore = lastFmScrobbleStore;
         this.pmsUserLibraryStore = pmsUserLibraryStore;
         this.lastFmWebApiClient = lastFmWebApiClient;
+        this.recommendationSnapshotService = recommendationSnapshotService;
     }
 
     public GmsRecommendationPreviewResponse previewRecommendations(GmsRecommendationPreviewRequest request) {
@@ -64,8 +68,9 @@ public class GmsRecommendationPreviewService {
             );
         }
 
+        GmsRecommendationPreviewResponse finalResponse;
         if (enrichmentWarnings.isEmpty()) {
-            return playableItems.isEmpty() ? response : new GmsRecommendationPreviewResponse(
+            finalResponse = playableItems.isEmpty() ? response : new GmsRecommendationPreviewResponse(
                 response.requestId(),
                 response.generatedAt(),
                 response.service(),
@@ -75,12 +80,14 @@ public class GmsRecommendationPreviewService {
                 playableItems,
                 response.warnings()
             );
+            recommendationSnapshotService.recordGmsPreview(enrichedRequest, finalResponse);
+            return finalResponse;
         }
 
         List<String> mergedWarnings = new ArrayList<>(response.warnings());
         mergedWarnings.addAll(enrichmentWarnings);
 
-        return new GmsRecommendationPreviewResponse(
+        finalResponse = new GmsRecommendationPreviewResponse(
             response.requestId(),
             response.generatedAt(),
             response.service(),
@@ -90,6 +97,8 @@ public class GmsRecommendationPreviewService {
             playableItems.isEmpty() ? response.items() : playableItems,
             List.copyOf(mergedWarnings)
         );
+        recommendationSnapshotService.recordGmsPreview(enrichedRequest, finalResponse);
+        return finalResponse;
     }
 
     private List<GmsRecommendationPreviewResponse.RecommendationItem> projectPlayableItems(

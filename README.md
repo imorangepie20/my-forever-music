@@ -86,7 +86,7 @@ my-forever-music/
 - `apps/web`는 `/platforms` 화면에서 Last.fm username 저장, 최근 scrobble sync, 저장 snapshot 확인까지 제공
 - `apps/web`는 `/pms` 화면에서 사용자별 PMS bootstrap과 platform playlist import를 제공
 - `apps/web`는 `PMS import/bootstrap -> EMS workspace -> GMS preview` 흐름까지 반영 완료
-- `apps/web`의 `EMS` 화면은 Spring Boot `workspace overview`와 EMS DB 공개 playlist pool을 한 화면에서 표시
+- `apps/web`의 `EMS` 화면은 provider 검색, 검색 playlist track detail/playback, EMS DB 공개 playlist pool을 한 화면 흐름으로 제공
 - `apps/web` 공통 플레이어는 새 재생 시작 전 초기화한 뒤 TIDAL resolve/stream 준비 상태를 spinner와 메시지로 표시
 - `apps/desktop`는 향후 Windows 앱 개발을 위한 예약 구조 생성 완료
 - `services/api`는 `GET /api/v1/platforms/catalog` 엔드포인트로 플랫폼 역할과 온보딩 흐름 제공
@@ -111,7 +111,7 @@ my-forever-music/
 - `services/api`의 `PMS workspace bootstrap`는 현재 정식 `PMS user library`를 raw import snapshot보다 우선 사용함
 - `services/api`는 PMS workspace bootstrap과 `services/ai` preview 호출용 GMS 브리지 엔드포인트 생성 완료
 - `services/api`는 PMS seed 기반 `EMS workspace analysis` 엔드포인트 추가 완료
-- `services/api`는 EMS collection browse/detail, EMS overview, TIDAL playback target resolve endpoint를 제공
+- `services/api`는 EMS provider search, search playlist track preview, EMS collection browse/detail, EMS overview, TIDAL playback target resolve endpoint를 제공
 - `services/api`는 `local` 프로필 기준으로 DB 없이 로컬 부팅 검증 완료
 - `services/api`의 `PMS bootstrap`과 `GMS preview -> services/ai` 브리지 응답 검증 완료
 - `services/api`는 import 전 PMS workspace가 가짜 seed를 노출하지 않도록 빈 라이브러리 상태를 반환함

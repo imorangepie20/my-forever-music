@@ -28,6 +28,7 @@ import org.springframework.stereotype.Component;
 public class SpotifyWebApiClient {
 
     private static final Logger log = LoggerFactory.getLogger(SpotifyWebApiClient.class);
+    private static final int SEARCH_PAGE_SIZE = 50;
 
     private final PlatformOAuthProperties platformOAuthProperties;
     private final ObjectMapper objectMapper;
@@ -58,38 +59,64 @@ public class SpotifyWebApiClient {
         String query,
         int limit
     ) {
-        int clampedLimit = Math.min(Math.max(limit, 1), 10);
-        SpotifySearchPlaylistEnvelope payload = get(
-            credential,
-            buildApiUri("/search?q=%s&type=playlist&limit=%d".formatted(
-                URLEncoder.encode(query, StandardCharsets.UTF_8), clampedLimit
-            )),
-            SpotifySearchPlaylistEnvelope.class
-        );
+        int requestLimit = Math.min(Math.max(limit, 1), 50);
+        return searchPlaylists(credential, query, requestLimit, false);
+    }
 
-        List<SpotifyPlaylistItemResponse> items = Optional.ofNullable(payload.playlists())
-            .map(SpotifyPlaylistPageResponse::items)
-            .orElse(List.of());
+    public SpotifySearchResult<SpotifyPlaylistSummary> searchPlaylists(
+        PlatformAccountCredential credential,
+        String query
+    ) {
+        return searchPlaylists(credential, query, SEARCH_PAGE_SIZE, true);
+    }
 
-        List<SpotifyPlaylistSummary> results = items.stream()
-            .filter(item -> item != null && item.id() != null && !item.id().isBlank())
-            .map(item -> new SpotifyPlaylistSummary(
-                item.id(),
-                item.name() == null || item.name().isBlank() ? "Untitled Spotify Playlist" : item.name(),
-                item.description(),
-                item.owner() == null ? null : item.owner().id(),
-                item.owner() == null || item.owner().displayName() == null || item.owner().displayName().isBlank()
-                    ? "Spotify" : item.owner().displayName(),
-                item.collaborative() != null && item.collaborative(),
-                item.tracks() == null || item.tracks().total() == null ? 0 : item.tracks().total(),
-                firstImageUrl(item.images()),
-                spotifyExternalUrl(item.externalUrls()),
-                item.uri()
-            ))
-            .toList();
+    private SpotifySearchResult<SpotifyPlaylistSummary> searchPlaylists(
+        PlatformAccountCredential credential,
+        String query,
+        int requestLimit,
+        boolean followAllPages
+    ) {
+        List<SpotifyPlaylistSummary> results = new ArrayList<>();
+        int total = 0;
+        String nextUri = buildApiUri("/search?q=%s&type=playlist&limit=%d".formatted(
+            URLEncoder.encode(query, StandardCharsets.UTF_8), requestLimit
+        ));
 
-        int total = payload.playlists() != null && payload.playlists().total() != null
-            ? payload.playlists().total() : results.size();
+        while (nextUri != null && !nextUri.isBlank()) {
+            SpotifySearchPlaylistEnvelope payload = get(
+                credential,
+                nextUri,
+                SpotifySearchPlaylistEnvelope.class
+            );
+
+            SpotifyPlaylistPageResponse page = payload.playlists();
+            List<SpotifyPlaylistItemResponse> items = Optional.ofNullable(page)
+                .map(SpotifyPlaylistPageResponse::items)
+                .orElse(List.of());
+
+            items.stream()
+                .filter(item -> item != null && item.id() != null && !item.id().isBlank())
+                .map(item -> new SpotifyPlaylistSummary(
+                    item.id(),
+                    item.name() == null || item.name().isBlank() ? "Untitled Spotify Playlist" : item.name(),
+                    item.description(),
+                    item.owner() == null ? null : item.owner().id(),
+                    item.owner() == null || item.owner().displayName() == null || item.owner().displayName().isBlank()
+                        ? "Spotify" : item.owner().displayName(),
+                    item.collaborative() != null && item.collaborative(),
+                    item.tracks() == null || item.tracks().total() == null ? 0 : item.tracks().total(),
+                    firstImageUrl(item.images()),
+                    spotifyExternalUrl(item.externalUrls()),
+                    item.uri()
+                ))
+                .forEach(results::add);
+
+            total = page != null && page.total() != null ? page.total() : results.size();
+            nextUri = page == null ? null : page.next();
+            if (!followAllPages) {
+                nextUri = null;
+            }
+        }
 
         return new SpotifySearchResult<>(results, total);
     }
@@ -155,40 +182,65 @@ public class SpotifyWebApiClient {
         String query,
         int limit
     ) {
-        int clampedLimit = Math.min(Math.max(limit, 1), 10);
-        SpotifySearchTrackEnvelope payload = get(
-            credential,
-            buildApiUri("/search?q=%s&type=track&limit=%d".formatted(
-                URLEncoder.encode(query, StandardCharsets.UTF_8), clampedLimit
-            )),
-            SpotifySearchTrackEnvelope.class
-        );
+        int requestLimit = Math.min(Math.max(limit, 1), 50);
+        return searchTracks(credential, query, requestLimit, false);
+    }
 
-        SpotifySearchTrackPageResponse trackPage = payload.tracks();
-        List<SpotifyTrackResponse> items = trackPage != null
-            ? Optional.ofNullable(trackPage.items()).orElse(List.of())
-            : List.of();
+    public SpotifySearchResult<SpotifyPlaylistTrack> searchTracks(
+        PlatformAccountCredential credential,
+        String query
+    ) {
+        return searchTracks(credential, query, SEARCH_PAGE_SIZE, true);
+    }
 
-        List<SpotifyPlaylistTrack> results = items.stream()
-            .filter(track -> track != null && track.id() != null && !track.id().isBlank())
-            .filter(track -> track.isLocal() == null || !track.isLocal())
-            .map(track -> new SpotifyPlaylistTrack(
-                track.id(),
-                track.name() == null || track.name().isBlank() ? "Untitled Spotify Track" : track.name(),
-                firstArtistName(track.artists()),
-                track.album() == null ? null : track.album().name(),
-                firstImageUrl(track.album() == null ? null : track.album().images()),
-                track.href(),
-                spotifyExternalUrl(track.externalUrls()),
-                track.uri(),
-                track.previewUrl(),
-                spotifyIsrc(track.externalIds()),
-                track.durationMs()
-            ))
-            .toList();
+    private SpotifySearchResult<SpotifyPlaylistTrack> searchTracks(
+        PlatformAccountCredential credential,
+        String query,
+        int requestLimit,
+        boolean followAllPages
+    ) {
+        List<SpotifyPlaylistTrack> results = new ArrayList<>();
+        int total = 0;
+        String nextUri = buildApiUri("/search?q=%s&type=track&limit=%d".formatted(
+            URLEncoder.encode(query, StandardCharsets.UTF_8), requestLimit
+        ));
 
-        int total = trackPage != null && trackPage.total() != null
-            ? trackPage.total() : results.size();
+        while (nextUri != null && !nextUri.isBlank()) {
+            SpotifySearchTrackEnvelope payload = get(
+                credential,
+                nextUri,
+                SpotifySearchTrackEnvelope.class
+            );
+
+            SpotifySearchTrackPageResponse trackPage = payload.tracks();
+            List<SpotifyTrackResponse> items = trackPage != null
+                ? Optional.ofNullable(trackPage.items()).orElse(List.of())
+                : List.of();
+
+            items.stream()
+                .filter(track -> track != null && track.id() != null && !track.id().isBlank())
+                .filter(track -> track.isLocal() == null || !track.isLocal())
+                .map(track -> new SpotifyPlaylistTrack(
+                    track.id(),
+                    track.name() == null || track.name().isBlank() ? "Untitled Spotify Track" : track.name(),
+                    firstArtistName(track.artists()),
+                    track.album() == null ? null : track.album().name(),
+                    firstImageUrl(track.album() == null ? null : track.album().images()),
+                    track.href(),
+                    spotifyExternalUrl(track.externalUrls()),
+                    track.uri(),
+                    track.previewUrl(),
+                    spotifyIsrc(track.externalIds()),
+                    track.durationMs()
+                ))
+                .forEach(results::add);
+
+            total = trackPage != null && trackPage.total() != null ? trackPage.total() : results.size();
+            nextUri = trackPage == null ? null : trackPage.next();
+            if (!followAllPages) {
+                nextUri = null;
+            }
+        }
 
         return new SpotifySearchResult<>(results, total);
     }

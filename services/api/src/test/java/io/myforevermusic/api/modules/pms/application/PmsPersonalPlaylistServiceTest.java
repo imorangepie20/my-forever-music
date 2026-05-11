@@ -9,6 +9,8 @@ import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudi
 import io.myforevermusic.api.modules.pms.presentation.PmsPersonalPlaylistCommandResponse;
 import io.myforevermusic.api.modules.pms.presentation.PmsPersonalPlaylistCreateRequest;
 import io.myforevermusic.api.modules.pms.presentation.PmsPersonalPlaylistTrackSaveRequest;
+import io.myforevermusic.api.modules.recommendation.application.UserMusicEventService;
+import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryUserMusicEventStore;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -19,7 +21,8 @@ class PmsPersonalPlaylistServiceTest {
     void shouldCreatePersonalPlaylist() {
         PmsPersonalPlaylistService service = new PmsPersonalPlaylistService(
             new InMemoryPmsPersonalPlaylistStore(),
-            new InMemoryPmsUserLibraryStore()
+            new InMemoryPmsUserLibraryStore(),
+            new UserMusicEventService(new InMemoryUserMusicEventStore())
         );
 
         PmsPersonalPlaylistCommandResponse response = service.createPlaylist(
@@ -38,10 +41,12 @@ class PmsPersonalPlaylistServiceTest {
     @Test
     void shouldSaveLibraryTrackIntoDefaultGmsPlaylist() {
         InMemoryPmsUserLibraryStore userLibraryStore = new InMemoryPmsUserLibraryStore();
+        InMemoryUserMusicEventStore eventStore = new InMemoryUserMusicEventStore();
         userLibraryStore.savePlaylists("user-001", List.of(sampleLibraryPlaylist()));
         PmsPersonalPlaylistService service = new PmsPersonalPlaylistService(
             new InMemoryPmsPersonalPlaylistStore(),
-            userLibraryStore
+            userLibraryStore,
+            new UserMusicEventService(eventStore)
         );
 
         PmsPersonalPlaylistCommandResponse response = service.saveTrack(
@@ -69,13 +74,20 @@ class PmsPersonalPlaylistServiceTest {
         assertThat(response.playlist().tracks().getFirst().spotifyTrackId()).isEqualTo("spotify-track-001");
         assertThat(response.playlist().tracks().getFirst().audioFeatureTrackId()).isEqualTo("spotify-track-001");
         assertThat(duplicateResponse.playlist().trackCount()).isEqualTo(1);
+        assertThat(eventStore.findRecentByUserId("user-001", 10))
+            .extracting("eventType")
+            .containsOnly("added_to_playlist")
+            .hasSize(2);
+        assertThat(eventStore.findRecentByUserId("user-001", 1).getFirst().playlistId())
+            .isEqualTo("personal-saved-gms-recommendations");
     }
 
     @Test
     void shouldRejectTrackOutsideSyncedPmsLibrary() {
         PmsPersonalPlaylistService service = new PmsPersonalPlaylistService(
             new InMemoryPmsPersonalPlaylistStore(),
-            new InMemoryPmsUserLibraryStore()
+            new InMemoryPmsUserLibraryStore(),
+            new UserMusicEventService(new InMemoryUserMusicEventStore())
         );
 
         assertThatThrownBy(() -> service.saveTrack(

@@ -3,6 +3,9 @@ import {
     Loader2,
     Pause,
     Play,
+    Repeat,
+    Repeat1,
+    Shuffle,
     SkipBack,
     SkipForward,
     Volume2,
@@ -29,12 +32,17 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
         positionMs,
         durationMs,
         volume,
+        shuffleEnabled,
+        repeatMode,
+        audioQualityLabel,
         pause,
         resume,
         skipNext,
         skipPrevious,
         seek,
         setVolume,
+        toggleShuffle,
+        cycleRepeatMode,
         clearItem,
     } = usePlayback()
 
@@ -45,6 +53,8 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
     const playbackPlatformId = resolvePlaybackPlatformId(currentItem)
     const totalDuration = durationMs || currentItem.durationMs || 0
     const progressValue = totalDuration > 0 ? Math.min(positionMs, totalDuration) : 0
+    const repeatLabel = repeatMode === 'one' ? 'Repeat one' : repeatMode === 'all' ? 'Repeat queue' : 'Repeat off'
+    const RepeatIcon = repeatMode === 'one' ? Repeat1 : Repeat
 
     const handleTogglePlayback = () => {
         if (isPlaying) {
@@ -80,6 +90,19 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                     <div className="flex items-center justify-center gap-3">
                         <button
                             type="button"
+                            onClick={() => void toggleShuffle()}
+                            className={`flex h-10 w-10 items-center justify-center rounded-full border transition-hud ${
+                                shuffleEnabled
+                                    ? 'border-hud-accent-primary bg-hud-accent-primary/10 text-hud-accent-primary'
+                                    : 'border-hud-border-secondary text-hud-text-secondary hover:border-hud-border-primary hover:text-hud-text-primary'
+                            }`}
+                            aria-label={shuffleEnabled ? 'Disable shuffle' : 'Enable shuffle'}
+                            title={shuffleEnabled ? 'Shuffle on' : 'Shuffle off'}
+                        >
+                            <Shuffle size={17} />
+                        </button>
+                        <button
+                            type="button"
                             onClick={() => void skipPrevious()}
                             className="flex h-10 w-10 items-center justify-center rounded-full border border-hud-border-secondary text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
                             aria-label="Previous track"
@@ -109,6 +132,19 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                         >
                             <SkipForward size={18} />
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => void cycleRepeatMode()}
+                            className={`flex h-10 w-10 items-center justify-center rounded-full border transition-hud ${
+                                repeatMode !== 'off'
+                                    ? 'border-hud-accent-primary bg-hud-accent-primary/10 text-hud-accent-primary'
+                                    : 'border-hud-border-secondary text-hud-text-secondary hover:border-hud-border-primary hover:text-hud-text-primary'
+                            }`}
+                            aria-label={repeatLabel}
+                            title={repeatLabel}
+                        >
+                            <RepeatIcon size={17} />
+                        </button>
                     </div>
 
                     <div className="mt-3 grid grid-cols-[48px_minmax(0,1fr)_48px] items-center gap-3">
@@ -133,6 +169,9 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                 </div>
 
                 <div className="flex items-center justify-end gap-3">
+                    <span className="max-w-44 truncate rounded-full border border-hud-border-secondary px-3 py-2 text-xs uppercase tracking-[0.16em] text-hud-text-muted" title={audioQualityLabel ?? undefined}>
+                        {audioQualityLabel ?? 'Quality pending'}
+                    </span>
                     <span className="rounded-full border border-hud-border-secondary px-3 py-2 text-xs uppercase tracking-[0.2em] text-hud-text-muted">
                         Queue {queue.length > 0 ? `${currentIndex + 1}/${queue.length}` : '0/0'}
                     </span>

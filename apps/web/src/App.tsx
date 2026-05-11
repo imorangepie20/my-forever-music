@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import MainLayout from './layouts/MainLayout'
 import EmsPage from './pages/EmsPage'
 import EmsPlaylistDetailPage from './pages/EmsPlaylistDetailPage'
+import EmsSearchPlaylistDetailPage from './pages/EmsSearchPlaylistDetailPage'
 import GmsPreviewPage from './pages/GmsPreviewPage'
 import HomePage from './pages/HomePage'
 import NotFoundPage from './pages/NotFoundPage'
@@ -26,6 +27,7 @@ function App() {
                     <Route path="ems" element={<EmsPage />} />
                     <Route path="gms-preview" element={<GmsPreviewPage />} />
                     <Route path="playback-harness" element={<PlaybackHarnessPage />} />
+                    <Route path="ems/search/playlists/:platformId/:externalPlaylistId" element={<EmsSearchPlaylistDetailPage />} />
                     <Route path="playlists/ems/:playlistId" element={<EmsPlaylistDetailPage />} />
                     <Route path="playlists/pms/:playlistId" element={<PmsPlaylistDetailPage />} />
                 </Route>

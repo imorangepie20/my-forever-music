@@ -8,7 +8,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService;
+import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsAudioFeatureBackfillResult;
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsAudioFeatureCoverage;
+import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPlaylistPreview;
+import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPlaylistTracksPreview;
+import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPreviewResult;
+import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchTrackPreview;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler.EmsPublicPlaylistDiscoveryFailure;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler.EmsPublicPlaylistDiscoveryRun;
@@ -37,6 +42,89 @@ class EmsCollectionControllerWebMvcTest {
 
     @MockBean
     private EmsPublicPlaylistDiscoveryScheduler emsPublicPlaylistDiscoveryScheduler;
+
+    @Test
+    void shouldPreviewEmsSearchResultsWithoutCollection() throws Exception {
+        when(emsCollectionService.previewSearch("user-001", null, "jazz"))
+            .thenReturn(new EmsCollectionSearchPreviewResult(
+                "all",
+                "jazz",
+                List.of(new EmsCollectionSearchPlaylistPreview(
+                    "playlist-001",
+                    "Stored Outside EMS",
+                    "tidal",
+                    "",
+                    "Preview only",
+                    null,
+                    "https://tidal.com/browse/playlist/playlist-001",
+                    null,
+                    20
+                )),
+                List.of(new EmsCollectionSearchTrackPreview(
+                    "track-001",
+                    "Preview Track",
+                    "Preview Artist",
+                    "tidal",
+                    "USRC17607839",
+                    "Preview Album",
+                    null,
+                    "https://tidal.com/browse/track/track-001",
+                    "tidal:track:track-001",
+                    null,
+                    210000
+                )),
+                5,
+                9,
+                Instant.parse("2026-05-10T00:00:00Z")
+            ));
+
+        mockMvc.perform(post("/api/v1/ems/collection/search")
+                .contentType("application/json")
+                .content("""
+                    {
+                      "user_id": "user-001",
+                      "query": "jazz"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.result_playlist_count").value(5))
+            .andExpect(jsonPath("$.result_track_count").value(9))
+            .andExpect(jsonPath("$.playlists[0].title").value("Stored Outside EMS"))
+            .andExpect(jsonPath("$.tracks[0].isrc").value("USRC17607839"));
+    }
+
+    @Test
+    void shouldPreviewSearchPlaylistTracksWithoutCollection() throws Exception {
+        when(emsCollectionService.getSearchPlaylistTracks("user-001", "tidal", "playlist-001"))
+            .thenReturn(new EmsCollectionSearchPlaylistTracksPreview(
+                "tidal",
+                "playlist-001",
+                List.of(new EmsCollectionSearchTrackPreview(
+                    "track-001",
+                    "Preview Track",
+                    "Preview Artist",
+                    "tidal",
+                    "USRC17607839",
+                    "Preview Album",
+                    null,
+                    "https://tidal.com/browse/track/track-001",
+                    "tidal:track:track-001",
+                    null,
+                    210000
+                )),
+                12,
+                Instant.parse("2026-05-10T00:00:00Z")
+            ));
+
+        mockMvc.perform(get("/api/v1/ems/collection/search/playlists/tidal/playlist-001/tracks")
+                .param("user_id", "user-001"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.platform_id").value("tidal"))
+            .andExpect(jsonPath("$.external_playlist_id").value("playlist-001"))
+            .andExpect(jsonPath("$.track_count").value(12))
+            .andExpect(jsonPath("$.tracks[0].title").value("Preview Track"))
+            .andExpect(jsonPath("$.tracks[0].platform_uri").value("tidal:track:track-001"));
+    }
 
     @Test
     void shouldDisplayCollectedPlaylistTracksFromDatabaseOnly() throws Exception {
@@ -147,6 +235,38 @@ class EmsCollectionControllerWebMvcTest {
             .andExpect(jsonPath("$.collected_track_count").value(24))
             .andExpect(jsonPath("$.failures[0].platform_id").value("tidal"))
             .andExpect(jsonPath("$.failures[0].message").value("token expired"));
+    }
+
+    @Test
+    void shouldBackfillCollectedPlaylistAudioFeatures() throws Exception {
+        when(emsCollectionService.backfillAudioFeaturesForPlaylist(2L))
+            .thenReturn(new EmsAudioFeatureBackfillResult(
+                2L,
+                "Pop Hits",
+                "tidal",
+                50,
+                0,
+                50,
+                50,
+                0,
+                12,
+                12,
+                12,
+                12,
+                38,
+                0.24,
+                Instant.parse("2026-05-10T02:00:00Z")
+            ));
+
+        mockMvc.perform(post("/api/v1/ems/collection/playlists/2/audio-features/backfill"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.playlist_id").value(2))
+            .andExpect(jsonPath("$.playlist_title").value("Pop Hits"))
+            .andExpect(jsonPath("$.source_platform").value("tidal"))
+            .andExpect(jsonPath("$.eligible_track_count").value(50))
+            .andExpect(jsonPath("$.missing_isrc_track_count").value(0))
+            .andExpect(jsonPath("$.newly_filled_track_count").value(12))
+            .andExpect(jsonPath("$.coverage_ratio_after").value(0.24));
     }
 
     @Test

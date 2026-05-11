@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 public class ReccoBeatsAudioFeaturesClient {
 
     private static final Logger log = LoggerFactory.getLogger(ReccoBeatsAudioFeaturesClient.class);
-    private static final int BATCH_SIZE = 100;
+    private static final int BATCH_SIZE = 40;
 
     private final ReccoBeatsProperties properties;
     private final ObjectMapper objectMapper;

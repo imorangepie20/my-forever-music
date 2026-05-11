@@ -9,6 +9,8 @@ import io.myforevermusic.api.modules.gms.presentation.GmsRecommendationFeedbackR
 import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
+import io.myforevermusic.api.modules.recommendation.application.UserMusicEventService;
+import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryUserMusicEventStore;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -18,10 +20,12 @@ class GmsRecommendationFeedbackServiceTest {
     @Test
     void shouldRecordFeedbackForSyncedPmsLibraryTrack() {
         InMemoryPmsUserLibraryStore userLibraryStore = new InMemoryPmsUserLibraryStore();
+        InMemoryUserMusicEventStore eventStore = new InMemoryUserMusicEventStore();
         userLibraryStore.savePlaylists("user-001", List.of(samplePlaylist()));
         GmsRecommendationFeedbackService service = new GmsRecommendationFeedbackService(
             new InMemoryGmsRecommendationFeedbackStore(),
-            userLibraryStore
+            userLibraryStore,
+            new UserMusicEventService(eventStore)
         );
 
         GmsRecommendationFeedbackResponse response = service.recordFeedback(
@@ -41,13 +45,18 @@ class GmsRecommendationFeedbackServiceTest {
         assertThat(response.feedback().feedbackId()).isEqualTo(1L);
         assertThat(response.feedback().feedbackType()).isEqualTo("like");
         assertThat(response.feedback().trackId()).isEqualTo("track-001");
+        assertThat(eventStore.findRecentByUserId("user-001", 1).getFirst().eventType())
+            .isEqualTo("recommendation_liked");
+        assertThat(eventStore.findRecentByUserId("user-001", 1).getFirst().recommendationId())
+            .isEqualTo("preview-001");
     }
 
     @Test
     void shouldRejectFeedbackForTrackOutsideUserLibrary() {
         GmsRecommendationFeedbackService service = new GmsRecommendationFeedbackService(
             new InMemoryGmsRecommendationFeedbackStore(),
-            new InMemoryPmsUserLibraryStore()
+            new InMemoryPmsUserLibraryStore(),
+            new UserMusicEventService(new InMemoryUserMusicEventStore())
         );
 
         assertThatThrownBy(() -> service.recordFeedback(

@@ -23,8 +23,9 @@
 13. [TIDAL_PLAYBACK_TARGET_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/TIDAL_PLAYBACK_TARGET_API.md)
 14. [GMS_RECOMMENDATION_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_PREVIEW_API.md)
 15. [GMS_RECOMMENDATION_FEEDBACK_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_FEEDBACK_API.md)
-16. [AI_RECOMMENDATION_PREVIEW.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AI_RECOMMENDATION_PREVIEW.md)
-17. [PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md)
+16. [USER_MUSIC_EVENT_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/USER_MUSIC_EVENT_API.md)
+17. [AI_RECOMMENDATION_PREVIEW.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AI_RECOMMENDATION_PREVIEW.md)
+18. [PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md)
 
 ## 문서 분류
 
@@ -47,6 +48,7 @@
 - [TIDAL_PLAYBACK_TARGET_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/TIDAL_PLAYBACK_TARGET_API.md)
 - [GMS_RECOMMENDATION_PREVIEW_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_PREVIEW_API.md)
 - [GMS_RECOMMENDATION_FEEDBACK_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/GMS_RECOMMENDATION_FEEDBACK_API.md)
+- [USER_MUSIC_EVENT_API.md](/Users/woosungjo/music-space/my-forever-music/docs/api/USER_MUSIC_EVENT_API.md)
 
 ### 2. 내부 서비스 계약
 
@@ -85,6 +87,7 @@
 | EMS Workspace Analysis API | `POST` | `/api/v1/ems/workspace/analysis` | `services/api` | 공개 API |
 | EMS Workspace Overview API | `POST` | `/api/v1/ems/workspace/overview` | `services/api` | 공개 API |
 | EMS Collection API | `POST` | `/api/v1/ems/collection/search` | `services/api` | 검색 preview API |
+| EMS Collection API | `GET` | `/api/v1/ems/collection/search/playlists/{platformId}/{externalPlaylistId}/tracks` | `services/api` | 검색 playlist track preview API |
 | EMS Collection API | `POST` | `/api/v1/ems/collection/discovery/run` | `services/api` | 운영/개발 수집 API |
 | EMS Collection API | `GET` | `/api/v1/ems/collection/discovery/status` | `services/api` | 운영/개발 수집 상태 API |
 | EMS Collection API | `GET` | `/api/v1/ems/collection/playlists` | `services/api` | 공개 API |
@@ -93,6 +96,7 @@
 | TIDAL Playback Target API | `GET` | `/api/v1/platforms/playback/tidal/tracks/{track_id}/stream` | `services/api` | 공개 API |
 | GMS Recommendation Preview API | `POST` | `/api/v1/gms/recommendations/preview` | `services/api` | 공개 API |
 | GMS Recommendation Feedback API | `POST` | `/api/v1/gms/recommendations/feedback` | `services/api` | 공개 API |
+| User Music Event API | `POST` | `/api/v1/recommendations/events` | `services/api` | 공개 API |
 | AI Recommendation Preview API | `POST` | `/v1/recommendations/preview` | `services/ai` | 내부 계약 |
 
 ## 정리 원칙

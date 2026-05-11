@@ -14,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,6 +44,8 @@ public class TidalWebApiClient {
 
     private static final Logger log = LoggerFactory.getLogger(TidalWebApiClient.class);
     private static final String ACCEPT_HEADER = "application/vnd.api+json";
+    private static final int SEARCH_PAGE_SIZE = 50;
+    private static final int PLAYLIST_TRACK_PAGE_SIZE = 100;
     private static final Map<String, String> HOME_PAGE_TITLES_BY_SOURCE_ID = Map.of(
         "THE_HITS", "The Hits",
         "POPULAR_MIXES", "Popular Mixes",
@@ -54,6 +57,8 @@ public class TidalWebApiClient {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
     private final String apiBaseUri;
+
+    public record TidalSearchResult<T>(List<T> items, int total) {}
 
     @Autowired
     public TidalWebApiClient(
@@ -197,33 +202,70 @@ public class TidalWebApiClient {
         String query,
         int limit
     ) {
+        int requestLimit = Math.min(Math.max(limit, 1), 50);
+        return searchPlaylistResults(credential, query, requestLimit, false).items();
+    }
+
+    public List<TidalPlaylistSummary> searchPlaylists(
+        PlatformAccountCredential credential,
+        String query
+    ) {
+        return searchPlaylistResults(credential, query).items();
+    }
+
+    public TidalSearchResult<TidalPlaylistSummary> searchPlaylistResults(
+        PlatformAccountCredential credential,
+        String query
+    ) {
+        return searchPlaylistResults(credential, query, SEARCH_PAGE_SIZE, true);
+    }
+
+    private TidalSearchResult<TidalPlaylistSummary> searchPlaylistResults(
+        PlatformAccountCredential credential,
+        String query,
+        int requestLimit,
+        boolean followAllPages
+    ) {
         String countryCode = countryCodeForCredential(credential);
-        int clampedLimit = Math.min(Math.max(limit, 1), 10);
         try {
             String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("%s/search?query=%s&type=playlists&countryCode=%s&limit=%d".formatted(
-                    apiBaseUri, encodedQuery, countryCode, clampedLimit
-                )))
-                .header("Accept", ACCEPT_HEADER)
-                .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
-                .header("Content-Type", "application/vnd.api+json")
-                .GET()
-                .build();
+            URI nextUri = URI.create("%s/search?query=%s&type=playlists&countryCode=%s&limit=%d".formatted(
+                apiBaseUri, encodedQuery, countryCode, requestLimit
+            ));
+            List<TidalPlaylistSummary> results = new ArrayList<>();
+            int total = 0;
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                log.info("TIDAL OpenAPI playlist search unavailable: {}. Falling back to legacy search boundary.", response.statusCode());
-                return searchLegacyPlaylists(credential, query, clampedLimit, countryCode);
+            while (nextUri != null) {
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(nextUri)
+                    .header("Accept", ACCEPT_HEADER)
+                    .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
+                    .header("Content-Type", "application/vnd.api+json")
+                    .GET()
+                    .build();
+
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                    log.info("TIDAL OpenAPI playlist search unavailable: {}. Falling back to legacy search boundary.", response.statusCode());
+                    return searchLegacyPlaylists(credential, query, requestLimit, countryCode, followAllPages);
+                }
+
+                JsonApiArrayRoot jsonApi = objectMapper.readValue(response.body(), JsonApiArrayRoot.class);
+                List<TidalPlaylistSummary> pagePlaylists = Optional.ofNullable(jsonApi.data())
+                    .stream()
+                    .flatMap(List::stream)
+                    .filter(data -> "playlists".equals(data.type()))
+                    .map(this::toPlaylistSummary)
+                    .toList();
+                results.addAll(pagePlaylists);
+                total = Math.max(total, totalFromMeta(jsonApi.meta(), results.size()));
+                nextUri = nextPageUri(jsonApi.links());
+                if (!followAllPages) {
+                    nextUri = null;
+                }
             }
 
-            JsonApiArrayRoot jsonApi = objectMapper.readValue(response.body(), JsonApiArrayRoot.class);
-            return Optional.ofNullable(jsonApi.data())
-                .stream()
-                .flatMap(List::stream)
-                .filter(data -> "playlists".equals(data.type()))
-                .map(this::toPlaylistSummary)
-                .toList();
+            return new TidalSearchResult<>(results, Math.max(total, results.size()));
         } catch (IOException exception) {
             throw new IllegalStateException("TIDAL playlist search response could not be parsed.", exception);
         } catch (InterruptedException exception) {
@@ -240,35 +282,71 @@ public class TidalWebApiClient {
         String query,
         int limit
     ) {
+        int requestLimit = Math.min(Math.max(limit, 1), 50);
+        return searchTrackResults(credential, query, requestLimit, false).items();
+    }
+
+    public List<TidalPlaylistTrack> searchTracks(
+        PlatformAccountCredential credential,
+        String query
+    ) {
+        return searchTrackResults(credential, query).items();
+    }
+
+    public TidalSearchResult<TidalPlaylistTrack> searchTrackResults(
+        PlatformAccountCredential credential,
+        String query
+    ) {
+        return searchTrackResults(credential, query, SEARCH_PAGE_SIZE, true);
+    }
+
+    private TidalSearchResult<TidalPlaylistTrack> searchTrackResults(
+        PlatformAccountCredential credential,
+        String query,
+        int requestLimit,
+        boolean followAllPages
+    ) {
         String countryCode = countryCodeForCredential(credential);
-        int clampedLimit = Math.min(Math.max(limit, 1), 10);
         try {
             String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("%s/search?query=%s&type=tracks&countryCode=%s&limit=%d".formatted(
-                    apiBaseUri, encodedQuery, countryCode, clampedLimit
-                )))
-                .header("Accept", ACCEPT_HEADER)
-                .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
-                .header("Content-Type", "application/vnd.api+json")
-                .GET()
-                .build();
+            URI nextUri = URI.create("%s/search?query=%s&type=tracks&countryCode=%s&limit=%d".formatted(
+                apiBaseUri, encodedQuery, countryCode, requestLimit
+            ));
+            List<TidalPlaylistTrack> results = new ArrayList<>();
+            int total = 0;
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                log.info("TIDAL OpenAPI track search unavailable: {}. Falling back to legacy search boundary.", response.statusCode());
-                return searchLegacyTracks(credential, query, clampedLimit, countryCode);
+            while (nextUri != null) {
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(nextUri)
+                    .header("Accept", ACCEPT_HEADER)
+                    .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
+                    .header("Content-Type", "application/vnd.api+json")
+                    .GET()
+                    .build();
+
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                    log.info("TIDAL OpenAPI track search unavailable: {}. Falling back to legacy search boundary.", response.statusCode());
+                    return searchLegacyTracks(credential, query, requestLimit, countryCode, followAllPages);
+                }
+
+                JsonApiArrayWithIncluded jsonApi = objectMapper.readValue(response.body(), JsonApiArrayWithIncluded.class);
+                Map<String, JsonApiData> includedByKey = indexIncluded(jsonApi.included());
+                List<TidalPlaylistTrack> pageTracks = Optional.ofNullable(jsonApi.data())
+                    .stream()
+                    .flatMap(List::stream)
+                    .filter(data -> "tracks".equals(data.type()))
+                    .map(trackData -> toTrackFromSearch(trackData, includedByKey))
+                    .toList();
+                results.addAll(pageTracks);
+                total = Math.max(total, totalFromMeta(jsonApi.meta(), results.size()));
+                nextUri = nextPageUri(jsonApi.links());
+                if (!followAllPages) {
+                    nextUri = null;
+                }
             }
 
-            JsonApiArrayWithIncluded jsonApi = objectMapper.readValue(response.body(), JsonApiArrayWithIncluded.class);
-            Map<String, JsonApiData> includedByKey = indexIncluded(jsonApi.included());
-
-            return Optional.ofNullable(jsonApi.data())
-                .stream()
-                .flatMap(List::stream)
-                .filter(data -> "tracks".equals(data.type()))
-                .map(trackData -> toTrackFromSearch(trackData, includedByKey))
-                .toList();
+            return new TidalSearchResult<>(results, Math.max(total, results.size()));
         } catch (IOException exception) {
             throw new IllegalStateException("TIDAL track search response could not be parsed.", exception);
         } catch (InterruptedException exception) {
@@ -402,38 +480,53 @@ public class TidalWebApiClient {
         }
     }
 
-    private List<TidalPlaylistSummary> searchLegacyPlaylists(
+    private TidalSearchResult<TidalPlaylistSummary> searchLegacyPlaylists(
         PlatformAccountCredential credential,
         String query,
         int limit,
-        String countryCode
+        String countryCode,
+        boolean followAllPages
     ) {
         try {
             String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("%s/search/playlists?query=%s&limit=%d&countryCode=%s".formatted(
-                    legacyApiBaseUri(), encodedQuery, limit, countryCode
-                )))
-                .header("Accept", "application/json")
-                .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
-                .GET()
-                .build();
+            int offset = 0;
+            List<TidalPlaylistSummary> playlists = new ArrayList<>();
+            while (true) {
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("%s/search/playlists?query=%s&limit=%d&offset=%d&countryCode=%s".formatted(
+                        legacyApiBaseUri(), encodedQuery, limit, offset, countryCode
+                    )))
+                    .header("Accept", "application/json")
+                    .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
+                    .GET()
+                    .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() == 404) {
-                log.info("TIDAL legacy playlist search endpoint is unavailable. Continuing with track search only.");
-                return List.of();
-            }
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalArgumentException("TIDAL legacy playlist search failed (%s): %s"
-                    .formatted(response.statusCode(), response.body()));
-            }
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() == 404) {
+                    log.info("TIDAL legacy playlist search endpoint is unavailable. Continuing with track search only.");
+                    return new TidalSearchResult<>(List.of(), 0);
+                }
+                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                    throw new IllegalArgumentException("TIDAL legacy playlist search failed (%s): %s"
+                        .formatted(response.statusCode(), response.body()));
+                }
 
-            JsonNode body = objectMapper.readTree(response.body());
-            return jsonItems(body)
-                .map(this::toLegacyPlaylistSummary)
-                .filter(Objects::nonNull)
-                .toList();
+                JsonNode body = objectMapper.readTree(response.body());
+                List<TidalPlaylistSummary> pagePlaylists = jsonItems(body)
+                    .map(this::toLegacyPlaylistSummary)
+                    .filter(Objects::nonNull)
+                    .toList();
+                playlists.addAll(pagePlaylists);
+                Integer total = totalFromJson(body);
+                if (!followAllPages || pagePlaylists.size() < limit || (total != null && total <= playlists.size())) {
+                    return new TidalSearchResult<>(playlists, Math.max(total == null ? 0 : total, playlists.size()));
+                }
+                if (pagePlaylists.isEmpty()) {
+                    break;
+                }
+                offset += pagePlaylists.size();
+            }
+            return new TidalSearchResult<>(playlists, playlists.size());
         } catch (IOException exception) {
             throw new IllegalStateException("TIDAL legacy playlist search response could not be parsed.", exception);
         } catch (InterruptedException exception) {
@@ -442,34 +535,49 @@ public class TidalWebApiClient {
         }
     }
 
-    private List<TidalPlaylistTrack> searchLegacyTracks(
+    private TidalSearchResult<TidalPlaylistTrack> searchLegacyTracks(
         PlatformAccountCredential credential,
         String query,
         int limit,
-        String countryCode
+        String countryCode,
+        boolean followAllPages
     ) {
         try {
             String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("%s/search/tracks?query=%s&limit=%d&countryCode=%s".formatted(
-                    legacyApiBaseUri(), encodedQuery, limit, countryCode
-                )))
-                .header("Accept", "application/json")
-                .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
-                .GET()
-                .build();
+            int offset = 0;
+            List<TidalPlaylistTrack> tracks = new ArrayList<>();
+            while (true) {
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("%s/search/tracks?query=%s&limit=%d&offset=%d&countryCode=%s".formatted(
+                        legacyApiBaseUri(), encodedQuery, limit, offset, countryCode
+                    )))
+                    .header("Accept", "application/json")
+                    .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
+                    .GET()
+                    .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalArgumentException("TIDAL legacy track search failed (%s): %s"
-                    .formatted(response.statusCode(), response.body()));
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                    throw new IllegalArgumentException("TIDAL legacy track search failed (%s): %s"
+                        .formatted(response.statusCode(), response.body()));
+                }
+
+                JsonNode body = objectMapper.readTree(response.body());
+                List<TidalPlaylistTrack> pageTracks = jsonItems(body)
+                    .map(this::toLegacyTrack)
+                    .filter(Objects::nonNull)
+                    .toList();
+                tracks.addAll(pageTracks);
+                Integer total = totalFromJson(body);
+                if (!followAllPages || pageTracks.size() < limit || (total != null && total <= tracks.size())) {
+                    return new TidalSearchResult<>(tracks, Math.max(total == null ? 0 : total, tracks.size()));
+                }
+                if (pageTracks.isEmpty()) {
+                    break;
+                }
+                offset += pageTracks.size();
             }
-
-            JsonNode body = objectMapper.readTree(response.body());
-            return jsonItems(body)
-                .map(this::toLegacyTrack)
-                .filter(Objects::nonNull)
-                .toList();
+            return new TidalSearchResult<>(tracks, tracks.size());
         } catch (IOException exception) {
             throw new IllegalStateException("TIDAL legacy track search response could not be parsed.", exception);
         } catch (InterruptedException exception) {
@@ -584,10 +692,24 @@ public class TidalWebApiClient {
     ) {
         String countryCode = countryCodeForCredential(credential);
         try {
+            boolean legacyUnavailable = false;
+            try {
+                List<TidalPlaylistTrack> legacyTracks = getLegacyPlaylistTracks(credential, playlistId, countryCode);
+                if (!legacyTracks.isEmpty()) {
+                    return legacyTracks;
+                }
+            } catch (IllegalArgumentException exception) {
+                legacyUnavailable = true;
+                log.info("TIDAL legacy playlist tracks unavailable for {}: {}", playlistId, exception.getMessage());
+            }
+
+            if (!legacyUnavailable) {
+                log.info("TIDAL legacy playlist tracks returned no tracks for {}. Falling back to OpenAPI track details.", playlistId);
+            }
             List<String> trackIds = getPlaylistTrackIds(credential, playlistId, countryCode);
             if (trackIds.isEmpty()) {
-                log.info("TIDAL OpenAPI playlist item relationship returned no track ids for {}. Falling back to legacy playlist tracks.", playlistId);
-                return getLegacyPlaylistTracks(credential, playlistId, countryCode);
+                log.info("TIDAL OpenAPI playlist item relationship returned no track ids for {}.", playlistId);
+                return List.of();
             }
 
             List<TidalPlaylistTrack> tracks = trackIds.stream()
@@ -595,8 +717,8 @@ public class TidalWebApiClient {
                 .filter(Objects::nonNull)
                 .toList();
             if (tracks.isEmpty()) {
-                log.info("TIDAL OpenAPI track detail returned no tracks for playlist {}. Falling back to legacy playlist tracks.", playlistId);
-                return getLegacyPlaylistTracks(credential, playlistId, countryCode);
+                log.info("TIDAL OpenAPI track detail returned no tracks for playlist {}.", playlistId);
+                return List.of();
             }
             return tracks;
         } catch (IOException exception) {
@@ -689,28 +811,40 @@ public class TidalWebApiClient {
         String countryCode
     ) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("%s/playlists/%s/tracks?countryCode=%s&limit=50".formatted(
-                    legacyApiBaseUri(),
-                    URLEncoder.encode(playlistId, StandardCharsets.UTF_8),
-                    countryCode
-                )))
-                .header("Accept", "application/json")
-                .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
-                .GET()
-                .build();
+            int offset = 0;
+            List<TidalPlaylistTrack> tracks = new ArrayList<>();
+            while (true) {
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("%s/playlists/%s/tracks?countryCode=%s&limit=%d&offset=%d".formatted(
+                        legacyApiBaseUri(),
+                        URLEncoder.encode(playlistId, StandardCharsets.UTF_8),
+                        countryCode,
+                        PLAYLIST_TRACK_PAGE_SIZE,
+                        offset
+                    )))
+                    .header("Accept", "application/json")
+                    .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
+                    .GET()
+                    .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalArgumentException("TIDAL legacy playlist tracks failed (%s): %s"
-                    .formatted(response.statusCode(), response.body()));
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                    throw new IllegalArgumentException("TIDAL legacy playlist tracks failed (%s): %s"
+                        .formatted(response.statusCode(), response.body()));
+                }
+
+                JsonNode body = objectMapper.readTree(response.body());
+                List<TidalPlaylistTrack> pageTracks = jsonItems(body)
+                    .map(this::toLegacyTrack)
+                    .filter(Objects::nonNull)
+                    .toList();
+                tracks.addAll(pageTracks);
+                if (pageTracks.size() < PLAYLIST_TRACK_PAGE_SIZE) {
+                    break;
+                }
+                offset += pageTracks.size();
             }
-
-            JsonNode body = objectMapper.readTree(response.body());
-            return jsonItems(body)
-                .map(this::toLegacyTrack)
-                .filter(Objects::nonNull)
-                .toList();
+            return tracks;
         } catch (IOException exception) {
             throw new IllegalStateException("TIDAL legacy playlist tracks response could not be parsed.", exception);
         } catch (InterruptedException exception) {
@@ -1004,6 +1138,88 @@ public class TidalWebApiClient {
         return URI.create("%s%s".formatted(apiBaseUri, href.startsWith("/") ? href : "/" + href));
     }
 
+    private int totalFromMeta(Map<String, Object> meta, int fallback) {
+        if (meta == null) {
+            return fallback;
+        }
+        return firstPositiveIntOrDefault(
+            fallback,
+            meta.get("total"),
+            meta.get("totalNumberOfItems"),
+            meta.get("total_number_of_items"),
+            meta.get("totalItems"),
+            meta.get("totalItemCount"),
+            meta.get("count")
+        );
+    }
+
+    private Integer totalFromJson(JsonNode body) {
+        if (body == null || body.isMissingNode() || body.isNull()) {
+            return null;
+        }
+        return firstPositiveIntValue(
+            body.path("total"),
+            body.path("totalNumberOfItems"),
+            body.path("total_number_of_items"),
+            body.path("totalItems"),
+            body.path("totalItemCount"),
+            body.path("count"),
+            body.path("meta").path("total"),
+            body.path("meta").path("totalNumberOfItems"),
+            body.path("meta").path("total_number_of_items"),
+            body.path("paging").path("total"),
+            body.path("paging").path("totalNumberOfItems")
+        );
+    }
+
+    private int firstPositiveIntOrDefault(int fallback, Object... values) {
+        Integer parsed = firstPositiveIntValue(values);
+        return parsed == null ? fallback : parsed;
+    }
+
+    private Integer firstPositiveIntValue(Object... values) {
+        for (Object value : values) {
+            Integer parsed = asPositiveInt(value);
+            if (parsed != null) {
+                return parsed;
+            }
+        }
+        return null;
+    }
+
+    private Integer asPositiveInt(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            int parsed = number.intValue();
+            return parsed > 0 ? parsed : null;
+        }
+        if (value instanceof JsonNode node) {
+            if (node.isMissingNode() || node.isNull()) {
+                return null;
+            }
+            if (node.isNumber()) {
+                int parsed = node.asInt();
+                return parsed > 0 ? parsed : null;
+            }
+            if (node.isTextual()) {
+                return asPositiveInt(node.asText());
+            }
+            return null;
+        }
+        String textValue = value.toString();
+        if (textValue == null || textValue.isBlank()) {
+            return null;
+        }
+        try {
+            int parsed = Integer.parseInt(textValue);
+            return parsed > 0 ? parsed : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
     private String resourceKey(String type, String id) {
         return type + ":" + id;
     }
@@ -1107,7 +1323,8 @@ public class TidalWebApiClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     record JsonApiArrayRoot(
         @JsonProperty("data") List<JsonApiData> data,
-        @JsonProperty("links") Map<String, Object> links
+        @JsonProperty("links") Map<String, Object> links,
+        @JsonProperty("meta") Map<String, Object> meta
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -1119,7 +1336,9 @@ public class TidalWebApiClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     record JsonApiArrayWithIncluded(
         @JsonProperty("data") List<JsonApiData> data,
-        @JsonProperty("included") List<JsonApiData> included
+        @JsonProperty("included") List<JsonApiData> included,
+        @JsonProperty("links") Map<String, Object> links,
+        @JsonProperty("meta") Map<String, Object> meta
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)

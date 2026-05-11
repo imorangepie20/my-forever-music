@@ -406,6 +406,20 @@ export const spotifySetVolume = async (userId: string, volume: number) => {
     await session.player.setVolume(clampVolume(volume))
 }
 
+export const spotifySetShuffle = async (userId: string, enabled: boolean) => {
+    const session = await ensureSpotifyWebPlayer(userId, activeCallbacks)
+    await spotifyApiRequest(userId, `/me/player/shuffle?state=${enabled ? 'true' : 'false'}&device_id=${encodeURIComponent(session.deviceId)}`, {
+        method: 'PUT',
+    })
+}
+
+export const spotifySetRepeat = async (userId: string, mode: 'off' | 'track' | 'context') => {
+    const session = await ensureSpotifyWebPlayer(userId, activeCallbacks)
+    await spotifyApiRequest(userId, `/me/player/repeat?state=${encodeURIComponent(mode)}&device_id=${encodeURIComponent(session.deviceId)}`, {
+        method: 'PUT',
+    })
+}
+
 export const getSpotifyCurrentState = async (userId: string) => {
     const session = await ensureSpotifyWebPlayer(userId, activeCallbacks)
     return session.player.getCurrentState()

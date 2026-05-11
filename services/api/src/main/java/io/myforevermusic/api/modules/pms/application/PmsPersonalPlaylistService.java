@@ -4,6 +4,8 @@ import io.myforevermusic.api.modules.pms.presentation.PmsPersonalPlaylistBootstr
 import io.myforevermusic.api.modules.pms.presentation.PmsPersonalPlaylistCreateRequest;
 import io.myforevermusic.api.modules.pms.presentation.PmsPersonalPlaylistCommandResponse;
 import io.myforevermusic.api.modules.pms.presentation.PmsPersonalPlaylistTrackSaveRequest;
+import io.myforevermusic.api.modules.recommendation.application.UserMusicEventService;
+import io.myforevermusic.api.modules.recommendation.presentation.UserMusicEventRequest;
 import java.text.Normalizer;
 import java.time.Instant;
 import java.util.List;
@@ -19,13 +21,16 @@ public class PmsPersonalPlaylistService {
 
     private final PmsPersonalPlaylistStore personalPlaylistStore;
     private final PmsUserLibraryStore userLibraryStore;
+    private final UserMusicEventService userMusicEventService;
 
     public PmsPersonalPlaylistService(
         PmsPersonalPlaylistStore personalPlaylistStore,
-        PmsUserLibraryStore userLibraryStore
+        PmsUserLibraryStore userLibraryStore,
+        UserMusicEventService userMusicEventService
     ) {
         this.personalPlaylistStore = personalPlaylistStore;
         this.userLibraryStore = userLibraryStore;
+        this.userMusicEventService = userMusicEventService;
     }
 
     public PmsPersonalPlaylistBootstrapResponse bootstrap(String userId) {
@@ -66,12 +71,43 @@ public class PmsPersonalPlaylistService {
                 normalizeSourceContext(request.sourceContext())
             )
         );
+        recordAddedToPlaylistEvent(request, targetPlaylist.playlistId(), libraryTrack);
 
         return PmsPersonalPlaylistCommandResponse.from(
             "saved",
             updatedPlaylist,
             "Track is now saved into a PMS personal playlist."
         );
+    }
+
+    private void recordAddedToPlaylistEvent(
+        PmsPersonalPlaylistTrackSaveRequest request,
+        String targetPlaylistId,
+        PmsUserLibraryStore.LibraryTrackState libraryTrack
+    ) {
+        userMusicEventService.recordEvent(new UserMusicEventRequest(
+            request.userId(),
+            "added_to_playlist",
+            normalizeSourceContext(request.sourceContext()),
+            libraryTrack.sourcePlatform(),
+            libraryTrack.preferredPlaybackPlatform(),
+            libraryTrack.trackId(),
+            "track",
+            libraryTrack.trackId(),
+            targetPlaylistId,
+            libraryTrack.externalTrackId(),
+            libraryTrack.platformUri(),
+            libraryTrack.title(),
+            libraryTrack.artistName(),
+            libraryTrack.albumTitle(),
+            libraryTrack.isrc(),
+            trackDurationMs(libraryTrack),
+            null,
+            null,
+            null,
+            null,
+            Instant.now()
+        ));
     }
 
     private PmsPersonalPlaylistStore.PersonalPlaylistState resolveTargetPlaylist(
@@ -130,6 +166,12 @@ public class PmsPersonalPlaylistService {
             normalizeSourceContext(sourceContext),
             Instant.now()
         );
+    }
+
+    private Integer trackDurationMs(PmsUserLibraryStore.LibraryTrackState track) {
+        return track.audioFeatures() == null
+            ? null
+            : track.audioFeatures().getDurationMs();
     }
 
     private String normalizeTitle(String title, String fallback) {

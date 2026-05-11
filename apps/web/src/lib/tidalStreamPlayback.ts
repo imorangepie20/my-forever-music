@@ -12,6 +12,12 @@ export interface TidalPlaybackSnapshot {
     productId: string | null
     presentation?: string | null
     previewReason?: string | null
+    requestedQuality?: string | null
+    audioQuality?: string | null
+    codec?: string | null
+    bitRate?: number | null
+    sampleRate?: number | null
+    bitDepth?: number | null
 }
 
 export interface TidalPlayerCallbacks {
@@ -27,6 +33,12 @@ let hls: Hls | null = null
 let activeCallbacks: TidalPlayerCallbacks = {}
 let currentProductId: string | null = null
 let currentPresentation: string | null = null
+let currentRequestedQuality: string | null = null
+let currentAudioQuality: string | null = null
+let currentCodec: string | null = null
+let currentBitRate: number | null = null
+let currentSampleRate: number | null = null
+let currentBitDepth: number | null = null
 let lastDurationMs = 0
 let listenersAttached = false
 
@@ -56,6 +68,12 @@ export const getTidalCurrentSnapshot = (): TidalPlaybackSnapshot => {
         productId: currentProductId,
         presentation: currentPresentation,
         previewReason: null,
+        requestedQuality: currentRequestedQuality,
+        audioQuality: currentAudioQuality,
+        codec: currentCodec,
+        bitRate: currentBitRate,
+        sampleRate: currentSampleRate,
+        bitDepth: currentBitDepth,
     }
 }
 
@@ -177,6 +195,12 @@ const resetSource = () => {
         audioElement.removeAttribute('src')
         audioElement.load()
     }
+    currentRequestedQuality = null
+    currentAudioQuality = null
+    currentCodec = null
+    currentBitRate = null
+    currentSampleRate = null
+    currentBitDepth = null
 }
 
 const isHlsStream = (stream: TidalPlaybackStreamResponse) => {
@@ -254,6 +278,12 @@ export const playTidalMediaItem = async (
     try {
         const stream = await fetchTidalPlaybackStream(userId, tidalTrackId)
         currentPresentation = stream.asset_presentation
+        currentRequestedQuality = stream.requested_quality
+        currentAudioQuality = stream.audio_quality
+        currentCodec = stream.codec
+        currentBitRate = stream.bit_rate
+        currentSampleRate = stream.sample_rate
+        currentBitDepth = stream.bit_depth
         if (stream.asset_presentation !== 'FULL') {
             throw new Error(`TIDAL stream endpoint did not return FULL playback. presentation=${stream.asset_presentation ?? 'unknown'}`)
         }

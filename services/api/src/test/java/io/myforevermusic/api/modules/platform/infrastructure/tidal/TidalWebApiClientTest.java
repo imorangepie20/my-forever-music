@@ -17,6 +17,115 @@ import org.junit.jupiter.api.Test;
 class TidalWebApiClientTest {
 
     @Test
+    void shouldUseOpenApiTrackSearchMetaTotalForFullSearchCount() throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v2/search", exchange -> {
+            String query = exchange.getRequestURI().getQuery();
+            if (query == null || !query.contains("countryCode=KR") || !query.contains("limit=50")) {
+                exchange.sendResponseHeaders(400, -1);
+                exchange.close();
+                return;
+            }
+
+            byte[] response = """
+                {
+                  "data": [
+                    {
+                      "id": "track-001",
+                      "type": "tracks",
+                      "attributes": {
+                        "title": "Meta Count Track",
+                        "duration": 180
+                      }
+                    }
+                  ],
+                  "included": [],
+                  "meta": {
+                    "totalNumberOfItems": 123
+                  }
+                }
+                """.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/vnd.api+json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+
+        try {
+            PlatformOAuthProperties properties = new PlatformOAuthProperties();
+            properties.getTidal().setCountryCode("KR");
+            properties.getTidal().setApiBaseUri("http://127.0.0.1:%d/v2".formatted(server.getAddress().getPort()));
+            TidalWebApiClient client = new TidalWebApiClient(
+                properties,
+                new ObjectMapper(),
+                HttpClient.newHttpClient(),
+                properties.getTidal().getApiBaseUri()
+            );
+
+            TidalWebApiClient.TidalSearchResult<TidalWebApiClient.TidalPlaylistTrack> result = client.searchTrackResults(
+                tidalCredential(),
+                "jazz"
+            );
+
+            assertThat(result.items()).hasSize(1);
+            assertThat(result.total()).isEqualTo(123);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void shouldFollowLegacyTrackSearchPagesForFullSearch() throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v2/search", exchange -> {
+            exchange.sendResponseHeaders(503, -1);
+            exchange.close();
+        });
+        server.createContext("/v1/search/tracks", exchange -> {
+            String query = exchange.getRequestURI().getQuery();
+            if (query == null || !query.contains("countryCode=KR") || !query.contains("limit=50")) {
+                exchange.sendResponseHeaders(400, -1);
+                exchange.close();
+                return;
+            }
+
+            int offset = query.contains("offset=50") ? 50 : 0;
+            int count = offset == 0 ? 50 : 1;
+            byte[] response = legacyTrackSearchResponse(offset, count).getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+
+        try {
+            PlatformOAuthProperties properties = new PlatformOAuthProperties();
+            properties.getTidal().setCountryCode("KR");
+            properties.getTidal().setApiBaseUri("http://127.0.0.1:%d/v2".formatted(server.getAddress().getPort()));
+            properties.getTidal().setLegacyApiBaseUri("http://127.0.0.1:%d/v1".formatted(server.getAddress().getPort()));
+            TidalWebApiClient client = new TidalWebApiClient(
+                properties,
+                new ObjectMapper(),
+                HttpClient.newHttpClient(),
+                properties.getTidal().getApiBaseUri()
+            );
+
+            List<TidalWebApiClient.TidalPlaylistTrack> tracks = client.searchTracks(
+                tidalCredential(),
+                "jazz"
+            );
+
+            assertThat(tracks).hasSize(51);
+            assertThat(tracks.get(0).tidalTrackId()).isEqualTo("track-000");
+            assertThat(tracks.get(50).tidalTrackId()).isEqualTo("track-050");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void shouldParsePlaylistTracksWithIncludedArtistsAlbumsAndIsrc() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v2/playlists/playlist-001/relationships/items", exchange -> {
@@ -260,5 +369,25 @@ class TidalWebApiClientTest {
             Instant.parse("2026-05-03T00:00:00Z"),
             Instant.parse("2026-05-03T00:00:00Z")
         );
+    }
+
+    private static String legacyTrackSearchResponse(int start, int count) {
+        StringBuilder items = new StringBuilder();
+        for (int index = 0; index < count; index++) {
+            int trackNumber = start + index;
+            if (index > 0) {
+                items.append(",");
+            }
+            items.append("""
+                {
+                  "id": "track-%03d",
+                  "title": "Legacy Track %03d",
+                  "duration": 180,
+                  "artist": {"name": "TIDAL Artist"},
+                  "album": {"title": "TIDAL Album"}
+                }
+                """.formatted(trackNumber, trackNumber));
+        }
+        return "{\"items\": [%s]}".formatted(items);
     }
 }

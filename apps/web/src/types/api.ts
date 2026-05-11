@@ -284,6 +284,39 @@ export interface TidalPlaybackTargetResolveResponse {
     match_score: number
 }
 
+export interface SpotifyPlaybackTargetResolveRequest {
+    user_id: string
+    title: string
+    artist_name: string
+    source_platform?: string | null
+    external_track_id?: string | null
+    platform_uri?: string | null
+    tidal_track_id?: string | null
+    isrc?: string | null
+    duration_ms?: number | null
+}
+
+export interface SpotifyPlaybackTargetResolveResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string
+    source_platform: string | null
+    source_track_id: string | null
+    spotify_track_id: string
+    spotify_uri: string | null
+    title: string
+    artist_name: string
+    album_title: string | null
+    album_image_url: string | null
+    platform_external_url: string | null
+    preview_url: string | null
+    isrc: string | null
+    duration_ms: number | null
+    match_reason: string
+    match_score: number
+}
+
 export interface LastFmProfileConnectRequest {
     user_id: string
     username: string
@@ -853,9 +886,8 @@ export interface GmsRecommendationPreviewResponse {
 
 export interface EmsCollectionSearchRequest {
     user_id: string
-    platform_id: string
+    platform_id?: string
     query: string
-    limit?: number
 }
 
 export interface EmsCollectionSearchResponse {
@@ -866,6 +898,47 @@ export interface EmsCollectionSearchResponse {
     query: string
     result_playlist_count: number
     result_track_count: number
+    playlists: EmsCollectionSearchPlaylistItem[]
+    tracks: EmsCollectionSearchTrackItem[]
+    searched_at: string
+}
+
+export interface EmsCollectionSearchPlaylistItem {
+    external_playlist_id: string
+    title: string
+    source_platform: string
+    curator: string
+    description: string
+    cover_image_url: string | null
+    platform_external_url: string | null
+    platform_uri: string | null
+    spotify_uri: string | null
+    track_count: number
+}
+
+export interface EmsCollectionSearchTrackItem {
+    external_track_id: string
+    title: string
+    artist_name: string
+    source_platform: string
+    isrc: string | null
+    album_title: string | null
+    album_image_url: string | null
+    platform_external_url: string | null
+    platform_uri: string | null
+    spotify_uri: string | null
+    preview_url: string | null
+    duration_ms: number | null
+}
+
+export interface EmsCollectionSearchPlaylistTracksResponse {
+    service: string
+    status: string
+    generated_at: string
+    platform_id: string
+    external_playlist_id: string
+    track_count: number
+    tracks: EmsCollectionSearchTrackItem[]
     searched_at: string
 }
 
@@ -1005,6 +1078,57 @@ export interface EmsOverviewResponse {
     system_attention: string[]
     evidence: string[]
     warnings: string[]
+}
+
+export type UserMusicEventType =
+    | 'play_started'
+    | 'play_paused'
+    | 'play_resumed'
+    | 'play_completed'
+    | 'skip_next'
+    | 'skip_previous'
+    | 'replay'
+    | 'track_saved'
+    | 'added_to_playlist'
+    | 'recommendation_liked'
+    | 'recommendation_rejected'
+    | 'ignored_recommendation'
+    | 'stopped_midway'
+
+export interface UserMusicEventRequest {
+    user_id: string
+    event_type: UserMusicEventType
+    source_space?: string | null
+    source_platform?: string | null
+    playback_platform_id?: string | null
+    item_id?: string | null
+    item_kind?: 'track' | 'playlist' | string | null
+    track_id?: string | null
+    playlist_id?: string | null
+    external_track_id?: string | null
+    platform_uri?: string | null
+    title?: string | null
+    artist_name?: string | null
+    album_title?: string | null
+    isrc?: string | null
+    duration_ms?: number | null
+    position_ms?: number | null
+    play_ratio?: number | null
+    recommendation_id?: string | null
+    metadata_confidence?: number | null
+    occurred_at?: string
+}
+
+export interface UserMusicEventResponse {
+    service: string
+    status: string
+    processed_at: string
+    event: UserMusicEventRequest & {
+        event_id: number
+        event_weight: number | null
+        received_at: string
+    }
+    next_step_message: string
 }
 
 export type GmsRecommendationFeedbackType = 'like' | 'dislike' | 'save' | 'skip'

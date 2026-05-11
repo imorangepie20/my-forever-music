@@ -8,6 +8,7 @@ import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollected
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackRepository;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsTrackAudioFeatures;
 import io.myforevermusic.api.common.error.ApiResourceNotFoundException;
+import io.myforevermusic.api.modules.auth.application.AuthAccountStore;
 import io.myforevermusic.api.modules.platform.application.PlatformAccountCredential;
 import io.myforevermusic.api.modules.platform.application.PlatformCredentialService;
 import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsAudioFeaturesClient;
@@ -20,7 +21,9 @@ import io.myforevermusic.api.modules.platform.infrastructure.spotify.SpotifyWebA
 import io.myforevermusic.api.modules.platform.infrastructure.tidal.TidalWebApiClient;
 import io.myforevermusic.api.modules.platform.infrastructure.tidal.TidalWebApiClient.TidalPlaylistSummary;
 import io.myforevermusic.api.modules.platform.infrastructure.tidal.TidalWebApiClient.TidalPlaylistTrack;
+import io.myforevermusic.api.modules.platform.infrastructure.tidal.TidalWebApiClient.TidalSearchResult;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -43,6 +46,7 @@ public class EmsCollectionService {
     private final TidalWebApiClient tidalWebApiClient;
     private final ReccoBeatsAudioFeaturesClient reccoBeatsAudioFeaturesClient;
     private final PlatformCredentialService platformCredentialService;
+    private final AuthAccountStore authAccountStore;
     private final EmsCollectedPlaylistRepository playlistRepository;
     private final EmsCollectedTrackRepository trackRepository;
     private final EmsCollectedPlaylistTrackRepository playlistTrackRepository;
@@ -52,6 +56,7 @@ public class EmsCollectionService {
         TidalWebApiClient tidalWebApiClient,
         ReccoBeatsAudioFeaturesClient reccoBeatsAudioFeaturesClient,
         PlatformCredentialService platformCredentialService,
+        AuthAccountStore authAccountStore,
         EmsCollectedPlaylistRepository playlistRepository,
         EmsCollectedTrackRepository trackRepository,
         EmsCollectedPlaylistTrackRepository playlistTrackRepository
@@ -60,40 +65,185 @@ public class EmsCollectionService {
         this.tidalWebApiClient = tidalWebApiClient;
         this.reccoBeatsAudioFeaturesClient = reccoBeatsAudioFeaturesClient;
         this.platformCredentialService = platformCredentialService;
+        this.authAccountStore = authAccountStore;
         this.playlistRepository = playlistRepository;
         this.trackRepository = trackRepository;
         this.playlistTrackRepository = playlistTrackRepository;
     }
 
-    public EmsCollectionSearchPreviewResult previewSearch(String userId, String platformId, String query, int limit) {
+    public EmsCollectionSearchPreviewResult previewSearch(String userId, String platformId, String query) {
+        List<EmsCollectionSearchPlaylistPreview> playlists = new ArrayList<>();
+        List<EmsCollectionSearchTrackPreview> tracks = new ArrayList<>();
+        int totalPlaylistCount = 0;
+        int totalTrackCount = 0;
+
+        String requestedPlatformId = resolveSearchPlatformId(userId, platformId);
+        PlatformAccountCredential credential = platformCredentialService
+            .findUsableCredential(userId, requestedPlatformId)
+            .orElse(null);
+        if (credential == null) {
+            throw new IllegalArgumentException(
+                "Connect %s before searching EMS public playlists.".formatted(requestedPlatformId)
+            );
+        }
+
+        SearchTotals totals;
+        if ("spotify".equals(requestedPlatformId)) {
+            totals = appendSpotifySearchResults(credential, query, playlists, tracks);
+        } else if ("tidal".equals(requestedPlatformId)) {
+            totals = appendTidalSearchResults(credential, query, playlists, tracks);
+        } else {
+            throw new IllegalArgumentException("Unsupported EMS search platform: %s".formatted(requestedPlatformId));
+        }
+        totalPlaylistCount += totals.playlistCount();
+        totalTrackCount += totals.trackCount();
+
+        return new EmsCollectionSearchPreviewResult(
+            requestedPlatformId,
+            query,
+            playlists,
+            tracks,
+            totalPlaylistCount,
+            totalTrackCount,
+            Instant.now()
+        );
+    }
+
+    public EmsCollectionSearchPlaylistTracksPreview getSearchPlaylistTracks(
+        String userId,
+        String platformId,
+        String externalPlaylistId
+    ) {
         PlatformAccountCredential credential = platformCredentialService
             .findUsableCredential(userId, platformId)
             .orElseThrow(() -> new IllegalArgumentException(
-                "Connect %s before searching EMS public playlists.".formatted(platformId)
+                "Connect %s before loading EMS search playlist tracks.".formatted(platformId)
             ));
 
-        int clampedLimit = Math.min(Math.max(limit, 1), 50);
-        int playlistResultCount;
-        int trackResultCount;
-
         if ("spotify".equals(platformId)) {
-            log.info("EMS search preview: calling Spotify search only query='{}' limit={}", query, clampedLimit);
-            playlistResultCount = spotifyWebApiClient.searchPlaylists(credential, query, clampedLimit).items().size();
-            trackResultCount = spotifyWebApiClient.searchTracks(credential, query, clampedLimit).items().size();
-        } else if ("tidal".equals(platformId)) {
-            log.info("EMS search preview: calling TIDAL search only query='{}' limit={}", query, clampedLimit);
-            playlistResultCount = tidalWebApiClient.searchPlaylists(credential, query, clampedLimit).size();
-            trackResultCount = tidalWebApiClient.searchTracks(credential, query, clampedLimit).size();
-        } else {
-            throw new IllegalArgumentException("Unsupported EMS search platform: %s".formatted(platformId));
+            List<EmsCollectionSearchTrackPreview> tracks = spotifyWebApiClient.getPlaylistTracks(credential, externalPlaylistId)
+                .stream()
+                .map(this::toSpotifySearchTrackPreview)
+                .toList();
+            return new EmsCollectionSearchPlaylistTracksPreview(platformId, externalPlaylistId, tracks, tracks.size(), Instant.now());
         }
 
-        return new EmsCollectionSearchPreviewResult(
-            platformId,
-            query,
-            playlistResultCount,
-            trackResultCount,
-            Instant.now()
+        if ("tidal".equals(platformId)) {
+            List<EmsCollectionSearchTrackPreview> tracks = tidalWebApiClient.getPlaylistTracks(credential, externalPlaylistId)
+                .stream()
+                .map(this::toTidalSearchTrackPreview)
+                .toList();
+            return new EmsCollectionSearchPlaylistTracksPreview(platformId, externalPlaylistId, tracks, tracks.size(), Instant.now());
+        }
+
+        throw new IllegalArgumentException("Unsupported EMS search platform: %s".formatted(platformId));
+    }
+
+    private String resolveSearchPlatformId(String userId, String platformId) {
+        if (hasText(platformId) && !"all".equals(platformId)) {
+            return platformId;
+        }
+        return authAccountStore.findByUserId(userId)
+            .map(account -> account.preferredPlatformId())
+            .filter(this::hasText)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "A registered user with a preferred provider is required before searching EMS public playlists."
+            ));
+    }
+
+    private SearchTotals appendSpotifySearchResults(
+        PlatformAccountCredential credential,
+        String query,
+        List<EmsCollectionSearchPlaylistPreview> playlists,
+        List<EmsCollectionSearchTrackPreview> tracks
+    ) {
+        log.info("EMS search preview: calling Spotify search only query='{}'", query);
+        SpotifySearchResult<SpotifyPlaylistSummary> playlistResults =
+            spotifyWebApiClient.searchPlaylists(credential, query);
+        playlists.addAll(playlistResults.items().stream()
+            .map(playlist -> new EmsCollectionSearchPlaylistPreview(
+                playlist.playlistId(),
+                playlist.name(),
+                "spotify",
+                playlist.ownerDisplayName(),
+                playlist.description(),
+                playlist.coverImageUrl(),
+                playlist.externalUrl(),
+                playlist.spotifyUri(),
+                playlist.trackCount()
+            ))
+            .toList());
+        SpotifySearchResult<SpotifyPlaylistTrack> trackResults =
+            spotifyWebApiClient.searchTracks(credential, query);
+        tracks.addAll(trackResults.items().stream()
+            .map(this::toSpotifySearchTrackPreview)
+            .toList());
+        return new SearchTotals(
+            Math.max(playlistResults.total(), playlistResults.items().size()),
+            Math.max(trackResults.total(), trackResults.items().size())
+        );
+    }
+
+    private SearchTotals appendTidalSearchResults(
+        PlatformAccountCredential credential,
+        String query,
+        List<EmsCollectionSearchPlaylistPreview> playlists,
+        List<EmsCollectionSearchTrackPreview> tracks
+    ) {
+        log.info("EMS search preview: calling TIDAL search only query='{}'", query);
+        TidalSearchResult<TidalPlaylistSummary> playlistResults = tidalWebApiClient.searchPlaylistResults(credential, query);
+        playlists.addAll(playlistResults.items().stream()
+            .map(playlist -> new EmsCollectionSearchPlaylistPreview(
+                playlist.playlistId(),
+                playlist.name(),
+                "tidal",
+                "",
+                playlist.description(),
+                playlist.coverImageUrl(),
+                playlist.externalUrl(),
+                null,
+                playlist.trackCount()
+            ))
+            .toList());
+        TidalSearchResult<TidalPlaylistTrack> trackResults = tidalWebApiClient.searchTrackResults(credential, query);
+        tracks.addAll(trackResults.items().stream()
+            .map(this::toTidalSearchTrackPreview)
+            .toList());
+        return new SearchTotals(
+            Math.max(playlistResults.total(), playlistResults.items().size()),
+            Math.max(trackResults.total(), trackResults.items().size())
+        );
+    }
+
+    private EmsCollectionSearchTrackPreview toSpotifySearchTrackPreview(SpotifyPlaylistTrack track) {
+        return new EmsCollectionSearchTrackPreview(
+            track.spotifyTrackId(),
+            track.title(),
+            track.artistName(),
+            "spotify",
+            track.isrc(),
+            track.albumTitle(),
+            track.albumImageUrl(),
+            track.externalUrl(),
+            track.spotifyUri(),
+            track.previewUrl(),
+            track.durationMs()
+        );
+    }
+
+    private EmsCollectionSearchTrackPreview toTidalSearchTrackPreview(TidalPlaylistTrack track) {
+        return new EmsCollectionSearchTrackPreview(
+            track.tidalTrackId(),
+            track.title(),
+            track.artistName(),
+            "tidal",
+            track.isrc(),
+            track.albumTitle(),
+            track.albumImageUrl(),
+            track.externalUrl(),
+            track.tidalUri(),
+            track.previewUrl(),
+            track.durationMs() > 0 ? track.durationMs() : null
         );
     }
 
@@ -289,6 +439,166 @@ public class EmsCollectionService {
         return new EmsAudioFeatureCoverage(linkedTrackCount, filledTrackCount, pendingTrackCount, coverageRatio);
     }
 
+    @Transactional
+    public EmsAudioFeatureBackfillResult backfillAudioFeaturesForPlaylist(Long playlistId) {
+        EmsCollectedPlaylistEntity playlist = getCollectedPlaylist(playlistId);
+        List<EmsCollectedTrackEntity> tracks = getTracksForPlaylist(playlistId);
+        long filledBefore = tracks.stream().filter(this::hasFilledAudioFeatures).count();
+        List<EmsCollectedTrackEntity> pendingTracks = tracks.stream()
+            .filter(track -> !hasFilledAudioFeatures(track))
+            .toList();
+
+        Map<String, ReccoBeatsAudioFeaturesSnapshot> snapshots = resolveAudioFeaturesForBackfill(
+            playlist.getSourcePlatform(),
+            pendingTracks
+        );
+
+        Instant resolvedAt = Instant.now();
+        int matchedSnapshotCount = 0;
+        int updatedTrackCount = 0;
+        int newlyFilledTrackCount = 0;
+        List<EmsCollectedTrackEntity> updatedTracks = new java.util.ArrayList<>();
+        for (EmsCollectedTrackEntity track : pendingTracks) {
+            ReccoBeatsAudioFeaturesSnapshot snapshot = snapshots.get(track.getExternalTrackId());
+            if (snapshot == null) {
+                continue;
+            }
+
+            matchedSnapshotCount++;
+            EmsTrackAudioFeatures audioFeatures = toBackfilledAudioFeatures(track, snapshot, resolvedAt);
+            track.applyAudioFeatures(audioFeatures);
+            updatedTrackCount++;
+            updatedTracks.add(track);
+            if (audioFeatures.isAudioFeaturesFilled()) {
+                newlyFilledTrackCount++;
+            }
+        }
+
+        if (updatedTrackCount > 0) {
+            trackRepository.saveAll(updatedTracks);
+        }
+
+        long filledAfter = filledBefore + newlyFilledTrackCount;
+        long pendingAfter = Math.max(0, tracks.size() - filledAfter);
+        double coverageRatio = tracks.isEmpty() ? 0.0 : (double) filledAfter / tracks.size();
+        return new EmsAudioFeatureBackfillResult(
+            playlist.getId(),
+            playlist.getTitle(),
+            playlist.getSourcePlatform(),
+            tracks.size(),
+            filledBefore,
+            pendingTracks.size(),
+            eligibleBackfillTrackCount(playlist.getSourcePlatform(), pendingTracks),
+            missingIsrcTrackCount(playlist.getSourcePlatform(), pendingTracks),
+            matchedSnapshotCount,
+            updatedTrackCount,
+            newlyFilledTrackCount,
+            filledAfter,
+            pendingAfter,
+            coverageRatio,
+            resolvedAt
+        );
+    }
+
+    private Map<String, ReccoBeatsAudioFeaturesSnapshot> resolveAudioFeaturesForBackfill(
+        String sourcePlatform,
+        List<EmsCollectedTrackEntity> tracks
+    ) {
+        if ("spotify".equals(sourcePlatform)) {
+            List<String> spotifyTrackIds = tracks.stream()
+                .map(EmsCollectedTrackEntity::getExternalTrackId)
+                .filter(this::hasText)
+                .distinct()
+                .toList();
+            if (spotifyTrackIds.isEmpty()) {
+                return Map.of();
+            }
+            return reccoBeatsAudioFeaturesClient.getAudioFeaturesForSpotifyTrackIds(spotifyTrackIds);
+        }
+
+        if ("tidal".equals(sourcePlatform)) {
+            List<ReccoBeatsTrackLookupRequest> lookupRequests = tracks.stream()
+                .filter(track -> hasText(track.getExternalTrackId()) && hasText(track.getIsrc()))
+                .map(track -> new ReccoBeatsTrackLookupRequest(
+                    track.getExternalTrackId(),
+                    track.getTitle(),
+                    track.getArtistName(),
+                    track.getDurationMs(),
+                    track.getIsrc()
+                ))
+                .toList();
+            if (lookupRequests.isEmpty()) {
+                return Map.of();
+            }
+            return reccoBeatsAudioFeaturesClient.getAudioFeaturesForExternalTracksByIsrc(lookupRequests);
+        }
+
+        return Map.of();
+    }
+
+    private int eligibleBackfillTrackCount(String sourcePlatform, List<EmsCollectedTrackEntity> tracks) {
+        if ("spotify".equals(sourcePlatform)) {
+            return (int) tracks.stream()
+                .map(EmsCollectedTrackEntity::getExternalTrackId)
+                .filter(this::hasText)
+                .distinct()
+                .count();
+        }
+        if ("tidal".equals(sourcePlatform)) {
+            return (int) tracks.stream()
+                .filter(track -> hasText(track.getExternalTrackId()) && hasText(track.getIsrc()))
+                .count();
+        }
+        return 0;
+    }
+
+    private int missingIsrcTrackCount(String sourcePlatform, List<EmsCollectedTrackEntity> tracks) {
+        if (!"tidal".equals(sourcePlatform)) {
+            return 0;
+        }
+        return (int) tracks.stream()
+            .filter(track -> hasText(track.getExternalTrackId()) && !hasText(track.getIsrc()))
+            .count();
+    }
+
+    private EmsTrackAudioFeatures toBackfilledAudioFeatures(
+        EmsCollectedTrackEntity track,
+        ReccoBeatsAudioFeaturesSnapshot snapshot,
+        Instant resolvedAt
+    ) {
+        Integer durationMs = track.getDurationMs();
+        String audioFeatureSource = "tidal".equals(track.getSourcePlatform())
+            ? "reccobeats_isrc_match"
+            : "reccobeats_lookup";
+        return new EmsTrackAudioFeatures(
+            firstNonBlank(snapshot.spotifyTrackId(), track.getExternalTrackId()),
+            audioFeatureSource,
+            hasCompleteAudioFeatures(snapshot, durationMs),
+            null,
+            firstNonBlank(snapshot.spotifyTrackHref(), track.getPlatformExternalUrl()),
+            firstNonBlank(buildSpotifyUri(snapshot.spotifyTrackId()), track.getSpotifyUri()),
+            "audio_features",
+            durationMs,
+            snapshot.musicalKey(),
+            snapshot.mode(),
+            null,
+            snapshot.acousticness(),
+            snapshot.danceability(),
+            snapshot.energy(),
+            snapshot.instrumentalness(),
+            snapshot.liveness(),
+            snapshot.loudness(),
+            snapshot.speechiness(),
+            snapshot.tempo(),
+            snapshot.valence(),
+            snapshot.resolvedAt() == null ? resolvedAt : snapshot.resolvedAt()
+        );
+    }
+
+    private boolean hasFilledAudioFeatures(EmsCollectedTrackEntity track) {
+        return track.getAudioFeatures() != null && track.getAudioFeatures().isAudioFeaturesFilled();
+    }
+
     private Map<String, ReccoBeatsAudioFeaturesSnapshot> resolveSpotifyAudioFeatures(List<SpotifyPlaylistTrack> tracks) {
         List<String> spotifyTrackIds = tracks.stream()
             .map(SpotifyPlaylistTrack::spotifyTrackId)
@@ -461,6 +771,10 @@ public class EmsCollectionService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String firstNonBlank(String first, String second) {
+        return hasText(first) ? first : second;
     }
 
     private boolean isTidalHomePageSource(String value) {
@@ -684,8 +998,44 @@ public class EmsCollectionService {
     public record EmsCollectionSearchPreviewResult(
         String platformId,
         String query,
+        List<EmsCollectionSearchPlaylistPreview> playlists,
+        List<EmsCollectionSearchTrackPreview> tracks,
         int resultPlaylistCount,
         int resultTrackCount,
+        Instant searchedAt
+    ) {}
+
+    public record EmsCollectionSearchPlaylistPreview(
+        String externalPlaylistId,
+        String title,
+        String sourcePlatform,
+        String curator,
+        String description,
+        String coverImageUrl,
+        String platformExternalUrl,
+        String platformUri,
+        int trackCount
+    ) {}
+
+    public record EmsCollectionSearchTrackPreview(
+        String externalTrackId,
+        String title,
+        String artistName,
+        String sourcePlatform,
+        String isrc,
+        String albumTitle,
+        String albumImageUrl,
+        String platformExternalUrl,
+        String platformUri,
+        String previewUrl,
+        Integer durationMs
+    ) {}
+
+    public record EmsCollectionSearchPlaylistTracksPreview(
+        String platformId,
+        String externalPlaylistId,
+        List<EmsCollectionSearchTrackPreview> tracks,
+        int trackCount,
         Instant searchedAt
     ) {}
 
@@ -694,6 +1044,24 @@ public class EmsCollectionService {
         long filledTrackCount,
         long pendingTrackCount,
         double coverageRatio
+    ) {}
+
+    public record EmsAudioFeatureBackfillResult(
+        Long playlistId,
+        String playlistTitle,
+        String sourcePlatform,
+        long trackCount,
+        long filledTrackCountBefore,
+        long pendingTrackCountBefore,
+        int eligibleTrackCount,
+        int missingIsrcTrackCount,
+        int matchedSnapshotCount,
+        int updatedTrackCount,
+        int newlyFilledTrackCount,
+        long filledTrackCountAfter,
+        long pendingTrackCountAfter,
+        double coverageRatioAfter,
+        Instant backfilledAt
     ) {}
 
     private record SpotifyPlaylistSource(
@@ -717,4 +1085,6 @@ public class EmsCollectionService {
             int limit
         );
     }
+
+    private record SearchTotals(int playlistCount, int trackCount) {}
 }

@@ -13,7 +13,11 @@ import io.myforevermusic.api.modules.platform.application.LastFmProperties;
 import io.myforevermusic.api.modules.platform.application.LastFmScrobbleStore;
 import io.myforevermusic.api.modules.platform.infrastructure.lastfm.LastFmWebApiClient;
 import io.myforevermusic.api.modules.platform.infrastructure.local.InMemoryLastFmScrobbleStore;
+import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsUserLibraryStore;
+import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
+import io.myforevermusic.api.modules.recommendation.application.RecommendationSnapshotService;
+import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryRecommendationSnapshotStore;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -46,7 +50,8 @@ class GmsRecommendationPreviewServiceTest {
             authAccountStore,
             new InMemoryLastFmScrobbleStore(),
             new InMemoryPmsUserLibraryStore(),
-            Optional.of(new FakeLastFmWebApiClient())
+            Optional.of(new FakeLastFmWebApiClient()),
+            new RecommendationSnapshotService(new InMemoryRecommendationSnapshotStore())
         );
 
         GmsRecommendationPreviewResponse response = service.previewRecommendations(
@@ -138,7 +143,8 @@ class GmsRecommendationPreviewServiceTest {
             authAccountStore,
             scrobbleStore,
             new InMemoryPmsUserLibraryStore(),
-            Optional.of(new FakeLastFmWebApiClient())
+            Optional.of(new FakeLastFmWebApiClient()),
+            new RecommendationSnapshotService(new InMemoryRecommendationSnapshotStore())
         );
 
         GmsRecommendationPreviewResponse response = service.previewRecommendations(
@@ -161,6 +167,46 @@ class GmsRecommendationPreviewServiceTest {
         assertThat(aiClient.capturedRequest.seedArtistNames()).contains("Artist One", "Grimes", "Caribou");
         assertThat(aiClient.capturedRequest.seedArtistNames()).doesNotContain("The Midnight");
         assertThat(response.warnings()).anyMatch(warning -> warning.contains("Stored Last.fm scrobble snapshot"));
+    }
+
+    @Test
+    void shouldStoreRecommendationSnapshotsForPlayableGmsPreviewItems() {
+        InMemoryAuthAccountStore authAccountStore = new InMemoryAuthAccountStore();
+        InMemoryPmsUserLibraryStore pmsUserLibraryStore = new InMemoryPmsUserLibraryStore();
+        InMemoryRecommendationSnapshotStore snapshotStore = new InMemoryRecommendationSnapshotStore();
+        pmsUserLibraryStore.savePlaylists("user-001", List.of(sampleLibraryPlaylist()));
+        GmsRecommendationPreviewService service = new GmsRecommendationPreviewService(
+            new SingleItemAiRecommendationPreviewClient(),
+            authAccountStore,
+            new InMemoryLastFmScrobbleStore(),
+            pmsUserLibraryStore,
+            Optional.empty(),
+            new RecommendationSnapshotService(snapshotStore)
+        );
+
+        GmsRecommendationPreviewResponse response = service.previewRecommendations(
+            new GmsRecommendationPreviewRequest(
+                "request-003",
+                "user-001",
+                "playlist-001",
+                "gms",
+                "upbeat",
+                4,
+                2,
+                5,
+                List.of("track-alpha"),
+                List.of("Neon Bloom"),
+                List.of("synth-pop"),
+                true
+            )
+        );
+
+        assertThat(response.items()).hasSize(1);
+        assertThat(snapshotStore.findRecentByUserId("user-001", 10)).hasSize(1);
+        assertThat(snapshotStore.findRecentByUserId("user-001", 1).getFirst().candidateTrackId())
+            .isEqualTo("track-001");
+        assertThat(snapshotStore.findRecentByUserId("user-001", 1).getFirst().modelVersion())
+            .isEqualTo("gms-baseline-v1");
     }
 
     private static final class CapturingAiRecommendationPreviewClient extends AiRecommendationPreviewClient {
@@ -202,6 +248,61 @@ class GmsRecommendationPreviewServiceTest {
         }
     }
 
+    private static final class SingleItemAiRecommendationPreviewClient extends AiRecommendationPreviewClient {
+
+        private SingleItemAiRecommendationPreviewClient() {
+            super(new io.myforevermusic.api.modules.gms.infrastructure.ai.AiServiceProperties("http://localhost:8000", "/v1/recommendations/preview", "/v1/ems/overview"), new ObjectMapper());
+        }
+
+        @Override
+        public GmsRecommendationPreviewResponse requestPreview(GmsRecommendationPreviewRequest request) {
+            return new GmsRecommendationPreviewResponse(
+                "recommendation-003",
+                Instant.parse("2026-05-04T01:00:00Z"),
+                "ai",
+                "ok",
+                new GmsRecommendationPreviewResponse.RecommendationContext(
+                    "gms-hybrid-blend",
+                    "rule-based-preview-v1",
+                    "gms",
+                    "upbeat",
+                    4,
+                    List.of("track-alpha", "neon-bloom")
+                ),
+                new GmsRecommendationPreviewResponse.RecommendationInputSummary(
+                    request.userId(),
+                    request.playlistId(),
+                    request.seedTrackIds().size(),
+                    request.seedArtistNames().size(),
+                    request.seedGenres().size(),
+                    request.familiarityBias(),
+                    request.limit()
+                ),
+                List.of(new GmsRecommendationPreviewResponse.RecommendationItem(
+                    1,
+                    "ai-track-placeholder",
+                    "AI Placeholder",
+                    "AI Artist",
+                    "spotify",
+                    "playlist-001",
+                    "Night Drive Archive",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0.75,
+                    "gms",
+                    4,
+                    "AI candidate."
+                )),
+                List.of()
+            );
+        }
+    }
+
     private static final class FakeLastFmWebApiClient extends LastFmWebApiClient {
 
         private FakeLastFmWebApiClient() {
@@ -215,5 +316,39 @@ class GmsRecommendationPreviewServiceTest {
                 new LastFmTopArtist("M83", 2, 56L, "https://www.last.fm/music/M83", null)
             );
         }
+    }
+
+    private PmsUserLibraryStore.LibraryPlaylistState sampleLibraryPlaylist() {
+        return new PmsUserLibraryStore.LibraryPlaylistState(
+            "user-001",
+            "playlist-001",
+            "spotify-playlist-001",
+            "Night Drive Archive",
+            "spotify",
+            "Forever Listener",
+            "Synced from imported playlists.",
+            null,
+            "https://open.spotify.com/playlist/spotify-playlist-001",
+            "spotify:playlist:spotify-playlist-001",
+            Instant.parse("2026-05-04T00:00:00Z"),
+            List.of(
+                new PmsUserLibraryStore.LibraryTrackState(
+                    "track-001",
+                    "spotify-track-001",
+                    "Midnight Receiver",
+                    "Neon Bloom",
+                    "spotify",
+                    "synth-pop",
+                    "Signal Bloom",
+                    null,
+                    "https://open.spotify.com/track/spotify-track-001",
+                    "spotify:track:spotify-track-001",
+                    null,
+                    1,
+                    true,
+                    PmsTrackAudioFeatures.unresolved()
+                )
+            )
+        );
     }
 }

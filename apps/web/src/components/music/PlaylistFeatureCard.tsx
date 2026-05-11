@@ -15,6 +15,7 @@ interface PlaylistFeatureCardProps {
     onSelect?: () => void
     onPlay?: () => void
     onOpenExternal?: () => void
+    onOpenDetail?: () => void
     actionLabel?: string
     isPlayLoading?: boolean
     detailPath?: string
@@ -32,6 +33,7 @@ const PlaylistFeatureCard = ({
     onSelect,
     onPlay,
     onOpenExternal,
+    onOpenDetail,
     actionLabel = 'Use Playlist',
     isPlayLoading = false,
     detailPath,
@@ -39,6 +41,7 @@ const PlaylistFeatureCard = ({
     const navigate = useNavigate()
     const openDetail = () => {
         if (detailPath) {
+            onOpenDetail?.()
             navigate(detailPath)
         }
     }

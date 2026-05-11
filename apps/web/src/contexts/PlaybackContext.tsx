@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
+import { recordUserMusicEvent } from '@/services/api'
 import {
     resolvePlaybackPlatformId,
     resolveSpotifyContextUri,
@@ -17,9 +18,12 @@ import {
     spotifyPreviousTrack,
     spotifyResume,
     spotifySeek,
+    spotifySetRepeat,
+    spotifySetShuffle,
     spotifySetVolume,
     type SpotifyPlaybackState,
 } from '@/lib/spotifyPlaybackSdk'
+import { resolveSpotifyPlayableItem } from '@/lib/spotifyResolvedPlayback'
 import {
     describeTidalPreviewFailure,
     ensureTidalWebPlayer,
@@ -36,6 +40,7 @@ import {
     type TidalPlaybackSnapshot,
     type TidalPlayerCallbacks,
 } from '@/lib/tidalStreamPlayback'
+import type { UserMusicEventType } from '@/types/api'
 
 interface PlaybackContextValue {
     currentItem: PlaybackMediaItem | null
@@ -49,6 +54,9 @@ interface PlaybackContextValue {
     durationMs: number
     volume: number
     deviceId: string | null
+    shuffleEnabled: boolean
+    repeatMode: PlaybackRepeatMode
+    audioQualityLabel: string | null
     playItem: (item: PlaybackMediaItem) => Promise<void>
     playQueue: (items: PlaybackMediaItem[], startIndex?: number) => Promise<void>
     pause: () => Promise<void>
@@ -57,40 +65,47 @@ interface PlaybackContextValue {
     skipPrevious: () => Promise<void>
     seek: (positionMs: number) => Promise<void>
     setVolume: (volume: number) => Promise<void>
+    toggleShuffle: () => Promise<void>
+    cycleRepeatMode: () => Promise<void>
     clearItem: () => void
 }
 
 const PlaybackContext = createContext<PlaybackContextValue | null>(null)
+export type PlaybackRepeatMode = 'off' | 'all' | 'one'
 
 const clampIndex = (index: number, length: number) => Math.min(Math.max(0, index), Math.max(0, length - 1))
 const toSpotifyUri = (item: PlaybackMediaItem) => {
     const spotifyTrackId = resolveSpotifyTrackId(item)
     return spotifyTrackId ? `spotify:track:${spotifyTrackId}` : null
 }
-
-const resolveTidalQueue = async (
-    userId: string,
-    items: PlaybackMediaItem[],
-    selectedIndex: number,
-) => {
-    const resolvedEntries: Array<{ item: PlaybackMediaItem; originalIndex: number; tidalTrackId: string }> = []
-
-    for (const [originalIndex, item] of items.entries()) {
-        try {
-            const resolvedItem = await resolveTidalPlayableItem(userId, item)
-            const tidalTrackId = resolveTidalTrackId(resolvedItem)
-            if (tidalTrackId) {
-                resolvedEntries.push({ item: resolvedItem, originalIndex, tidalTrackId })
-            }
-        } catch (resolveError) {
-            if (originalIndex === selectedIndex) {
-                throw resolveError
-            }
-        }
+const nextRepeatMode = (mode: PlaybackRepeatMode): PlaybackRepeatMode =>
+    mode === 'off' ? 'all' : mode === 'all' ? 'one' : 'off'
+const toSpotifyRepeatMode = (mode: PlaybackRepeatMode) =>
+    mode === 'one' ? 'track' : mode === 'all' ? 'context' : 'off'
+const shuffledQueueWithStart = (items: PlaybackMediaItem[], startIndex: number) => {
+    const safeStartIndex = clampIndex(startIndex, items.length)
+    const selectedItem = items[safeStartIndex]
+    const remainingItems = items.filter((_, index) => index !== safeStartIndex)
+    for (let index = remainingItems.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1))
+        ;[remainingItems[index], remainingItems[swapIndex]] = [remainingItems[swapIndex], remainingItems[index]]
     }
-
-    return resolvedEntries
+    return [selectedItem, ...remainingItems]
 }
+const formatTidalAudioQuality = (snapshot: TidalPlaybackSnapshot) => {
+    const quality = snapshot.audioQuality ?? snapshot.requestedQuality
+    const codec = snapshot.codec
+    const sampleRate = snapshot.sampleRate
+        ? `${Number.isInteger(snapshot.sampleRate / 1000) ? snapshot.sampleRate / 1000 : (snapshot.sampleRate / 1000).toFixed(1)} kHz`
+        : null
+    const bitDepth = snapshot.bitDepth ? `${snapshot.bitDepth}-bit` : null
+    const resolution = [sampleRate, bitDepth].filter(Boolean).join(' / ')
+    const parts = [quality, codec, resolution || null].filter(Boolean)
+    return parts.length > 0 ? parts.join(' · ') : null
+}
+const replaceQueueItem = (items: PlaybackMediaItem[], index: number, item: PlaybackMediaItem) =>
+    items.map((entry, entryIndex) => entryIndex === index ? item : entry)
+const readArtistName = (item: PlaybackMediaItem) => item.subtitle.split(' · ')[0]?.trim() || item.subtitle || null
 
 export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
     const { session } = useAuthSession()
@@ -105,9 +120,16 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
     const [durationMs, setDurationMs] = useState(0)
     const [volumeState, setVolumeState] = useState(0.5)
     const [deviceId, setDeviceId] = useState<string | null>(null)
+    const [shuffleEnabled, setShuffleEnabled] = useState(false)
+    const [repeatMode, setRepeatMode] = useState<PlaybackRepeatMode>('off')
+    const [audioQualityLabel, setAudioQualityLabel] = useState<string | null>(null)
     const queueRef = useRef(queue)
     const currentIndexRef = useRef(currentIndex)
     const volumeStateRef = useRef(volumeState)
+    const shuffleEnabledRef = useRef(shuffleEnabled)
+    const repeatModeRef = useRef(repeatMode)
+    const positionMsRef = useRef(positionMs)
+    const durationMsRef = useRef(durationMs)
     const tidalCallbacksRef = useRef<TidalPlayerCallbacks>({})
     const tidalPreviewBlockedRef = useRef(false)
 
@@ -123,9 +145,66 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
         volumeStateRef.current = volumeState
     }, [volumeState])
 
+    useEffect(() => {
+        shuffleEnabledRef.current = shuffleEnabled
+    }, [shuffleEnabled])
+
+    useEffect(() => {
+        repeatModeRef.current = repeatMode
+    }, [repeatMode])
+
+    useEffect(() => {
+        positionMsRef.current = positionMs
+    }, [positionMs])
+
+    useEffect(() => {
+        durationMsRef.current = durationMs
+    }, [durationMs])
+
     const clearPlaybackError = useCallback(() => {
         setError(null)
     }, [])
+
+    const recordPlaybackEvent = useCallback(
+        (
+            eventType: UserMusicEventType,
+            item: PlaybackMediaItem,
+            overrides: { positionMs?: number; durationMs?: number } = {},
+        ) => {
+            if (!session?.userId) {
+                return
+            }
+
+            const nextDurationMs = overrides.durationMs ?? item.durationMs ?? durationMsRef.current
+            const nextPositionMs = overrides.positionMs ?? positionMsRef.current
+            const playRatio = nextDurationMs && nextDurationMs > 0
+                ? Math.min(1, Math.max(0, nextPositionMs / nextDurationMs))
+                : null
+            const playbackPlatformId = resolvePlaybackPlatformId(item, session.preferredPlatformId)
+
+            void recordUserMusicEvent({
+                user_id: session.userId,
+                event_type: eventType,
+                source_space: 'player',
+                source_platform: item.sourcePlatform,
+                playback_platform_id: playbackPlatformId,
+                item_id: item.id,
+                item_kind: item.kind,
+                track_id: item.kind === 'track' ? item.id : null,
+                external_track_id: item.externalTrackId ?? item.spotifyTrackId ?? item.tidalTrackId ?? null,
+                platform_uri: item.platformUri ?? null,
+                title: item.title,
+                artist_name: readArtistName(item),
+                album_title: item.albumTitle ?? null,
+                isrc: item.isrc ?? null,
+                duration_ms: nextDurationMs && nextDurationMs > 0 ? Math.round(nextDurationMs) : null,
+                position_ms: nextPositionMs && nextPositionMs > 0 ? Math.round(nextPositionMs) : null,
+                play_ratio: playRatio,
+                occurred_at: new Date().toISOString(),
+            }).catch(() => undefined)
+        },
+        [session?.preferredPlatformId, session?.userId],
+    )
 
     const handleSpotifyStateChange = useCallback((state: SpotifyPlaybackState | null) => {
         if (!state) {
@@ -136,6 +215,7 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
         setIsPlaying(!state.paused)
         setPositionMs(state.position ?? 0)
         setDurationMs(state.duration ?? 0)
+        setAudioQualityLabel('Spotify')
 
         const spotifyTrackId = state.track_window.current_track?.id
         if (!state.paused && spotifyTrackId) {
@@ -179,6 +259,7 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
         setNotice(null)
         setIsPlaying(state === 'PLAYING' || state === 'STALLED')
         setPositionMs(snapshot.positionMs)
+        setAudioQualityLabel(formatTidalAudioQuality(snapshot))
         if (snapshot.durationMs > 0) {
             setDurationMs(snapshot.durationMs)
         }
@@ -199,8 +280,22 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
     }, [clearPlaybackError])
 
     const handleTidalEnded = useCallback(() => {
-        const nextIndex = currentIndexRef.current + 1
         const nextQueue = queueRef.current
+        const completedItem = nextQueue[currentIndexRef.current]
+        if (completedItem) {
+            const completedDurationMs = durationMsRef.current || completedItem.durationMs || 0
+            recordPlaybackEvent('play_completed', completedItem, {
+                durationMs: completedDurationMs,
+                positionMs: completedDurationMs,
+            })
+        }
+
+        let nextIndex = currentIndexRef.current + 1
+        if (repeatModeRef.current === 'one') {
+            nextIndex = currentIndexRef.current
+        } else if (nextIndex >= nextQueue.length && repeatModeRef.current === 'all') {
+            nextIndex = 0
+        }
         const nextItem = nextQueue[nextIndex]
 
         if (!session?.userId || !nextItem) {
@@ -208,24 +303,31 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
             return
         }
 
-        setCurrentIndex(nextIndex)
-        setCurrentItem(nextItem)
         setPositionMs(0)
-        setDurationMs(nextItem.durationMs ?? 0)
         void (async () => {
+            setNotice('Searching TIDAL for playable track...')
+            const playableItem = await resolveTidalPlayableItem(session.userId, nextItem)
+            const resolvedQueue = replaceQueueItem(nextQueue, nextIndex, playableItem)
+            queueRef.current = resolvedQueue
+            setQueue(resolvedQueue)
+            setCurrentIndex(nextIndex)
+            setCurrentItem(playableItem)
+            setDurationMs(playableItem.durationMs ?? 0)
             await tidalSetVolume(volumeStateRef.current)
             await playTidalMediaItem(
                 session.userId,
-                nextItem,
-                nextQueue[nextIndex + 1],
+                playableItem,
+                resolvedQueue[nextIndex + 1],
                 tidalCallbacksRef.current,
             )
+            setNotice(null)
         })().catch((playbackError: unknown) => {
             const message = playbackError instanceof Error ? playbackError.message : 'TIDAL playback failed.'
             setError(message)
+            setNotice(null)
             setIsPlaying(false)
         })
-    }, [session?.userId])
+    }, [recordPlaybackEvent, session?.userId])
 
     const tidalCallbacks = useMemo<TidalPlayerCallbacks>(
         () => ({
@@ -257,10 +359,13 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
             }
 
             const userId = requireUserId()
-            const safeStartIndex = clampIndex(startIndex, items.length)
-            const selectedItem = items[safeStartIndex]
+            const nextPlaybackItems = shuffleEnabledRef.current
+                ? shuffledQueueWithStart(items, startIndex)
+                : items
+            const safeStartIndex = shuffleEnabledRef.current ? 0 : clampIndex(startIndex, nextPlaybackItems.length)
+            const selectedItem = nextPlaybackItems[safeStartIndex]
             const playbackPlatformId = resolvePlaybackPlatformId(selectedItem, session?.preferredPlatformId)
-            const pendingItems = items.map((item, index) =>
+            const pendingItems = nextPlaybackItems.map((item, index) =>
                 index === safeStartIndex ? { ...item, playbackPlatformId } : item
             )
             const pendingSelectedItem = pendingItems[safeStartIndex]
@@ -274,6 +379,7 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
             setCurrentItem(null)
             setPositionMs(0)
             setDurationMs(0)
+            setAudioQualityLabel(null)
             setIsPlaying(false)
             tidalPreviewBlockedRef.current = false
 
@@ -297,8 +403,11 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
                     setNotice('Preparing Spotify playback...')
                     await ensureSpotifyWebPlayer(userId, spotifyCallbacks)
                     await spotifySetVolume(userId, volumeState)
+                    await spotifySetShuffle(userId, shuffleEnabledRef.current)
+                    await spotifySetRepeat(userId, toSpotifyRepeatMode(repeatModeRef.current))
+                    setAudioQualityLabel('Spotify')
 
-                    const spotifyContextUri = items.length === 1 ? resolveSpotifyContextUri(selectedItem) : null
+                    const spotifyContextUri = nextPlaybackItems.length === 1 ? resolveSpotifyContextUri(selectedItem) : null
                     if (spotifyContextUri) {
                         setQueue([selectedItem])
                         setCurrentIndex(0)
@@ -307,11 +416,26 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
                         setDurationMs(selectedItem.durationMs ?? 0)
                         await playSpotifyContext(userId, spotifyContextUri)
                         setIsPlaying(true)
+                        recordPlaybackEvent('play_started', selectedItem, {
+                            durationMs: selectedItem.durationMs ?? 0,
+                            positionMs: 0,
+                        })
                         clearPlaybackError()
                         return
                     }
 
-                    const spotifyEntries = items
+                    setNotice('Searching Spotify for playable tracks...')
+                    const resolvedSpotifyItems = await Promise.all(
+                        nextPlaybackItems.map((item) => resolveSpotifyPlayableItem(userId, item))
+                    )
+                    const resolvedSelectedItem = resolvedSpotifyItems[safeStartIndex] ?? pendingSelectedItem
+                    setQueue(resolvedSpotifyItems)
+                    setCurrentIndex(safeStartIndex)
+                    setCurrentItem(resolvedSelectedItem)
+                    setDurationMs(resolvedSelectedItem.durationMs ?? 0)
+                    setNotice('Starting Spotify playback...')
+
+                    const spotifyEntries = resolvedSpotifyItems
                         .map((item, originalIndex) => ({
                             item,
                             originalIndex,
@@ -334,6 +458,10 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
                     setDurationMs(nextQueue[nextIndex]?.durationMs ?? 0)
                     await playSpotifyUris(userId, spotifyEntries.map((entry) => entry.uri), nextIndex)
                     setIsPlaying(true)
+                    recordPlaybackEvent('play_started', nextQueue[nextIndex], {
+                        durationMs: nextQueue[nextIndex]?.durationMs ?? 0,
+                        positionMs: 0,
+                    })
                     clearPlaybackError()
                     return
                 }
@@ -343,26 +471,22 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
                     await ensureTidalWebPlayer(userId, tidalCallbacks)
                     await tidalSetVolume(volumeState)
 
-                    setNotice('Searching TIDAL for playable tracks...')
-                    const tidalEntries = await resolveTidalQueue(userId, items, safeStartIndex)
-
-                    const selectedEntry = tidalEntries.find((entry) => entry.originalIndex === safeStartIndex)
-                    if (!selectedEntry) {
-                        throw new Error('Selected track could not be resolved to a playable TIDAL track.')
-                    }
-
-                    const nextQueue = tidalEntries.map((entry) => entry.item)
-                    const nextIndex = tidalEntries.findIndex((entry) => entry.originalIndex === safeStartIndex)
-
                     setDeviceId(getTidalDeviceId())
-                    setQueue(nextQueue)
-                    setCurrentIndex(nextIndex)
-                    setCurrentItem(nextQueue[nextIndex])
                     setPositionMs(0)
-                    setDurationMs(nextQueue[nextIndex]?.durationMs ?? 0)
+                    setNotice('Searching TIDAL for playable track...')
+                    const playableSelectedItem = await resolveTidalPlayableItem(userId, pendingSelectedItem)
+                    const resolvedItems = replaceQueueItem(pendingItems, safeStartIndex, playableSelectedItem)
+                    setQueue(resolvedItems)
+                    setCurrentIndex(safeStartIndex)
+                    setCurrentItem(playableSelectedItem)
+                    setDurationMs(playableSelectedItem.durationMs ?? 0)
                     setNotice('Starting TIDAL stream...')
-                    await playTidalMediaItem(userId, nextQueue[nextIndex], nextQueue[nextIndex + 1], tidalCallbacks)
+                    await playTidalMediaItem(userId, playableSelectedItem, resolvedItems[safeStartIndex + 1], tidalCallbacks)
                     setIsPlaying(true)
+                    recordPlaybackEvent('play_started', playableSelectedItem, {
+                        durationMs: playableSelectedItem.durationMs ?? 0,
+                        positionMs: 0,
+                    })
                     clearPlaybackError()
                     return
                 }
@@ -377,7 +501,7 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
                 setIsLoading(false)
             }
         },
-        [clearPlaybackError, currentItem, requireUserId, session?.preferredPlatformId, spotifyCallbacks, tidalCallbacks, volumeState],
+        [clearPlaybackError, currentItem, recordPlaybackEvent, requireUserId, session?.preferredPlatformId, spotifyCallbacks, tidalCallbacks, volumeState],
     )
 
     const playItem = useCallback((item: PlaybackMediaItem) => playQueue([item], 0), [playQueue])
@@ -395,7 +519,8 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
             await spotifyPause(userId)
         }
         setIsPlaying(false)
-    }, [currentItem, requireUserId, session?.preferredPlatformId])
+        recordPlaybackEvent('play_paused', currentItem)
+    }, [currentItem, recordPlaybackEvent, requireUserId, session?.preferredPlatformId])
 
     const resume = useCallback(async () => {
         if (!currentItem) {
@@ -414,38 +539,51 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
             await spotifyResume(userId)
         }
         setIsPlaying(true)
-    }, [clearPlaybackError, currentItem, requireUserId, session?.preferredPlatformId, spotifyCallbacks, tidalCallbacks, volumeState])
+        recordPlaybackEvent('play_resumed', currentItem)
+    }, [clearPlaybackError, currentItem, recordPlaybackEvent, requireUserId, session?.preferredPlatformId, spotifyCallbacks, tidalCallbacks, volumeState])
 
     const skipNext = useCallback(async () => {
         if (!currentItem) {
             return
         }
 
-        const nextIndex = clampIndex(currentIndexRef.current + 1, queueRef.current.length)
+        const isAtQueueEnd = currentIndexRef.current >= queueRef.current.length - 1
+        const nextIndex = isAtQueueEnd && repeatModeRef.current === 'all'
+            ? 0
+            : clampIndex(currentIndexRef.current + 1, queueRef.current.length)
         const nextItem = queueRef.current[nextIndex] ?? currentItem
         const userId = requireUserId()
         const playbackPlatformId = resolvePlaybackPlatformId(currentItem, session?.preferredPlatformId)
         if (playbackPlatformId === 'tidal') {
-            if (currentIndexRef.current >= queueRef.current.length - 1) {
+            if (isAtQueueEnd && repeatModeRef.current !== 'all') {
                 await tidalReset()
                 setIsPlaying(false)
                 setPositionMs(0)
+                recordPlaybackEvent('skip_next', currentItem)
                 return
             }
 
-            setCurrentIndex(nextIndex)
-            setCurrentItem(nextItem)
             setPositionMs(0)
-            setDurationMs(nextItem.durationMs ?? 0)
+            setNotice('Searching TIDAL for playable track...')
+            const playableItem = await resolveTidalPlayableItem(userId, nextItem)
+            const resolvedQueue = replaceQueueItem(queueRef.current, nextIndex, playableItem)
+            queueRef.current = resolvedQueue
+            setQueue(resolvedQueue)
+            setCurrentIndex(nextIndex)
+            setCurrentItem(playableItem)
+            setDurationMs(playableItem.durationMs ?? 0)
             await tidalSetVolume(volumeState)
-            await playTidalMediaItem(userId, nextItem, queueRef.current[nextIndex + 1], tidalCallbacks)
+            await playTidalMediaItem(userId, playableItem, resolvedQueue[nextIndex + 1], tidalCallbacks)
+            setNotice(null)
+            recordPlaybackEvent('skip_next', currentItem)
             return
         }
 
         await spotifyNextTrack(userId)
         setCurrentIndex(nextIndex)
         setCurrentItem(nextItem)
-    }, [currentItem, requireUserId, session?.preferredPlatformId, tidalCallbacks, volumeState])
+        recordPlaybackEvent('skip_next', currentItem)
+    }, [currentItem, recordPlaybackEvent, requireUserId, session?.preferredPlatformId, tidalCallbacks, volumeState])
 
     const skipPrevious = useCallback(async () => {
         if (!currentItem) {
@@ -457,19 +595,27 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
         const userId = requireUserId()
         const playbackPlatformId = resolvePlaybackPlatformId(currentItem, session?.preferredPlatformId)
         if (playbackPlatformId === 'tidal') {
-            setCurrentIndex(nextIndex)
-            setCurrentItem(nextItem)
             setPositionMs(0)
-            setDurationMs(nextItem.durationMs ?? 0)
+            setNotice('Searching TIDAL for playable track...')
+            const playableItem = await resolveTidalPlayableItem(userId, nextItem)
+            const resolvedQueue = replaceQueueItem(queueRef.current, nextIndex, playableItem)
+            queueRef.current = resolvedQueue
+            setQueue(resolvedQueue)
+            setCurrentIndex(nextIndex)
+            setCurrentItem(playableItem)
+            setDurationMs(playableItem.durationMs ?? 0)
             await tidalSetVolume(volumeState)
-            await playTidalMediaItem(userId, nextItem, queueRef.current[nextIndex + 1], tidalCallbacks)
+            await playTidalMediaItem(userId, playableItem, resolvedQueue[nextIndex + 1], tidalCallbacks)
+            setNotice(null)
+            recordPlaybackEvent('skip_previous', currentItem)
             return
         }
 
         await spotifyPreviousTrack(userId)
         setCurrentIndex(nextIndex)
         setCurrentItem(nextItem)
-    }, [currentItem, requireUserId, session?.preferredPlatformId, tidalCallbacks, volumeState])
+        recordPlaybackEvent('skip_previous', currentItem)
+    }, [currentItem, recordPlaybackEvent, requireUserId, session?.preferredPlatformId, tidalCallbacks, volumeState])
 
     const seek = useCallback(
         async (nextPositionMs: number) => {
@@ -508,6 +654,33 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
         [currentItem, session],
     )
 
+    const toggleShuffle = useCallback(async () => {
+        const nextShuffleEnabled = !shuffleEnabledRef.current
+        shuffleEnabledRef.current = nextShuffleEnabled
+        setShuffleEnabled(nextShuffleEnabled)
+
+        if (nextShuffleEnabled && queueRef.current.length > 1) {
+            const nextQueue = shuffledQueueWithStart(queueRef.current, currentIndexRef.current)
+            setQueue(nextQueue)
+            setCurrentIndex(0)
+            setCurrentItem(nextQueue[0])
+        }
+
+        if (session?.userId && currentItem && resolvePlaybackPlatformId(currentItem, session.preferredPlatformId) === 'spotify') {
+            await spotifySetShuffle(session.userId, nextShuffleEnabled)
+        }
+    }, [currentItem, session])
+
+    const cycleRepeatMode = useCallback(async () => {
+        const nextMode = nextRepeatMode(repeatModeRef.current)
+        repeatModeRef.current = nextMode
+        setRepeatMode(nextMode)
+
+        if (session?.userId && currentItem && resolvePlaybackPlatformId(currentItem, session.preferredPlatformId) === 'spotify') {
+            await spotifySetRepeat(session.userId, toSpotifyRepeatMode(nextMode))
+        }
+    }, [currentItem, session])
+
     const clearItem = useCallback(() => {
         if (session?.userId && currentItem) {
             const playbackPlatformId = resolvePlaybackPlatformId(currentItem, session.preferredPlatformId)
@@ -526,6 +699,7 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
         setNotice(null)
         setPositionMs(0)
         setDurationMs(0)
+        setAudioQualityLabel(null)
     }, [clearPlaybackError, currentItem, session])
 
     useEffect(() => {
@@ -562,6 +736,9 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
             durationMs,
             volume: volumeState,
             deviceId,
+            shuffleEnabled,
+            repeatMode,
+            audioQualityLabel,
             playItem,
             playQueue,
             pause,
@@ -570,6 +747,8 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
             skipPrevious,
             seek,
             setVolume,
+            toggleShuffle,
+            cycleRepeatMode,
             clearItem,
         }),
         [
@@ -584,6 +763,9 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
             durationMs,
             volumeState,
             deviceId,
+            shuffleEnabled,
+            repeatMode,
+            audioQualityLabel,
             playItem,
             playQueue,
             pause,
@@ -592,6 +774,8 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
             skipPrevious,
             seek,
             setVolume,
+            toggleShuffle,
+            cycleRepeatMode,
             clearItem,
         ],
     )

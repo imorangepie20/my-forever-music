@@ -1,24 +1,37 @@
-import { startTransition, useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
-import { Activity, AlertTriangle, Brain, Database, RefreshCw, Route, Sparkles } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { startTransition, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ListMusic, RefreshCw, Search } from 'lucide-react'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
 import PlaylistFeatureCard from '@/components/music/PlaylistFeatureCard'
+import TrackFeatureCard from '@/components/music/TrackFeatureCard'
+import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { usePlayback } from '@/contexts/PlaybackContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
-import { buildEmsPlaylistDetailPath, toEmsTrackPlaybackItem } from '@/lib/emsPlayback'
+import {
+    buildEmsPlaylistDetailPath,
+    buildEmsSearchPlaylistDetailPath,
+    emsSearchPlaylistCacheKey,
+    toEmsSearchTrackPlaybackItem,
+    toEmsTrackPlaybackItem,
+} from '@/lib/emsPlayback'
 import {
     ApiError,
     fetchEmsCollectedPlaylistDetail,
     fetchEmsCollectedPlaylists,
-    fetchEmsOverview,
+    searchEmsCollection,
 } from '@/services/api'
-import type { EmsCollectionPlaylistItem, EmsOverviewResponse } from '@/types/api'
+import type {
+    EmsCollectionPlaylistItem,
+    EmsCollectionSearchPlaylistItem,
+    EmsCollectionSearchResponse,
+} from '@/types/api'
 
 type DiscoveryPlatformId = string
 
 const defaultDiscoveryPlatformIds: DiscoveryPlatformId[] = ['tidal', 'spotify']
+const SEARCH_RESULT_PAGE_SIZE = 12
+const SEARCH_CACHE_PREFIX = 'ems-search'
 
 const openExternal = (url?: string | null) => {
     if (!url) {
@@ -27,100 +40,47 @@ const openExternal = (url?: string | null) => {
     window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-const formatStatus = (status?: string | null) =>
-    status ? status.replace(/_/g, ' ') : 'unknown'
-
-const formatDateTime = (value?: string | null) => {
-    if (!value) {
-        return 'not collected'
-    }
-    return new Intl.DateTimeFormat('ko-KR', {
-        dateStyle: 'short',
-        timeStyle: 'short',
-    }).format(new Date(value))
-}
-
 const formatPercent = (value?: number | null) =>
     `${Math.round((value ?? 0) * 100)}%`
 
-const StatusTile = ({
-    label,
-    value,
-    icon,
-}: {
-    label: string
-    value: string
-    icon: ReactNode
-}) => (
-    <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
-        <div className="flex items-center gap-3">
-            <span className="rounded-xl bg-hud-accent-primary/10 p-2 text-hud-accent-primary">{icon}</span>
-            <div>
-                <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">{label}</p>
-                <p className="mt-1 text-lg font-semibold capitalize text-hud-text-primary">{formatStatus(value)}</p>
-            </div>
-        </div>
-    </div>
-)
+const pageValue = (value: string | null) => {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1
+}
+
+const searchCacheKey = (userId: string, platformId: string, query: string) =>
+    `${SEARCH_CACHE_PREFIX}:${userId}:${platformId}:${query.trim().toLowerCase()}`
+
+const writeSearchPlaylistCache = (playlist: EmsCollectionSearchPlaylistItem) => {
+    window.sessionStorage.setItem(
+        emsSearchPlaylistCacheKey(playlist.source_platform, playlist.external_playlist_id),
+        JSON.stringify(playlist),
+    )
+}
+
+const pageCountFor = (count: number) =>
+    Math.max(1, Math.ceil(count / SEARCH_RESULT_PAGE_SIZE))
 
 const EmsPage = () => {
+    const { session } = useAuthSession()
     const { workspace } = useRecommendationWorkspace()
-    const { playQueue } = usePlayback()
-    const [overview, setOverview] = useState<EmsOverviewResponse | null>(null)
-    const [isLoadingOverview, setIsLoadingOverview] = useState(true)
-    const [overviewError, setOverviewError] = useState<string | null>(null)
+    const { playItem, playQueue } = usePlayback()
+    const navigate = useNavigate()
+    const [searchParams, setSearchParams] = useSearchParams()
+    const activeUserId = session?.userId || workspace.userId
+    const activeSearchPlatformId = session?.preferredPlatformId ?? workspace.preferredPlatformId
+    const urlQuery = searchParams.get('q')?.trim() ?? ''
+    const playlistPage = pageValue(searchParams.get('playlist_page'))
+    const trackPage = pageValue(searchParams.get('track_page'))
+    const [searchQuery, setSearchQuery] = useState(urlQuery)
+    const [searchResult, setSearchResult] = useState<EmsCollectionSearchResponse | null>(null)
+    const [isSearching, setIsSearching] = useState(false)
+    const [searchError, setSearchError] = useState<string | null>(null)
     const [publicPlaylistsByPlatform, setPublicPlaylistsByPlatform] =
         useState<Record<DiscoveryPlatformId, EmsCollectionPlaylistItem[]>>({})
     const [isLoadingCollection, setIsLoadingCollection] = useState(false)
     const [preparingPlaylistId, setPreparingPlaylistId] = useState<number | null>(null)
     const [collectionError, setCollectionError] = useState<string | null>(null)
-
-    const discoveryPlatformIds = useMemo(() => {
-        const platformIds = new Set(defaultDiscoveryPlatformIds)
-        overview?.ems_pool.providers
-            .filter((provider) => provider.playlist_count > 0 || provider.track_count > 0)
-            .forEach((provider) => platformIds.add(provider.platform_id))
-        return Array.from(platformIds)
-    }, [overview])
-
-    useEffect(() => {
-        const controller = new AbortController()
-
-        setIsLoadingOverview(true)
-        setOverviewError(null)
-
-        fetchEmsOverview(
-            {
-                user_id: workspace.userId || undefined,
-                playlist_id: workspace.playlistId || undefined,
-            },
-            controller.signal,
-        )
-            .then((response) => {
-                startTransition(() => {
-                    setOverview(response)
-                    setOverviewError(null)
-                })
-            })
-            .catch((requestError: unknown) => {
-                if (requestError instanceof DOMException && requestError.name === 'AbortError') {
-                    return
-                }
-                const message =
-                    requestError instanceof ApiError
-                        ? requestError.message
-                        : 'Unable to load the EMS overview.'
-                startTransition(() => {
-                    setOverview(null)
-                    setOverviewError(message)
-                })
-            })
-            .finally(() => {
-                setIsLoadingOverview(false)
-            })
-
-        return () => controller.abort()
-    }, [workspace.playlistId, workspace.userId])
 
     useEffect(() => {
         const controller = new AbortController()
@@ -129,7 +89,7 @@ const EmsPage = () => {
         setCollectionError(null)
 
         Promise.all(
-            discoveryPlatformIds.map(async (providerId) => {
+            defaultDiscoveryPlatformIds.map(async (providerId) => {
                 const response = await fetchEmsCollectedPlaylists(providerId, controller.signal, 12)
                 return [providerId, response.playlists] as const
             }),
@@ -152,10 +112,100 @@ const EmsPage = () => {
             })
 
         return () => controller.abort()
-    }, [discoveryPlatformIds])
+    }, [])
 
-    const publicPoolPlaylists = discoveryPlatformIds.flatMap((providerId) => publicPlaylistsByPlatform[providerId] ?? [])
-    const attentionItems = overview ? [...overview.system_attention, ...overview.warnings] : []
+    useEffect(() => {
+        setSearchQuery(urlQuery)
+        if (!urlQuery) {
+            setSearchResult(null)
+            setSearchError(null)
+            return
+        }
+        if (!activeUserId) {
+            setSearchError('Sign in before searching provider results.')
+            return
+        }
+
+        const cacheKey = searchCacheKey(activeUserId, activeSearchPlatformId, urlQuery)
+        const cached = window.sessionStorage.getItem(cacheKey)
+        if (cached) {
+            try {
+                setSearchResult(JSON.parse(cached) as EmsCollectionSearchResponse)
+                setSearchError(null)
+                return
+            } catch {
+                window.sessionStorage.removeItem(cacheKey)
+            }
+        }
+
+        let isCurrent = true
+        setIsSearching(true)
+        setSearchError(null)
+        searchEmsCollection({
+            user_id: activeUserId,
+            query: urlQuery,
+        })
+            .then((response) => {
+                if (!isCurrent) {
+                    return
+                }
+                window.sessionStorage.setItem(cacheKey, JSON.stringify(response))
+                startTransition(() => setSearchResult(response))
+            })
+            .catch((requestError: unknown) => {
+                if (!isCurrent) {
+                    return
+                }
+                const message =
+                    requestError instanceof ApiError
+                        ? requestError.message
+                        : 'Unable to search EMS provider results.'
+                setSearchResult(null)
+                setSearchError(message)
+            })
+            .finally(() => {
+                if (isCurrent) {
+                    setIsSearching(false)
+                }
+            })
+
+        return () => {
+            isCurrent = false
+        }
+    }, [activeSearchPlatformId, activeUserId, urlQuery])
+
+    const publicPoolPlaylists = defaultDiscoveryPlatformIds.flatMap((providerId) => publicPlaylistsByPlatform[providerId] ?? [])
+    const playlistPageCount = pageCountFor(searchResult?.playlists.length ?? 0)
+    const trackPageCount = pageCountFor(searchResult?.tracks.length ?? 0)
+    const safePlaylistPage = Math.min(playlistPage, playlistPageCount)
+    const safeTrackPage = Math.min(trackPage, trackPageCount)
+    const pagedSearchPlaylists = useMemo(
+        () => searchResult?.playlists.slice((safePlaylistPage - 1) * SEARCH_RESULT_PAGE_SIZE, safePlaylistPage * SEARCH_RESULT_PAGE_SIZE) ?? [],
+        [safePlaylistPage, searchResult],
+    )
+    const pagedSearchTracks = useMemo(
+        () => searchResult?.tracks.slice((safeTrackPage - 1) * SEARCH_RESULT_PAGE_SIZE, safeTrackPage * SEARCH_RESULT_PAGE_SIZE) ?? [],
+        [safeTrackPage, searchResult],
+    )
+
+    const updateSearchPage = (key: 'playlist_page' | 'track_page', page: number) => {
+        const nextParams = new URLSearchParams(searchParams)
+        nextParams.set(key, String(page))
+        setSearchParams(nextParams)
+    }
+
+    const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
+        const trimmedQuery = searchQuery.trim()
+        if (!trimmedQuery) {
+            return
+        }
+        setSearchParams({
+            q: trimmedQuery,
+            playlist_page: '1',
+            track_page: '1',
+        })
+    }
 
     const handlePlayEmsPlaylist = async (playlist: EmsCollectionPlaylistItem) => {
         setCollectionError(null)
@@ -181,154 +231,134 @@ const EmsPage = () => {
         }
     }
 
+    const openSearchPlaylistDetail = (playlist: EmsCollectionSearchPlaylistItem) => {
+        writeSearchPlaylistCache(playlist)
+        navigate(buildEmsSearchPlaylistDetailPath(playlist.source_platform, playlist.external_playlist_id))
+    }
+
     return (
         <div className="space-y-6">
             <HudCard
-                title="EMS Overview"
-                subtitle="LLM interpretation, deterministic direction, and stored pool health"
+                title="EMS Search"
+                subtitle="Search connected providers, inspect playlist tracks, and play from the result page"
                 action={
-                    isLoadingOverview ? (
+                    isSearching ? (
                         <span className="inline-flex items-center gap-2 text-xs text-hud-text-muted">
                             <RefreshCw size={14} className="animate-spin" />
-                            Loading overview
+                            Searching
                         </span>
                     ) : null
                 }
             >
-                {overviewError ? (
-                    <div className="rounded-2xl border border-hud-accent-danger/40 bg-hud-accent-danger/10 p-4 text-sm leading-6 text-hud-text-secondary">
-                        {overviewError}
-                    </div>
-                ) : overview ? (
-                    <div className="space-y-6">
-                        <div className="grid gap-4 md:grid-cols-3">
-                            <StatusTile label="PMS Library" value={overview.pipeline_status.pms_library} icon={<Database size={18} />} />
-                            <StatusTile label="EMS Pool" value={overview.pipeline_status.ems_pool} icon={<Activity size={18} />} />
-                            <StatusTile label="GMS Readiness" value={overview.pipeline_status.gms_readiness} icon={<Route size={18} />} />
+                <div className="space-y-5">
+                    <form className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]" onSubmit={handleSearchSubmit}>
+                        <label className="sr-only" htmlFor="ems-search-query">Search query</label>
+                        <input
+                            id="ems-search-query"
+                            value={searchQuery}
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                            placeholder="Search playlists or tracks"
+                            className="h-12 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary px-4 text-sm text-hud-text-primary outline-none transition-hud placeholder:text-hud-text-muted focus:border-hud-border-primary"
+                        />
+                        <Button type="submit" variant="primary" glow disabled={isSearching || !searchQuery.trim()}>
+                            {isSearching ? <RefreshCw size={18} className="animate-spin" /> : <Search size={18} />}
+                            Search
+                        </Button>
+                    </form>
+
+                    {searchError && (
+                        <div className="rounded-2xl border border-hud-accent-warning/40 bg-hud-accent-warning/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                            {searchError}
                         </div>
+                    )}
 
-                        <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-                            <div className="space-y-4">
-                                <div className="flex items-start gap-3">
-                                    <span className="rounded-xl bg-hud-accent-primary/10 p-2 text-hud-accent-primary">
-                                        <Brain size={18} />
-                                    </span>
-                                    <div>
-                                        <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
-                                            {overview.taste_model_snapshot.model ?? formatStatus(overview.taste_model_snapshot.status)}
-                                        </p>
-                                        <p className="mt-2 text-sm leading-6 text-hud-text-primary">
-                                            {overview.taste_model_snapshot.summary ??
-                                                'LLM interpretation is waiting for a configured EMS overview model.'}
-                                        </p>
+                    {searchResult && (
+                        <div className="space-y-6">
+                            <div className="flex flex-wrap gap-3">
+                                <span className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 px-4 py-3 text-sm font-medium text-hud-text-primary">
+                                    {searchResult.result_playlist_count} playlists
+                                </span>
+                                <span className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 px-4 py-3 text-sm font-medium text-hud-text-primary">
+                                    {searchResult.result_track_count} tracks
+                                </span>
+                            </div>
+
+                            {searchResult.playlists.length > 0 && (
+                                <section className="space-y-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                            <ListMusic size={15} />
+                                            Playlists
+                                        </div>
+                                        <ResultPager
+                                            page={safePlaylistPage}
+                                            pageCount={playlistPageCount}
+                                            onPrevious={() => updateSearchPage('playlist_page', Math.max(1, safePlaylistPage - 1))}
+                                            onNext={() => updateSearchPage('playlist_page', Math.min(playlistPageCount, safePlaylistPage + 1))}
+                                        />
                                     </div>
-                                </div>
-                                <div className="grid gap-3 md:grid-cols-3">
-                                    <StatusTile label="Playlists" value={String(overview.pms_context.playlist_count)} icon={<Database size={18} />} />
-                                    <StatusTile label="Tracks" value={String(overview.pms_context.library_track_count)} icon={<Activity size={18} />} />
-                                    <StatusTile label="Confidence" value={String(overview.taste_model_snapshot.confidence ?? 'pending')} icon={<Sparkles size={18} />} />
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <p className="text-sm leading-6 text-hud-text-primary">
-                                    {overview.candidate_direction.summary ??
-                                        'EMS has deterministic direction values, but no LLM summary has been generated yet.'}
-                                </p>
-                                <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
-                                    <StatusTile label="Mood" value={overview.candidate_direction.mood ?? 'pending'} icon={<Sparkles size={18} />} />
-                                    <StatusTile label="Energy" value={String(overview.candidate_direction.energy_level ?? 'pending')} icon={<Activity size={18} />} />
-                                    <StatusTile label="Familiarity" value={String(overview.candidate_direction.familiarity_bias ?? 'pending')} icon={<Brain size={18} />} />
-                                </div>
-                            </div>
-                        </section>
-
-                        <section className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
-                            <div>
-                                <p className="mb-3 text-xs uppercase tracking-[0.22em] text-hud-text-muted">Stored Pool Health</p>
-                                <div className="space-y-3">
-                                    {overview.ems_pool.providers.map((provider) => (
-                                        <div
-                                            key={provider.platform_id}
-                                            className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4"
-                                        >
-                                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-hud-text-primary">
-                                                    {provider.platform_id}
-                                                </p>
-                                                <span className="rounded-full border border-hud-border-secondary px-3 py-1 text-xs text-hud-text-muted">
-                                                    {formatDateTime(provider.last_collected_at)}
-                                                </span>
-                                            </div>
-                                            <p className="mt-2 text-sm text-hud-text-secondary">
-                                                {provider.playlist_count} playlists · {provider.track_count} tracks
-                                            </p>
-                                            <p className="mt-2 text-xs uppercase tracking-[0.18em] text-hud-accent-primary">
-                                                {provider.audio_feature_filled_track_count}/{provider.track_count} audio features · {formatPercent(provider.audio_feature_coverage_ratio)}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <p className="mb-3 text-xs uppercase tracking-[0.22em] text-hud-text-muted">Attention</p>
-                                    {attentionItems.length > 0 ? (
-                                        <div className="space-y-3">
-                                            {attentionItems.slice(0, 3).map((item) => (
-                                                <div
-                                                    key={item}
-                                                    className="flex gap-3 rounded-2xl border border-hud-accent-warning/40 bg-hud-accent-warning/10 p-4 text-sm leading-6 text-hud-text-secondary"
-                                                >
-                                                    <AlertTriangle size={18} className="mt-0.5 shrink-0 text-hud-accent-warning" />
-                                                    <span>{item}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm leading-6 text-hud-text-secondary">
-                                            No EMS boundary requires attention right now.
-                                        </p>
-                                    )}
-                                </div>
-
-                                {overview.evidence.length > 0 && (
-                                    <div>
-                                        <p className="mb-3 text-xs uppercase tracking-[0.22em] text-hud-text-muted">Evidence</p>
-                                        <div className="grid gap-3 md:grid-cols-2">
-                                            {overview.evidence.slice(0, 4).map((item) => (
-                                                <div
-                                                    key={item}
-                                                    className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4 text-sm leading-6 text-hud-text-secondary"
-                                                >
-                                                    {item}
-                                                </div>
-                                            ))}
-                                        </div>
+                                    <div className="grid gap-4 xl:grid-cols-2">
+                                        {pagedSearchPlaylists.map((playlist) => (
+                                            <PlaylistFeatureCard
+                                                key={`${playlist.source_platform}-${playlist.external_playlist_id}`}
+                                                title={playlist.title}
+                                                sourcePlatform={playlist.source_platform}
+                                                curator={playlist.curator || playlist.source_platform}
+                                                trackCount={playlist.track_count}
+                                                description={playlist.description || 'No description available.'}
+                                                imageUrl={playlist.cover_image_url}
+                                                actionLabel="Open Tracks"
+                                                detailPath={buildEmsSearchPlaylistDetailPath(playlist.source_platform, playlist.external_playlist_id)}
+                                                onOpenDetail={() => writeSearchPlaylistCache(playlist)}
+                                                onSelect={() => openSearchPlaylistDetail(playlist)}
+                                                onOpenExternal={() => openExternal(playlist.platform_external_url)}
+                                            />
+                                        ))}
                                     </div>
-                                )}
-                            </div>
-                        </section>
+                                </section>
+                            )}
 
-                        <div className="flex flex-wrap gap-3">
-                            <Link to="/gms-preview">
-                                <Button type="button" variant="primary" glow>
-                                    Review GMS Candidates
-                                </Button>
-                            </Link>
-                            <Link to="/pms">
-                                <Button type="button" variant="outline">
-                                    Back to PMS
-                                </Button>
-                            </Link>
+                            {searchResult.tracks.length > 0 && (
+                                <section className="space-y-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                            <Search size={15} />
+                                            Tracks
+                                        </div>
+                                        <ResultPager
+                                            page={safeTrackPage}
+                                            pageCount={trackPageCount}
+                                            onPrevious={() => updateSearchPage('track_page', Math.max(1, safeTrackPage - 1))}
+                                            onNext={() => updateSearchPage('track_page', Math.min(trackPageCount, safeTrackPage + 1))}
+                                        />
+                                    </div>
+                                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                        {pagedSearchTracks.map((track) => (
+                                            <TrackFeatureCard
+                                                key={`${track.source_platform}-${track.external_track_id}`}
+                                                title={track.title}
+                                                artistName={track.artist_name}
+                                                sourcePlatform={track.source_platform}
+                                                albumTitle={track.album_title}
+                                                imageUrl={track.album_image_url}
+                                                durationMs={track.duration_ms}
+                                                badges={track.isrc ? ['ISRC'] : []}
+                                                onPlay={() => void playItem(toEmsSearchTrackPlaybackItem(track, 'EMS Search'))}
+                                                onOpenExternal={() => openExternal(track.platform_external_url)}
+                                            />
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+
+                            {searchResult.playlists.length === 0 && searchResult.tracks.length === 0 && (
+                                <div className="rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">
+                                    No provider results found.
+                                </div>
+                            )}
                         </div>
-                    </div>
-                ) : (
-                    <div className="text-sm leading-6 text-hud-text-secondary">
-                        EMS overview will appear after the workspace context is available.
-                    </div>
-                )}
+                    )}
+                </div>
             </HudCard>
 
             <HudCard
@@ -380,5 +410,29 @@ const EmsPage = () => {
         </div>
     )
 }
+
+const ResultPager = ({
+    page,
+    pageCount,
+    onPrevious,
+    onNext,
+}: {
+    page: number
+    pageCount: number
+    onPrevious: () => void
+    onNext: () => void
+}) => (
+    <div className="flex items-center gap-2">
+        <Button type="button" variant="ghost" size="sm" onClick={onPrevious} disabled={page <= 1}>
+            Prev
+        </Button>
+        <span className="min-w-20 text-center text-xs uppercase tracking-[0.18em] text-hud-text-muted">
+            {page}/{pageCount}
+        </span>
+        <Button type="button" variant="ghost" size="sm" onClick={onNext} disabled={page >= pageCount}>
+            Next
+        </Button>
+    </div>
+)
 
 export default EmsPage
