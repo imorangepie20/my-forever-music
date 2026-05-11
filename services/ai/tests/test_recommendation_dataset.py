@@ -171,6 +171,7 @@ def test_train_sasrec_mvp_runs_pytorch_training_loop() -> None:
             "epochs": 3,
             "hidden_size": 8,
             "k": 3,
+            "persist_artifact": False,
         },
         json=payload,
     )
@@ -184,7 +185,26 @@ def test_train_sasrec_mvp_runs_pytorch_training_loop() -> None:
     assert result["summary"]["evaluation_example_count"] == 1
     assert result["summary"]["epoch_count"] == 3
     assert result["summary"]["final_loss"] is not None
+    assert result["baseline_metrics"]["hit_rate_at_k"] >= 0.0
+    assert "ndcg_at_k" in result["metric_delta"]
+    assert result["model_artifact"]["saved"] is False
     assert len(result["evaluation_examples"][0]["predicted_item_indices"]) == 3
+
+
+def test_sasrec_training_service_saves_model_artifact(tmp_path) -> None:
+    result = SasrecTrainingService(artifact_dir=tmp_path).train_mvp(
+        RecommendationDatasetImportRequest.model_validate(sasrec_training_payload()),
+        max_context_length=4,
+        epochs=2,
+        hidden_size=8,
+    )
+
+    assert result.model_artifact.saved is True
+    assert result.model_artifact.model_path is not None
+    assert result.model_artifact.metadata_path is not None
+    assert result.metric_delta.hit_rate_at_k >= -1.0
+    assert (tmp_path / "sasrec" / result.model_version / "model.pt").exists()
+    assert (tmp_path / "sasrec" / result.model_version / "metadata.json").exists()
 
 
 def test_sasrec_training_service_skips_when_train_split_is_empty() -> None:

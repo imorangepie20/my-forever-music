@@ -51,6 +51,7 @@ services/ai/
 - `AI_APP_VERSION`: 서비스 버전, 기본값 `0.1.0`
 - `AI_ENV`: 실행 환경, 기본값 `local`
 - `AI_ROOT_PATH`: Nginx 뒤에서 `/ai/*`로 공개할 때 사용할 prefix
+- `AI_MODEL_ARTIFACT_DIR`: SASRec MVP 같은 모델 artifact 저장 디렉터리, 기본값 `models`
 - `AI_EMS_OVERVIEW_MODEL`: EMS Overview 해석에 사용할 LLM 모델. 비어 있으면 해석을 생성하지 않고 `model_not_configured`를 반환
 - `AI_LLM_API_KEY`: OpenAI-compatible chat completions provider API key
 - `AI_LLM_BASE_URL`: OpenAI-compatible chat completions base URL, 기본값 `https://api.openai.com/v1`
@@ -149,7 +150,7 @@ Spring API의 `GET /api/v1/recommendations/datasets/users/{userId}/sequence` 응
 - 용도: `user_music_event`와 `recommendation_snapshot` 기반 sequence payload 검증
 - 응답: dataset id, readiness status, sequence/event/snapshot count, unique track count, positive/negative signal count, token preview, warnings
 
-현재 단계에서는 학습 파일을 저장하지 않고 payload의 구조와 readiness만 검증합니다. 실제 학습 artifact 저장과 SASRec 학습은 다음 단계에서 붙입니다.
+현재 단계에서는 payload의 구조와 readiness를 검증합니다. 실제 모델 학습은 `/sasrec/train`에서 수행합니다.
 
 SASRec MVP 입력 준비 엔드포인트:
 
@@ -172,9 +173,9 @@ PyTorch SASRec MVP 학습 엔드포인트:
 - 경로: `POST /v1/recommendations/datasets/sasrec/train`
 - 방식: 1-layer Transformer encoder 기반 next-item prediction
 - 입력: dataset validate와 같은 Spring exporter payload
-- 출력: model version, train/evaluation split, final loss, leave-last-out metric, predicted item indices
+- 출력: model version, train/evaluation split, final loss, leave-last-out metric, recency baseline metric, metric delta, predicted item indices, model artifact path
 
-현재 단계에서는 모델 artifact를 파일로 저장하지 않습니다. 먼저 작은 사용자 sequence에서 forward/backward 학습 루프와 offline metric 비교가 가능한지 검증하는 MVP입니다.
+기본적으로 `AI_MODEL_ARTIFACT_DIR/sasrec/{model_version}/` 아래에 `model.pt`와 `metadata.json`을 저장합니다. API 검증이나 임시 실행에서 파일 저장을 원하지 않으면 `persist_artifact=false` 쿼리 파라미터를 사용합니다.
 
 장기적으로는 이 서비스가 아래 역할까지 확장됩니다.
 
@@ -190,6 +191,6 @@ PyTorch SASRec MVP 학습 엔드포인트:
 
 1. Spotify 오디오 특성 적재 실패 시 재시도/부분 제외/사용자 안내 전략 정리
 2. `services/api` 호출용 내부 계약과 에러 코드 정리
-3. SASRec MVP model artifact 저장
-4. recency baseline 대비 offline metric 개선 검증
+3. recency baseline 대비 offline metric 개선 검증
+4. 저장된 SASRec MVP artifact 로드/추론 엔드포인트 추가
 5. 플랫폼 연동 이후 생성되는 `PMS user library` 기반 사용자 모델 입력 계약 확장

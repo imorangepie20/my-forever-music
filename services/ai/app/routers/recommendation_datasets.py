@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from app.config import get_settings
 from app.schemas.recommendation_dataset import (
     RecommendationDatasetImportRequest,
     RecommendationDatasetValidationResponse,
@@ -18,7 +19,10 @@ router = APIRouter(prefix="/v1/recommendations/datasets", tags=["recommendation-
 service = RecommendationDatasetService()
 sasrec_service = SasrecDatasetService()
 offline_report_service = SasrecOfflineReportService(sasrec_service)
-training_service = SasrecTrainingService(sasrec_service)
+training_service = SasrecTrainingService(
+    sasrec_service,
+    artifact_dir=get_settings().model_artifact_dir,
+)
 
 
 @router.post(
@@ -73,6 +77,7 @@ def train_sasrec_mvp(
     epochs: int = 30,
     hidden_size: int = 32,
     learning_rate: float = 0.01,
+    persist_artifact: bool = True,
 ) -> SasrecTrainingResponse:
     return training_service.train_mvp(
         request,
@@ -81,4 +86,5 @@ def train_sasrec_mvp(
         epochs=epochs,
         hidden_size=hidden_size,
         learning_rate=learning_rate,
+        persist_artifact=persist_artifact,
     )

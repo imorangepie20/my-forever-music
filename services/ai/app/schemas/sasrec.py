@@ -85,6 +85,23 @@ class SasrecTrainingSummary(BaseModel):
     final_loss: float | None = None
 
 
+class SasrecMetricDelta(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    hit_rate_at_k: float
+    mrr_at_k: float
+    ndcg_at_k: float
+
+
+class SasrecModelArtifact(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    artifact_dir: str | None = None
+    model_path: str | None = None
+    metadata_path: str | None = None
+    saved: bool
+
+
 class SasrecTrainingResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -94,5 +111,8 @@ class SasrecTrainingResponse(BaseModel):
     model_version: str
     summary: SasrecTrainingSummary
     metrics: SasrecOfflineMetrics
+    baseline_metrics: SasrecOfflineMetrics
+    metric_delta: SasrecMetricDelta
+    model_artifact: SasrecModelArtifact
     evaluation_examples: list[SasrecEvaluationExample]
     warnings: list[str]
