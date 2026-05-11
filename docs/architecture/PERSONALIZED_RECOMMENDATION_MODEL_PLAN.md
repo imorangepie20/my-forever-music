@@ -634,12 +634,14 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - SASRec 준비 경로는 sequence payload를 `track_id -> item_index` vocabulary와 next-item training window로 변환
 - AI service `POST /v1/recommendations/datasets/sasrec/offline-report` offline metric report 경로 추가
 - offline report는 leave-last-out 방식으로 recency baseline의 `HitRate@K`, `MRR@K`, `NDCG@K`를 계산해 PyTorch SASRec MVP의 비교 기준으로 사용
+- AI service `POST /v1/recommendations/datasets/sasrec/train` PyTorch SASRec MVP 학습 경로 추가
+- SASRec MVP는 1-layer Transformer encoder로 next-item prediction을 학습하고, final loss와 leave-last-out metric을 반환
 
 아직 남은 범위:
 
 - PMS/GMS 외 화면의 명시적 저장/좋아요/반복 재생 이벤트 확장
 - playlist-level 6축 evaluator의 API 노출과 운영 dashboard 연결
-- PyTorch 기반 SASRec MVP 학습 스크립트와 recency baseline 대비 metric 개선 검증
+- SASRec MVP model artifact 저장과 recency baseline 대비 metric 개선 검증
 
 ## 14. 내부 참고 문서
 

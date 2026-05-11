@@ -5,6 +5,7 @@ from app.schemas.recommendation_dataset import RecommendationDatasetImportReques
 from app.services.recommendation_dataset_service import RecommendationDatasetService
 from app.services.sasrec_dataset_service import SasrecDatasetService
 from app.services.sasrec_offline_report_service import SasrecOfflineReportService
+from app.services.sasrec_training_service import SasrecTrainingService
 
 client = TestClient(app)
 
@@ -160,6 +161,43 @@ def test_sasrec_offline_report_service_handles_empty_dataset() -> None:
     assert "Offline report has no evaluation example." in result.warnings
 
 
+def test_train_sasrec_mvp_runs_pytorch_training_loop() -> None:
+    payload = sasrec_training_payload()
+
+    response = client.post(
+        "/v1/recommendations/datasets/sasrec/train",
+        params={
+            "max_context_length": 4,
+            "epochs": 3,
+            "hidden_size": 8,
+            "k": 3,
+        },
+        json=payload,
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["service"] == "sasrec-mvp-training"
+    assert result["model_version"].startswith("sasrec-mvp-")
+    assert result["summary"]["vocabulary_size"] == 3
+    assert result["summary"]["train_example_count"] == 2
+    assert result["summary"]["evaluation_example_count"] == 1
+    assert result["summary"]["epoch_count"] == 3
+    assert result["summary"]["final_loss"] is not None
+    assert len(result["evaluation_examples"][0]["predicted_item_indices"]) == 3
+
+
+def test_sasrec_training_service_skips_when_train_split_is_empty() -> None:
+    result = SasrecTrainingService().train_mvp(
+        RecommendationDatasetImportRequest.model_validate(sample_dataset_payload())
+    )
+
+    assert result.summary.train_example_count == 0
+    assert result.summary.epoch_count == 0
+    assert result.summary.final_loss is None
+    assert "SASRec MVP training skipped because there is no train split before evaluation." in result.warnings
+
+
 def sample_dataset_payload() -> dict:
     return {
         "user_id": "user-001",
@@ -235,3 +273,55 @@ def sample_dataset_payload() -> dict:
             },
         ],
     }
+
+
+def sasrec_training_payload() -> dict:
+    payload = sample_dataset_payload()
+    payload["summary"] = {
+        "event_count": 1,
+        "recommendation_snapshot_count": 1,
+        "sequence_item_count": 4,
+    }
+    payload["sequence"] = [
+        {
+            "item_type": "event",
+            "source_id": 1,
+            "token": "event:track_saved:track-001",
+            "track_id": "track-001",
+            "playlist_id": "playlist-001",
+            "recommendation_id": "recommendation-001",
+            "weight": 1.0,
+            "occurred_at": "2026-05-11T01:00:00Z",
+        },
+        {
+            "item_type": "recommendation_snapshot",
+            "source_id": 1,
+            "token": "recommendation:gms-baseline-v1:track-002",
+            "track_id": "track-002",
+            "playlist_id": "playlist-002",
+            "recommendation_id": "recommendation-001",
+            "weight": 0.88,
+            "occurred_at": "2026-05-11T02:00:00Z",
+        },
+        {
+            "item_type": "recommendation_snapshot",
+            "source_id": 1,
+            "token": "recommendation:gms-baseline-v1:track-003",
+            "track_id": "track-003",
+            "playlist_id": "playlist-002",
+            "recommendation_id": "recommendation-001",
+            "weight": 0.76,
+            "occurred_at": "2026-05-11T03:00:00Z",
+        },
+        {
+            "item_type": "event",
+            "source_id": 1,
+            "token": "event:track_saved:track-002",
+            "track_id": "track-002",
+            "playlist_id": "playlist-001",
+            "recommendation_id": "recommendation-001",
+            "weight": 1.0,
+            "occurred_at": "2026-05-11T04:00:00Z",
+        },
+    ]
+    return payload

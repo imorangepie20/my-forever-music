@@ -7,15 +7,18 @@ from app.schemas.recommendation_dataset import (
     RecommendationDatasetValidationResponse,
 )
 from app.schemas.sasrec import SasrecDatasetResponse, SasrecOfflineReportResponse
+from app.schemas.sasrec import SasrecTrainingResponse
 from app.services.recommendation_dataset_service import RecommendationDatasetService
 from app.services.sasrec_dataset_service import SasrecDatasetService
 from app.services.sasrec_offline_report_service import SasrecOfflineReportService
+from app.services.sasrec_training_service import SasrecTrainingService
 
 router = APIRouter(prefix="/v1/recommendations/datasets", tags=["recommendation-datasets"])
 
 service = RecommendationDatasetService()
 sasrec_service = SasrecDatasetService()
 offline_report_service = SasrecOfflineReportService(sasrec_service)
+training_service = SasrecTrainingService(sasrec_service)
 
 
 @router.post(
@@ -55,4 +58,27 @@ def build_sasrec_offline_report(
         request,
         max_context_length=max_context_length,
         k=k,
+    )
+
+
+@router.post(
+    "/sasrec/train",
+    response_model=SasrecTrainingResponse,
+    summary="Train a minimal PyTorch SASRec MVP and evaluate it with leave-last-out metrics",
+)
+def train_sasrec_mvp(
+    request: RecommendationDatasetImportRequest,
+    max_context_length: int = 50,
+    k: int = 10,
+    epochs: int = 30,
+    hidden_size: int = 32,
+    learning_rate: float = 0.01,
+) -> SasrecTrainingResponse:
+    return training_service.train_mvp(
+        request,
+        max_context_length=max_context_length,
+        k=k,
+        epochs=epochs,
+        hidden_size=hidden_size,
+        learning_rate=learning_rate,
     )

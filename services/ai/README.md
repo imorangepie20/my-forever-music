@@ -22,6 +22,7 @@ FastAPI 기반 AI/추천 서비스 폴더입니다.
 - 추천 dataset 검증 엔드포인트: `POST /v1/recommendations/datasets/validate`
 - SASRec dataset 준비 엔드포인트: `POST /v1/recommendations/datasets/sasrec/prepare`
 - SASRec offline metric report 엔드포인트: `POST /v1/recommendations/datasets/sasrec/offline-report`
+- PyTorch SASRec MVP 학습 엔드포인트: `POST /v1/recommendations/datasets/sasrec/train`
 - FastAPI 문서 경로: `/docs`
 - OpenAPI 경로: `/openapi.json`
 - 최소 테스트 파일: `tests/test_health.py`
@@ -166,6 +167,15 @@ Offline metric report 엔드포인트:
 
 현재 report는 recency baseline을 사용합니다. PyTorch 기반 SASRec 모델은 이 report를 baseline으로 삼아 개선 여부를 비교합니다.
 
+PyTorch SASRec MVP 학습 엔드포인트:
+
+- 경로: `POST /v1/recommendations/datasets/sasrec/train`
+- 방식: 1-layer Transformer encoder 기반 next-item prediction
+- 입력: dataset validate와 같은 Spring exporter payload
+- 출력: model version, train/evaluation split, final loss, leave-last-out metric, predicted item indices
+
+현재 단계에서는 모델 artifact를 파일로 저장하지 않습니다. 먼저 작은 사용자 sequence에서 forward/backward 학습 루프와 offline metric 비교가 가능한지 검증하는 MVP입니다.
+
 장기적으로는 이 서비스가 아래 역할까지 확장됩니다.
 
 - Spotify 오디오 특성 적재
@@ -180,6 +190,6 @@ Offline metric report 엔드포인트:
 
 1. Spotify 오디오 특성 적재 실패 시 재시도/부분 제외/사용자 안내 전략 정리
 2. `services/api` 호출용 내부 계약과 에러 코드 정리
-3. PyTorch 기반 SASRec MVP 학습 스크립트 작성
+3. SASRec MVP model artifact 저장
 4. recency baseline 대비 offline metric 개선 검증
 5. 플랫폼 연동 이후 생성되는 `PMS user library` 기반 사용자 모델 입력 계약 확장

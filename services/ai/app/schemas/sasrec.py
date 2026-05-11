@@ -71,3 +71,28 @@ class SasrecOfflineReportResponse(BaseModel):
     metrics: SasrecOfflineMetrics
     evaluation_examples: list[SasrecEvaluationExample]
     warnings: list[str]
+
+
+class SasrecTrainingSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    vocabulary_size: int
+    train_example_count: int
+    evaluation_example_count: int
+    max_context_length: int
+    hidden_size: int
+    epoch_count: int
+    final_loss: float | None = None
+
+
+class SasrecTrainingResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    service: str
+    status: str
+    user_id: str
+    model_version: str
+    summary: SasrecTrainingSummary
+    metrics: SasrecOfflineMetrics
+    evaluation_examples: list[SasrecEvaluationExample]
+    warnings: list[str]
