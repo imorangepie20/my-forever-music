@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.schemas.recommendation_dataset import RecommendationDatasetImportRequest
 from app.services.recommendation_dataset_service import RecommendationDatasetService
+from app.services.sasrec_dataset_service import SasrecDatasetService
 
 client = TestClient(app)
 
@@ -49,6 +50,60 @@ def test_dataset_service_reports_mismatched_summary_counts() -> None:
     assert result.warnings == [
         "summary.event_count does not match the number of event payload items."
     ]
+
+
+def test_prepare_sasrec_dataset_returns_vocabulary_and_training_windows() -> None:
+    response = client.post(
+        "/v1/recommendations/datasets/sasrec/prepare",
+        params={"max_context_length": 3},
+        json=sample_dataset_payload(),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["service"] == "sasrec-dataset"
+    assert payload["summary"]["unique_track_count"] == 2
+    assert payload["summary"]["training_example_count"] == 1
+    assert payload["vocabulary"] == [
+        {"track_id": "track-001", "item_index": 1},
+        {"track_id": "track-002", "item_index": 2},
+    ]
+    assert payload["training_examples"][0]["context_item_indices"] == [1]
+    assert payload["training_examples"][0]["target_item_index"] == 2
+    assert payload["training_examples"][0]["weight"] == 0.88
+
+
+def test_sasrec_dataset_service_weights_positive_events() -> None:
+    payload = sample_dataset_payload()
+    payload["sequence"] = [
+        {
+            "item_type": "recommendation_snapshot",
+            "source_id": 1,
+            "token": "recommendation:gms-baseline-v1:track-002",
+            "track_id": "track-002",
+            "playlist_id": "playlist-002",
+            "recommendation_id": "recommendation-001",
+            "weight": 0.88,
+            "occurred_at": "2026-05-11T01:00:00Z",
+        },
+        {
+            "item_type": "event",
+            "source_id": 1,
+            "token": "event:track_saved:track-001",
+            "track_id": "track-001",
+            "playlist_id": "playlist-001",
+            "recommendation_id": "recommendation-001",
+            "weight": 0.1,
+            "occurred_at": "2026-05-11T02:00:00Z",
+        },
+    ]
+
+    result = SasrecDatasetService().prepare_dataset(
+        RecommendationDatasetImportRequest.model_validate(payload)
+    )
+
+    assert result.training_examples[0].target_track_id == "track-001"
+    assert result.training_examples[0].weight == 1.0
 
 
 def sample_dataset_payload() -> dict:

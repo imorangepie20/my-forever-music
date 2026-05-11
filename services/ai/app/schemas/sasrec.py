@@ -1,0 +1,42 @@
+from __future__ import annotations
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class SasrecVocabularyItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    track_id: str
+    item_index: int = Field(ge=1)
+
+
+class SasrecTrainingExample(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    context_item_indices: list[int]
+    target_item_index: int = Field(ge=1)
+    target_track_id: str
+    source_token: str
+    weight: float
+
+
+class SasrecDatasetSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sequence_item_count: int
+    usable_item_count: int
+    unique_track_count: int
+    training_example_count: int
+    max_context_length: int
+
+
+class SasrecDatasetResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    service: str
+    status: str
+    user_id: str
+    summary: SasrecDatasetSummary
+    vocabulary: list[SasrecVocabularyItem]
+    training_examples: list[SasrecTrainingExample]
+    warnings: list[str]

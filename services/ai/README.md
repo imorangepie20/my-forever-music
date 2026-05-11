@@ -20,6 +20,7 @@ FastAPI 기반 AI/추천 서비스 폴더입니다.
 - 헬스체크 엔드포인트: `/health`
 - 추천 미리보기 엔드포인트: `POST /v1/recommendations/preview`
 - 추천 dataset 검증 엔드포인트: `POST /v1/recommendations/datasets/validate`
+- SASRec dataset 준비 엔드포인트: `POST /v1/recommendations/datasets/sasrec/prepare`
 - FastAPI 문서 경로: `/docs`
 - OpenAPI 경로: `/openapi.json`
 - 최소 테스트 파일: `tests/test_health.py`
@@ -148,6 +149,14 @@ Spring API의 `GET /api/v1/recommendations/datasets/users/{userId}/sequence` 응
 
 현재 단계에서는 학습 파일을 저장하지 않고 payload의 구조와 readiness만 검증합니다. 실제 학습 artifact 저장과 SASRec 학습은 다음 단계에서 붙입니다.
 
+SASRec MVP 입력 준비 엔드포인트:
+
+- 경로: `POST /v1/recommendations/datasets/sasrec/prepare`
+- 입력: dataset validate와 같은 Spring exporter payload
+- 출력: `track_id -> item_index` vocabulary, next-item training window, target weight, warning
+
+이 단계는 PyTorch 모델을 아직 실행하지 않고, sequence payload가 SASRec류 next-item training 예제로 변환 가능한지 검증합니다.
+
 장기적으로는 이 서비스가 아래 역할까지 확장됩니다.
 
 - Spotify 오디오 특성 적재
@@ -162,6 +171,6 @@ Spring API의 `GET /api/v1/recommendations/datasets/users/{userId}/sequence` 응
 
 1. Spotify 오디오 특성 적재 실패 시 재시도/부분 제외/사용자 안내 전략 정리
 2. `services/api` 호출용 내부 계약과 에러 코드 정리
-3. SASRec MVP 학습 스크립트 작성
-4. 플랫폼 연동 이후 생성되는 `PMS user library` 기반 사용자 모델 입력 계약 확장
-5. 사용자별 추가 학습과 EMS 평가 파이프라인 설계
+3. PyTorch 기반 SASRec MVP 학습 스크립트 작성
+4. offline metric report 생성
+5. 플랫폼 연동 이후 생성되는 `PMS user library` 기반 사용자 모델 입력 계약 확장
