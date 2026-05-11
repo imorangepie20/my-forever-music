@@ -638,13 +638,15 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - SASRec MVP는 1-layer Transformer encoder로 next-item prediction을 학습하고, final loss와 leave-last-out metric을 반환
 - SASRec MVP 학습 결과를 `AI_MODEL_ARTIFACT_DIR/sasrec/{model_version}/model.pt`와 `metadata.json`으로 저장
 - 학습 응답은 recency baseline metric, SASRec metric, metric delta, artifact path를 함께 반환
+- AI service `POST /v1/recommendations/datasets/sasrec/rank` 후보 랭킹 경로 추가
+- rank 경로는 저장된 `model.pt`와 `metadata.json`을 로드해 context track 기준 candidate track logits를 정렬
 
 아직 남은 범위:
 
 - PMS/GMS 외 화면의 명시적 저장/좋아요/반복 재생 이벤트 확장
 - playlist-level 6축 evaluator의 API 노출과 운영 dashboard 연결
-- 저장된 SASRec MVP artifact 로드/추론 엔드포인트
 - recency baseline 대비 metric 개선 검증 자동화
+- Spring API에서 SASRec rank endpoint 호출 연결
 
 ## 14. 내부 참고 문서
 

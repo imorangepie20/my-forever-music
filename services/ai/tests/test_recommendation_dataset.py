@@ -2,9 +2,11 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas.recommendation_dataset import RecommendationDatasetImportRequest
+from app.schemas.sasrec import SasrecRankingRequest
 from app.services.recommendation_dataset_service import RecommendationDatasetService
 from app.services.sasrec_dataset_service import SasrecDatasetService
 from app.services.sasrec_offline_report_service import SasrecOfflineReportService
+from app.services.sasrec_ranking_service import SasrecRankingService
 from app.services.sasrec_training_service import SasrecTrainingService
 
 client = TestClient(app)
@@ -205,6 +207,43 @@ def test_sasrec_training_service_saves_model_artifact(tmp_path) -> None:
     assert result.metric_delta.hit_rate_at_k >= -1.0
     assert (tmp_path / "sasrec" / result.model_version / "model.pt").exists()
     assert (tmp_path / "sasrec" / result.model_version / "metadata.json").exists()
+
+
+def test_sasrec_ranking_service_loads_artifact_and_ranks_candidates(tmp_path) -> None:
+    training_result = SasrecTrainingService(artifact_dir=tmp_path).train_mvp(
+        RecommendationDatasetImportRequest.model_validate(sasrec_training_payload()),
+        max_context_length=4,
+        epochs=2,
+        hidden_size=8,
+    )
+
+    ranking = SasrecRankingService(artifact_dir=tmp_path).rank_candidates(
+        request=SasrecRankingRequest(
+            model_version=training_result.model_version,
+            context_track_ids=["track-001", "track-002"],
+            candidate_track_ids=["track-001", "track-002", "track-003"],
+            k=2,
+        )
+    )
+
+    assert ranking.status == "ok"
+    assert ranking.model_version == training_result.model_version
+    assert len(ranking.ranked_candidates) == 2
+    assert ranking.ranked_candidates[0].rank == 1
+    assert ranking.ranked_candidates[0].track_id in {"track-001", "track-002", "track-003"}
+
+
+def test_sasrec_ranking_service_reports_missing_artifact(tmp_path) -> None:
+    ranking = SasrecRankingService(artifact_dir=tmp_path).rank_candidates(
+        request=SasrecRankingRequest(
+            model_version="sasrec-mvp-missing",
+            context_track_ids=["track-001"],
+            candidate_track_ids=["track-002"],
+        )
+    )
+
+    assert ranking.status == "model_not_found"
+    assert ranking.ranked_candidates == []
 
 
 def test_sasrec_training_service_skips_when_train_split_is_empty() -> None:

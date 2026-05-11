@@ -116,3 +116,31 @@ class SasrecTrainingResponse(BaseModel):
     model_artifact: SasrecModelArtifact
     evaluation_examples: list[SasrecEvaluationExample]
     warnings: list[str]
+
+
+class SasrecRankingRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model_version: str = Field(min_length=1)
+    context_track_ids: list[str] = Field(default_factory=list)
+    candidate_track_ids: list[str] = Field(default_factory=list)
+    k: int = Field(default=10, ge=1, le=100)
+
+
+class SasrecRankedCandidate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rank: int
+    track_id: str
+    item_index: int
+    score: float
+
+
+class SasrecRankingResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    service: str
+    status: str
+    model_version: str
+    ranked_candidates: list[SasrecRankedCandidate]
+    warnings: list[str]

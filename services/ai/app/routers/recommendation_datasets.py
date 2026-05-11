@@ -8,10 +8,11 @@ from app.schemas.recommendation_dataset import (
     RecommendationDatasetValidationResponse,
 )
 from app.schemas.sasrec import SasrecDatasetResponse, SasrecOfflineReportResponse
-from app.schemas.sasrec import SasrecTrainingResponse
+from app.schemas.sasrec import SasrecRankingRequest, SasrecRankingResponse, SasrecTrainingResponse
 from app.services.recommendation_dataset_service import RecommendationDatasetService
 from app.services.sasrec_dataset_service import SasrecDatasetService
 from app.services.sasrec_offline_report_service import SasrecOfflineReportService
+from app.services.sasrec_ranking_service import SasrecRankingService
 from app.services.sasrec_training_service import SasrecTrainingService
 
 router = APIRouter(prefix="/v1/recommendations/datasets", tags=["recommendation-datasets"])
@@ -23,6 +24,7 @@ training_service = SasrecTrainingService(
     sasrec_service,
     artifact_dir=get_settings().model_artifact_dir,
 )
+ranking_service = SasrecRankingService(artifact_dir=get_settings().model_artifact_dir)
 
 
 @router.post(
@@ -88,3 +90,12 @@ def train_sasrec_mvp(
         learning_rate=learning_rate,
         persist_artifact=persist_artifact,
     )
+
+
+@router.post(
+    "/sasrec/rank",
+    response_model=SasrecRankingResponse,
+    summary="Load a persisted SASRec MVP artifact and rank candidate tracks",
+)
+def rank_sasrec_candidates(request: SasrecRankingRequest) -> SasrecRankingResponse:
+    return ranking_service.rank_candidates(request)
