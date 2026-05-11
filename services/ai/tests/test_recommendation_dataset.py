@@ -4,6 +4,7 @@ from app.main import app
 from app.schemas.recommendation_dataset import RecommendationDatasetImportRequest
 from app.services.recommendation_dataset_service import RecommendationDatasetService
 from app.services.sasrec_dataset_service import SasrecDatasetService
+from app.services.sasrec_offline_report_service import SasrecOfflineReportService
 
 client = TestClient(app)
 
@@ -104,6 +105,59 @@ def test_sasrec_dataset_service_weights_positive_events() -> None:
 
     assert result.training_examples[0].target_track_id == "track-001"
     assert result.training_examples[0].weight == 1.0
+
+
+def test_sasrec_offline_report_returns_leave_last_out_metrics() -> None:
+    payload = sample_dataset_payload()
+    payload["summary"]["sequence_item_count"] = 3
+    payload["sequence"].append(
+        {
+            "item_type": "event",
+            "source_id": 1,
+            "token": "event:track_saved:track-001",
+            "track_id": "track-001",
+            "playlist_id": "playlist-001",
+            "recommendation_id": "recommendation-001",
+            "weight": 1.0,
+            "occurred_at": "2026-05-11T03:00:00Z",
+        }
+    )
+
+    response = client.post(
+        "/v1/recommendations/datasets/sasrec/offline-report",
+        params={"k": 2},
+        json=payload,
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["service"] == "sasrec-offline-report"
+    assert result["train_example_count"] == 1
+    assert result["evaluation_example_count"] == 1
+    assert result["metrics"]["hit_rate_at_k"] == 1.0
+    assert result["metrics"]["mrr_at_k"] == 0.5
+    assert result["metrics"]["ndcg_at_k"] == 0.6309
+    assert result["evaluation_examples"][0]["hit_rank"] == 2
+
+
+def test_sasrec_offline_report_service_handles_empty_dataset() -> None:
+    payload = sample_dataset_payload()
+    payload["summary"] = {
+        "event_count": 0,
+        "recommendation_snapshot_count": 0,
+        "sequence_item_count": 0,
+    }
+    payload["events"] = []
+    payload["recommendation_snapshots"] = []
+    payload["sequence"] = []
+
+    result = SasrecOfflineReportService().build_report(
+        RecommendationDatasetImportRequest.model_validate(payload)
+    )
+
+    assert result.metrics.hit_rate_at_k == 0.0
+    assert result.evaluation_example_count == 0
+    assert "Offline report has no evaluation example." in result.warnings
 
 
 def sample_dataset_payload() -> dict:

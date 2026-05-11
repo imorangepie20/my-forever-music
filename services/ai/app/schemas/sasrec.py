@@ -40,3 +40,34 @@ class SasrecDatasetResponse(BaseModel):
     vocabulary: list[SasrecVocabularyItem]
     training_examples: list[SasrecTrainingExample]
     warnings: list[str]
+
+
+class SasrecOfflineMetrics(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    hit_rate_at_k: float
+    mrr_at_k: float
+    ndcg_at_k: float
+
+
+class SasrecEvaluationExample(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    target_track_id: str
+    target_item_index: int
+    predicted_item_indices: list[int]
+    hit_rank: int | None = None
+
+
+class SasrecOfflineReportResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    service: str
+    status: str
+    user_id: str
+    k: int
+    train_example_count: int
+    evaluation_example_count: int
+    metrics: SasrecOfflineMetrics
+    evaluation_examples: list[SasrecEvaluationExample]
+    warnings: list[str]

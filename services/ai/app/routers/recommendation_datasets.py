@@ -6,14 +6,16 @@ from app.schemas.recommendation_dataset import (
     RecommendationDatasetImportRequest,
     RecommendationDatasetValidationResponse,
 )
-from app.schemas.sasrec import SasrecDatasetResponse
+from app.schemas.sasrec import SasrecDatasetResponse, SasrecOfflineReportResponse
 from app.services.recommendation_dataset_service import RecommendationDatasetService
 from app.services.sasrec_dataset_service import SasrecDatasetService
+from app.services.sasrec_offline_report_service import SasrecOfflineReportService
 
 router = APIRouter(prefix="/v1/recommendations/datasets", tags=["recommendation-datasets"])
 
 service = RecommendationDatasetService()
 sasrec_service = SasrecDatasetService()
+offline_report_service = SasrecOfflineReportService(sasrec_service)
 
 
 @router.post(
@@ -37,3 +39,20 @@ def prepare_sasrec_dataset(
     max_context_length: int = 50,
 ) -> SasrecDatasetResponse:
     return sasrec_service.prepare_dataset(request, max_context_length=max_context_length)
+
+
+@router.post(
+    "/sasrec/offline-report",
+    response_model=SasrecOfflineReportResponse,
+    summary="Build a leave-last-out offline metric report for SASRec dataset windows",
+)
+def build_sasrec_offline_report(
+    request: RecommendationDatasetImportRequest,
+    max_context_length: int = 50,
+    k: int = 10,
+) -> SasrecOfflineReportResponse:
+    return offline_report_service.build_report(
+        request,
+        max_context_length=max_context_length,
+        k=k,
+    )
