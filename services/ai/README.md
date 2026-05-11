@@ -19,6 +19,7 @@ FastAPI 기반 AI/추천 서비스 폴더입니다.
 - 기본 정보 엔드포인트: `/`
 - 헬스체크 엔드포인트: `/health`
 - 추천 미리보기 엔드포인트: `POST /v1/recommendations/preview`
+- 추천 dataset 검증 엔드포인트: `POST /v1/recommendations/datasets/validate`
 - FastAPI 문서 경로: `/docs`
 - OpenAPI 경로: `/openapi.json`
 - 최소 테스트 파일: `tests/test_health.py`
@@ -137,6 +138,16 @@ curl -X POST http://127.0.0.1:8000/v1/recommendations/preview \
 
 상세 계약 문서는 [AI_RECOMMENDATION_PREVIEW.md](/Users/woosungjo/music-space/my-forever-music/docs/api/AI_RECOMMENDATION_PREVIEW.md) 에 정리했습니다.
 
+## 추천 Dataset Import Harness
+
+Spring API의 `GET /api/v1/recommendations/datasets/users/{userId}/sequence` 응답을 AI service로 가져와 학습 가능 상태를 검증하는 내부 엔드포인트입니다.
+
+- 경로: `POST /v1/recommendations/datasets/validate`
+- 용도: `user_music_event`와 `recommendation_snapshot` 기반 sequence payload 검증
+- 응답: dataset id, readiness status, sequence/event/snapshot count, unique track count, positive/negative signal count, token preview, warnings
+
+현재 단계에서는 학습 파일을 저장하지 않고 payload의 구조와 readiness만 검증합니다. 실제 학습 artifact 저장과 SASRec 학습은 다음 단계에서 붙입니다.
+
 장기적으로는 이 서비스가 아래 역할까지 확장됩니다.
 
 - Spotify 오디오 특성 적재
@@ -151,6 +162,6 @@ curl -X POST http://127.0.0.1:8000/v1/recommendations/preview \
 
 1. Spotify 오디오 특성 적재 실패 시 재시도/부분 제외/사용자 안내 전략 정리
 2. `services/api` 호출용 내부 계약과 에러 코드 정리
-3. 플랫폼 연동 이후 생성되는 `PMS user library` 기반 사용자 모델 입력 계약 설계
-4. 사용자별 추가 학습과 EMS 평가 파이프라인 설계
-5. 실제 카탈로그/벡터 검색 기반 ranking 로직 연결
+3. SASRec MVP 학습 스크립트 작성
+4. 플랫폼 연동 이후 생성되는 `PMS user library` 기반 사용자 모델 입력 계약 확장
+5. 사용자별 추가 학습과 EMS 평가 파이프라인 설계

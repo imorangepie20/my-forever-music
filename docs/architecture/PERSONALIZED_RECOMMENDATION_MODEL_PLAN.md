@@ -628,12 +628,14 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - GMS preview 후보 리스트 전체를 기준으로 playlist-level `coherence_score`, `diversity_score`, `redundancy_penalty`를 계산해 snapshot에 반영
 - `GET /api/v1/recommendations/datasets/users/{userId}/sequence` dataset exporter 추가
 - exporter는 `user_music_event`와 `recommendation_snapshot`을 시간순 sequence item으로 합쳐 AI service 학습/검증 입력 경계로 제공
+- AI service `POST /v1/recommendations/datasets/validate` dataset import harness 추가
+- import harness는 exporter payload의 count 정합성, source id 연결, sequence 정렬, positive/negative signal, unique track coverage, training readiness를 검증
 
 아직 남은 범위:
 
 - PMS/GMS 외 화면의 명시적 저장/좋아요/반복 재생 이벤트 확장
 - playlist-level 6축 evaluator의 API 노출과 운영 dashboard 연결
-- AI service 쪽 dataset import harness와 SASRec MVP 학습 스크립트
+- SASRec MVP 학습 스크립트와 offline metric report
 
 ## 14. 내부 참고 문서
 
