@@ -5,6 +5,7 @@ import {
     BarChart3,
     ChevronLeft,
     ChevronRight,
+    Compass,
     Globe,
     Home,
     Music2,
@@ -93,6 +94,12 @@ const adminMenuItems: MenuItem[] = [
         description: 'Promote, disable, rollback policy',
         icon: <BadgeCheck size={20} />,
         path: '/recommendations/sasrec-admin',
+    },
+    {
+        label: 'Metadata Normalize',
+        description: 'MusicBrainz lookup + candidate review',
+        icon: <Compass size={20} />,
+        path: '/recommendations/metadata-admin',
     },
 ]
 

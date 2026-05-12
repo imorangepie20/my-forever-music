@@ -1064,6 +1064,57 @@ export interface SasrecRegistryAdminResponse {
     warnings: string[]
 }
 
+export interface MetadataLookupCandidate {
+    mbid: string | null
+    title: string | null
+    artist_name: string | null
+    length_ms: number | null
+    score: number | null
+    isrcs: string[]
+    release_titles: string[]
+}
+
+export interface TrackIdentityCandidateItem {
+    id: number
+    query_title: string
+    query_artist: string | null
+    source: string
+    candidate_kind: string
+    candidate_value: string
+    candidate_score: number | null
+    status: 'pending' | 'accepted' | 'rejected' | string
+    created_by: string | null
+    created_at: string
+    resolved_by: string | null
+    resolved_at: string | null
+    notes: string | null
+}
+
+export interface MetadataLookupResponse {
+    service: string
+    status: string
+    generated_at: string
+    title: string
+    artist: string | null
+    total_count: number
+    candidates: MetadataLookupCandidate[]
+    saved_candidates: TrackIdentityCandidateItem[]
+}
+
+export interface MetadataCandidateListResponse {
+    service: string
+    status: string
+    generated_at: string
+    candidates: TrackIdentityCandidateItem[]
+}
+
+export interface MetadataCandidateCommandResponse {
+    service: string
+    status: string
+    generated_at: string
+    candidate: TrackIdentityCandidateItem
+}
+
 export interface SasrecAutoTrainAdminResponse {
     service: string
     status: string

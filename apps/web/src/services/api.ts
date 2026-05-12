@@ -40,6 +40,9 @@ import type {
     EmsPoolAdminRunDeleteResponse,
     EmsPoolAdminRunDetailResponse,
     EmsPoolAdminRunsResponse,
+    MetadataCandidateCommandResponse,
+    MetadataCandidateListResponse,
+    MetadataLookupResponse,
     PlaylistQualityRecentResponse,
     SasrecAutoTrainAdminResponse,
     SasrecRegistryAdminResponse,
@@ -475,6 +478,76 @@ export const autoTrainSasrecForAdmin = (userId: string) =>
     requestJson<SasrecAutoTrainAdminResponse>(
         `/api/v1/recommendations/admin/sasrec/models/auto-train?user_id=${encodeURIComponent(userId)}`,
         { method: 'POST' },
+    )
+
+export const lookupMusicBrainzRecordingsForAdmin = (
+    userId: string,
+    title: string,
+    artist: string | undefined,
+    limit: number,
+    persist: boolean,
+    signal?: AbortSignal,
+) => {
+    const params = new URLSearchParams({
+        user_id: userId,
+        title,
+        limit: String(limit),
+        persist: persist ? 'true' : 'false',
+    })
+    if (artist && artist.trim()) {
+        params.set('artist', artist)
+    }
+    return requestJson<MetadataLookupResponse>(
+        `/api/v1/recommendations/admin/metadata/musicbrainz/recordings?${params.toString()}`,
+        { signal, cache: 'no-store' },
+    )
+}
+
+export const listMetadataCandidatesForAdmin = (
+    userId: string,
+    status: string | undefined,
+    limit: number,
+    signal?: AbortSignal,
+) => {
+    const params = new URLSearchParams({
+        user_id: userId,
+        limit: String(limit),
+    })
+    if (status) {
+        params.set('status', status)
+    }
+    return requestJson<MetadataCandidateListResponse>(
+        `/api/v1/recommendations/admin/metadata/candidates?${params.toString()}`,
+        { signal, cache: 'no-store' },
+    )
+}
+
+export const acceptMetadataCandidateForAdmin = (
+    userId: string,
+    candidateId: number,
+    notes: string | null,
+) =>
+    requestJson<MetadataCandidateCommandResponse>(
+        `/api/v1/recommendations/admin/metadata/candidates/${encodeURIComponent(String(candidateId))}/accept?user_id=${encodeURIComponent(userId)}`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes }),
+        },
+    )
+
+export const rejectMetadataCandidateForAdmin = (
+    userId: string,
+    candidateId: number,
+    notes: string | null,
+) =>
+    requestJson<MetadataCandidateCommandResponse>(
+        `/api/v1/recommendations/admin/metadata/candidates/${encodeURIComponent(String(candidateId))}/reject?user_id=${encodeURIComponent(userId)}`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes }),
+        },
     )
 
 export const fetchEmsCollectedPlaylists = (platformId: string = 'spotify', signal?: AbortSignal, limit: number = 12) =>
