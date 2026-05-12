@@ -132,6 +132,12 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
     const durationMsRef = useRef(durationMs)
     const tidalCallbacksRef = useRef<TidalPlayerCallbacks>({})
     const tidalPreviewBlockedRef = useRef(false)
+    const lastSpotifyStateRef = useRef<{
+        trackId: string | null
+        position: number
+        duration: number
+        completionEmittedForTrackId: string | null
+    }>({ trackId: null, position: 0, duration: 0, completionEmittedForTrackId: null })
 
     useEffect(() => {
         queueRef.current = queue
@@ -217,9 +223,46 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
         setDurationMs(state.duration ?? 0)
         setAudioQualityLabel('Spotify')
 
-        const spotifyTrackId = state.track_window.current_track?.id
+        const spotifyTrackId = state.track_window.current_track?.id ?? null
         if (!state.paused && spotifyTrackId) {
             clearPlaybackError()
+        }
+
+        const prev = lastSpotifyStateRef.current
+        const prevWasNearEnd = prev.trackId !== null
+            && prev.duration > 0
+            && prev.position / prev.duration >= 0.95
+            && prev.completionEmittedForTrackId !== prev.trackId
+        const currentNearStart = (state.position ?? 0) < Math.max(2000, (state.duration ?? 0) * 0.05)
+
+        let nextCompletionEmittedForTrackId = prev.completionEmittedForTrackId
+
+        if (prevWasNearEnd) {
+            const completedQueueItem = queueRef.current.find((item) => resolveSpotifyTrackId(item) === prev.trackId)
+            if (completedQueueItem) {
+                recordPlaybackEvent('play_completed', completedQueueItem, {
+                    durationMs: prev.duration,
+                    positionMs: prev.duration,
+                })
+            }
+            nextCompletionEmittedForTrackId = prev.trackId
+
+            if (spotifyTrackId === prev.trackId && currentNearStart && !state.paused) {
+                const replayItem = completedQueueItem
+                    ?? queueRef.current.find((item) => resolveSpotifyTrackId(item) === spotifyTrackId)
+                if (replayItem) {
+                    recordPlaybackEvent('replay', replayItem, { positionMs: 0 })
+                }
+            }
+        }
+
+        lastSpotifyStateRef.current = {
+            trackId: spotifyTrackId,
+            position: state.position ?? 0,
+            duration: state.duration ?? 0,
+            completionEmittedForTrackId: spotifyTrackId === prev.trackId
+                ? nextCompletionEmittedForTrackId
+                : null,
         }
 
         if (!spotifyTrackId) {
@@ -231,7 +274,7 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
             setCurrentIndex(nextIndex)
             setCurrentItem(queueRef.current[nextIndex])
         }
-    }, [clearPlaybackError])
+    }, [clearPlaybackError, recordPlaybackEvent])
 
     const spotifyCallbacks = useMemo(
         () => ({
