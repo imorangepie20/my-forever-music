@@ -896,6 +896,7 @@ export interface EmsCollectionSearchResponse {
     generated_at: string
     platform_id: string
     query: string
+    pool_run_id: number | null
     result_playlist_count: number
     result_track_count: number
     playlists: EmsCollectionSearchPlaylistItem[]
@@ -940,6 +941,85 @@ export interface EmsCollectionSearchPlaylistTracksResponse {
     track_count: number
     tracks: EmsCollectionSearchTrackItem[]
     searched_at: string
+}
+
+export interface EmsPoolAdminRunItem {
+    run_id: number
+    requested_by_user_id: string
+    source_platform: string
+    search_query: string
+    status: string
+    total_playlist_entries: number
+    total_track_entries: number
+    processed_playlist_entries: number
+    processed_track_entries: number
+    failed_entries: number
+    collected_playlist_count: number
+    collected_track_count: number
+    progress_ratio: number
+    last_error: string | null
+    created_at: string
+    started_at: string | null
+    completed_at: string | null
+    updated_at: string
+}
+
+export interface EmsPoolAdminEntryItem {
+    entry_id: number
+    entry_type: string
+    source_platform: string
+    external_id: string
+    title: string
+    artist_name: string | null
+    status: string
+    attempts: number
+    last_error: string | null
+    created_at: string
+    updated_at: string
+    processed_at: string | null
+}
+
+export interface EmsPoolAdminRunsResponse {
+    service: string
+    status: string
+    generated_at: string
+    runs: EmsPoolAdminRunItem[]
+}
+
+export interface EmsPoolAdminRunDetailResponse {
+    service: string
+    status: string
+    generated_at: string
+    run: EmsPoolAdminRunItem
+    entries: EmsPoolAdminEntryItem[]
+}
+
+export interface EmsPoolAdminRunCommandResponse {
+    service: string
+    status: string
+    generated_at: string
+    run: EmsPoolAdminRunItem
+}
+
+export interface EmsPoolAdminEntryRetryResponse {
+    service: string
+    status: string
+    generated_at: string
+    entry: EmsPoolAdminEntryItem
+}
+
+export interface EmsPoolAdminRunDeleteResponse {
+    service: string
+    status: string
+    generated_at: string
+    run_id: number
+}
+
+export interface EmsCollectedPlaylistsCleanupResponse {
+    service: string
+    status: string
+    generated_at: string
+    deleted_count: number
 }
 
 export interface EmsCollectionPlaylistItem {

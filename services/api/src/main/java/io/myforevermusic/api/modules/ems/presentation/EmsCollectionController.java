@@ -7,6 +7,10 @@ import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsAud
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsAudioFeatureCoverage;
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPlaylistTracksPreview;
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPreviewResult;
+import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService;
+import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService.EmsPoolEntrySnapshot;
+import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService.EmsPoolRunDetailSnapshot;
+import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService.EmsPoolRunSnapshot;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler.EmsPublicPlaylistDiscoveryRun;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedPlaylistEntity;
@@ -16,6 +20,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,16 +35,19 @@ public class EmsCollectionController {
 
     private final EmsCollectionService emsCollectionService;
     private final EmsPublicPlaylistDiscoveryScheduler emsPublicPlaylistDiscoveryScheduler;
+    private final EmsPoolIngestService emsPoolIngestService;
 
     public EmsCollectionController(
         EmsCollectionService emsCollectionService,
-        EmsPublicPlaylistDiscoveryScheduler emsPublicPlaylistDiscoveryScheduler
+        EmsPublicPlaylistDiscoveryScheduler emsPublicPlaylistDiscoveryScheduler,
+        EmsPoolIngestService emsPoolIngestService
     ) {
         this.emsCollectionService = emsCollectionService;
         this.emsPublicPlaylistDiscoveryScheduler = emsPublicPlaylistDiscoveryScheduler;
+        this.emsPoolIngestService = emsPoolIngestService;
     }
 
-    @Operation(summary = "Search a provider for public playlists without storing results in EMS")
+    @Operation(summary = "Search a provider for public playlists and store results in the EMS search pool")
     @PostMapping("/search")
     public EmsCollectionSearchResponse search(@Valid @RequestBody EmsCollectionSearchRequest request) {
         EmsCollectionSearchPreviewResult result = emsCollectionService.previewSearch(
@@ -48,8 +56,9 @@ public class EmsCollectionController {
             request.query()
         );
         return new EmsCollectionSearchResponse(
-            "api", "ems_search_previewed", Instant.now(),
+            "api", "ems_search_pooled", Instant.now(),
             result.platformId(), result.query(),
+            result.poolRunId(),
             result.resultPlaylistCount(), result.resultTrackCount(),
             result.playlists().stream()
                 .map(playlist -> new EmsCollectionSearchPlaylistItem(
@@ -85,7 +94,70 @@ public class EmsCollectionController {
         );
     }
 
-    @Operation(summary = "Preview tracks for a provider playlist search result without storing results in EMS")
+    @Operation(summary = "List EMS pool ingest runs for the configured admin user")
+    @GetMapping("/admin/pool/runs")
+    public EmsPoolRunsResponse listPoolRuns(@RequestParam("user_id") String userId) {
+        List<EmsPoolRunSnapshot> runs = emsPoolIngestService.listRunsForAdmin(userId);
+        return new EmsPoolRunsResponse("api", "ok", Instant.now(), runs.stream().map(EmsPoolRunItem::from).toList());
+    }
+
+    @Operation(summary = "Get an EMS pool ingest run with recent entries for the configured admin user")
+    @GetMapping("/admin/pool/runs/{runId}")
+    public EmsPoolRunDetailResponse getPoolRun(
+        @PathVariable Long runId,
+        @RequestParam("user_id") String userId
+    ) {
+        EmsPoolRunDetailSnapshot detail = emsPoolIngestService.getRunForAdmin(userId, runId);
+        return new EmsPoolRunDetailResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            EmsPoolRunItem.from(detail.run()),
+            detail.entries().stream().map(EmsPoolEntryItem::from).toList()
+        );
+    }
+
+    @Operation(summary = "Retry an EMS pool ingest run for the configured admin user")
+    @PostMapping("/admin/pool/runs/{runId}/process")
+    public EmsPoolRunCommandResponse processPoolRun(
+        @PathVariable Long runId,
+        @RequestParam("user_id") String userId
+    ) {
+        EmsPoolRunSnapshot run = emsPoolIngestService.processRunForAdmin(userId, runId);
+        return new EmsPoolRunCommandResponse("api", "ok", Instant.now(), EmsPoolRunItem.from(run));
+    }
+
+    @Operation(summary = "Retry a single EMS pool ingest entry for the configured admin user")
+    @PostMapping("/admin/pool/runs/{runId}/entries/{entryId}/retry")
+    public EmsPoolEntryRetryResponse retryPoolEntry(
+        @PathVariable Long runId,
+        @PathVariable Long entryId,
+        @RequestParam("user_id") String userId
+    ) {
+        EmsPoolEntrySnapshot entry = emsPoolIngestService.retryEntryForAdmin(userId, runId, entryId);
+        return new EmsPoolEntryRetryResponse("api", "ok", Instant.now(), EmsPoolEntryItem.from(entry));
+    }
+
+    @Operation(summary = "Delete an EMS pool ingest run for the configured admin user")
+    @DeleteMapping("/admin/pool/runs/{runId}")
+    public EmsPoolRunDeleteResponse deletePoolRun(
+        @PathVariable Long runId,
+        @RequestParam("user_id") String userId
+    ) {
+        emsPoolIngestService.deleteRunForAdmin(userId, runId);
+        return new EmsPoolRunDeleteResponse("api", "ok", Instant.now(), runId);
+    }
+
+    @Operation(summary = "Delete EMS collected playlists that have no tracks (admin only)")
+    @PostMapping("/admin/playlists/cleanup-empty")
+    public EmsCollectedPlaylistsCleanupResponse cleanupEmptyCollectedPlaylists(
+        @RequestParam("user_id") String userId
+    ) {
+        int deletedCount = emsPoolIngestService.cleanupEmptyPlaylistsForAdmin(userId);
+        return new EmsCollectedPlaylistsCleanupResponse("api", "ok", Instant.now(), deletedCount);
+    }
+
+    @Operation(summary = "Load tracks for a provider playlist search result and store them in the EMS search pool")
     @GetMapping("/search/playlists/{platformId}/{externalPlaylistId}/tracks")
     public EmsCollectionSearchPlaylistTracksResponse getSearchPlaylistTracks(
         @PathVariable String platformId,
@@ -302,11 +374,139 @@ public class EmsCollectionController {
     public record EmsCollectionSearchResponse(
         String service, String status, Instant generatedAt,
         String platformId, String query,
+        Long poolRunId,
         int resultPlaylistCount, int resultTrackCount,
         List<EmsCollectionSearchPlaylistItem> playlists,
         List<EmsCollectionSearchTrackItem> tracks,
         Instant searchedAt
     ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsPoolRunsResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        List<EmsPoolRunItem> runs
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsPoolRunDetailResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        EmsPoolRunItem run,
+        List<EmsPoolEntryItem> entries
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsPoolRunCommandResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        EmsPoolRunItem run
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsPoolEntryRetryResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        EmsPoolEntryItem entry
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsPoolRunDeleteResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        Long runId
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsCollectedPlaylistsCleanupResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        int deletedCount
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsPoolRunItem(
+        Long runId,
+        String requestedByUserId,
+        String sourcePlatform,
+        String searchQuery,
+        String status,
+        int totalPlaylistEntries,
+        int totalTrackEntries,
+        int processedPlaylistEntries,
+        int processedTrackEntries,
+        int failedEntries,
+        int collectedPlaylistCount,
+        int collectedTrackCount,
+        double progressRatio,
+        String lastError,
+        Instant createdAt,
+        Instant startedAt,
+        Instant completedAt,
+        Instant updatedAt
+    ) {
+        static EmsPoolRunItem from(EmsPoolRunSnapshot run) {
+            return new EmsPoolRunItem(
+                run.runId(),
+                run.requestedByUserId(),
+                run.sourcePlatform(),
+                run.searchQuery(),
+                run.status(),
+                run.totalPlaylistEntries(),
+                run.totalTrackEntries(),
+                run.processedPlaylistEntries(),
+                run.processedTrackEntries(),
+                run.failedEntries(),
+                run.collectedPlaylistCount(),
+                run.collectedTrackCount(),
+                run.progressRatio(),
+                run.lastError(),
+                run.createdAt(),
+                run.startedAt(),
+                run.completedAt(),
+                run.updatedAt()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsPoolEntryItem(
+        Long entryId,
+        String entryType,
+        String sourcePlatform,
+        String externalId,
+        String title,
+        String artistName,
+        String status,
+        int attempts,
+        String lastError,
+        Instant createdAt,
+        Instant updatedAt,
+        Instant processedAt
+    ) {
+        static EmsPoolEntryItem from(EmsPoolEntrySnapshot entry) {
+            return new EmsPoolEntryItem(
+                entry.entryId(),
+                entry.entryType(),
+                entry.sourcePlatform(),
+                entry.externalId(),
+                entry.title(),
+                entry.artistName(),
+                entry.status(),
+                entry.attempts(),
+                entry.lastError(),
+                entry.createdAt(),
+                entry.updatedAt(),
+                entry.processedAt()
+            );
+        }
+    }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record EmsCollectionSearchPlaylistItem(

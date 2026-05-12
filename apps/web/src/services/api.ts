@@ -34,6 +34,12 @@ import type {
     EmsCollectionPlaylistDetailResponse,
     EmsCollectionTrackBrowseResponse,
     EmsCollectionSearchPlaylistTracksResponse,
+    EmsCollectedPlaylistsCleanupResponse,
+    EmsPoolAdminEntryRetryResponse,
+    EmsPoolAdminRunCommandResponse,
+    EmsPoolAdminRunDeleteResponse,
+    EmsPoolAdminRunDetailResponse,
+    EmsPoolAdminRunsResponse,
     EmsOverviewRequest,
     EmsOverviewResponse,
     EmsWorkspaceAnalysisRequest,
@@ -394,6 +400,42 @@ export const fetchEmsSearchPlaylistTracks = (
     requestJson<EmsCollectionSearchPlaylistTracksResponse>(
         `/api/v1/ems/collection/search/playlists/${encodeURIComponent(platformId)}/${encodeURIComponent(externalPlaylistId)}/tracks?user_id=${encodeURIComponent(userId)}`,
         { signal },
+    )
+
+export const fetchEmsPoolAdminRuns = (userId: string, signal?: AbortSignal) =>
+    requestJson<EmsPoolAdminRunsResponse>(
+        `/api/v1/ems/collection/admin/pool/runs?user_id=${encodeURIComponent(userId)}`,
+        { signal, cache: 'no-store' },
+    )
+
+export const fetchEmsPoolAdminRun = (runId: number, userId: string, signal?: AbortSignal) =>
+    requestJson<EmsPoolAdminRunDetailResponse>(
+        `/api/v1/ems/collection/admin/pool/runs/${encodeURIComponent(String(runId))}?user_id=${encodeURIComponent(userId)}`,
+        { signal, cache: 'no-store' },
+    )
+
+export const processEmsPoolAdminRun = (runId: number, userId: string) =>
+    requestJson<EmsPoolAdminRunCommandResponse>(
+        `/api/v1/ems/collection/admin/pool/runs/${encodeURIComponent(String(runId))}/process?user_id=${encodeURIComponent(userId)}`,
+        { method: 'POST' },
+    )
+
+export const retryEmsPoolAdminEntry = (runId: number, entryId: number, userId: string) =>
+    requestJson<EmsPoolAdminEntryRetryResponse>(
+        `/api/v1/ems/collection/admin/pool/runs/${encodeURIComponent(String(runId))}/entries/${encodeURIComponent(String(entryId))}/retry?user_id=${encodeURIComponent(userId)}`,
+        { method: 'POST' },
+    )
+
+export const deleteEmsPoolAdminRun = (runId: number, userId: string) =>
+    requestJson<EmsPoolAdminRunDeleteResponse>(
+        `/api/v1/ems/collection/admin/pool/runs/${encodeURIComponent(String(runId))}?user_id=${encodeURIComponent(userId)}`,
+        { method: 'DELETE' },
+    )
+
+export const cleanupEmsEmptyCollectedPlaylists = (userId: string) =>
+    requestJson<EmsCollectedPlaylistsCleanupResponse>(
+        `/api/v1/ems/collection/admin/playlists/cleanup-empty?user_id=${encodeURIComponent(userId)}`,
+        { method: 'POST' },
     )
 
 export const fetchEmsCollectedPlaylists = (platformId: string = 'spotify', signal?: AbortSignal, limit: number = 12) =>
