@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import {
     Activity,
+    BadgeCheck,
     BarChart3,
     ChevronLeft,
     ChevronRight,
@@ -86,6 +87,12 @@ const adminMenuItems: MenuItem[] = [
         description: 'Recent GMS 6-axis summary',
         icon: <BarChart3 size={20} />,
         path: '/recommendations/quality-admin',
+    },
+    {
+        label: 'SASRec Model',
+        description: 'Promote, disable, rollback policy',
+        icon: <BadgeCheck size={20} />,
+        path: '/recommendations/sasrec-admin',
     },
 ]
 

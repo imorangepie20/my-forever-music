@@ -1043,6 +1043,19 @@ export interface PlaylistQualityRecentResponse {
     playlists: PlaylistQualityRecentItem[]
 }
 
+export interface SasrecRegistryAdminResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string | null
+    model_version: string | null
+    artifact_dir: string | null
+    generated_at_ai: string | null
+    vocabulary_size: number | null
+    train_example_count: number | null
+    warnings: string[]
+}
+
 export interface EmsCollectionPlaylistItem {
     id: number
     external_playlist_id: string

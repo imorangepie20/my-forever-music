@@ -41,6 +41,7 @@ import type {
     EmsPoolAdminRunDetailResponse,
     EmsPoolAdminRunsResponse,
     PlaylistQualityRecentResponse,
+    SasrecRegistryAdminResponse,
     EmsOverviewRequest,
     EmsOverviewResponse,
     EmsWorkspaceAnalysisRequest,
@@ -443,6 +444,30 @@ export const fetchRecentPlaylistQualityForAdmin = (userId: string, limit: number
     requestJson<PlaylistQualityRecentResponse>(
         `/api/v1/recommendations/admin/playlist-quality/recent?user_id=${encodeURIComponent(userId)}&limit=${encodeURIComponent(String(limit))}`,
         { signal, cache: 'no-store' },
+    )
+
+export const fetchLatestSasrecModelForAdmin = (userId: string, signal?: AbortSignal) =>
+    requestJson<SasrecRegistryAdminResponse>(
+        `/api/v1/recommendations/admin/sasrec/models/latest?user_id=${encodeURIComponent(userId)}`,
+        { signal, cache: 'no-store' },
+    )
+
+export const promoteSasrecModelForAdmin = (userId: string, modelVersion: string) =>
+    requestJson<SasrecRegistryAdminResponse>(
+        `/api/v1/recommendations/admin/sasrec/models/${encodeURIComponent(modelVersion)}/promote?user_id=${encodeURIComponent(userId)}`,
+        { method: 'POST' },
+    )
+
+export const disableSasrecModelForAdmin = (userId: string, modelVersion: string) =>
+    requestJson<SasrecRegistryAdminResponse>(
+        `/api/v1/recommendations/admin/sasrec/models/${encodeURIComponent(modelVersion)}/disable?user_id=${encodeURIComponent(userId)}`,
+        { method: 'POST' },
+    )
+
+export const rollbackSasrecModelForAdmin = (userId: string) =>
+    requestJson<SasrecRegistryAdminResponse>(
+        `/api/v1/recommendations/admin/sasrec/models/rollback?user_id=${encodeURIComponent(userId)}`,
+        { method: 'POST' },
     )
 
 export const fetchEmsCollectedPlaylists = (platformId: string = 'spotify', signal?: AbortSignal, limit: number = 12) =>

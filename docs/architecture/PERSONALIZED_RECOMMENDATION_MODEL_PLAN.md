@@ -655,10 +655,13 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - 관리자 전용 `/recommendations/quality-admin` 화면에 6축 평균 카드와 최근 추천 playlist별 점수 테이블을 표시 (Sidebar admin 메뉴 등록)
 - AI service SASRec MVP 학습 응답에 `qualification`(qualified bool, threshold, reason) 자동 평가를 추가하고 Spring API/training 응답까지 통과해, recency baseline 대비 회귀가 없을 때만 qualified=true로 표시 (회귀 시 warnings에도 reason 적재)
 - AI service `SasrecModelRegistryService`에 `registry.json` 기반 promote/disable/rollback/latest 정책을 추가하고, `POST /v1/recommendations/datasets/sasrec/models/{version}/promote`, `.../disable`, `POST .../models/rollback` 엔드포인트로 노출 (latest_model은 promoted 우선 + disabled 제외 시간순 정렬)
+- Spring API에 admin 전용 통과 endpoint(`GET /api/v1/recommendations/admin/sasrec/models/latest`, `POST .../promote`, `.../disable`, `POST .../rollback`)와 frontend `/recommendations/sasrec-admin` 관리자 화면을 추가해 active model 확인 + promote/disable/rollback을 ConfirmDialog로 수행
 
-아직 남은 범위:
+§13-5 첫 단계 운영 범위가 닫힘. 후속 강화 항목:
 
-- Spring API와 운영 admin UI에 promote/disable/rollback 액션 노출
+- 사용자별 음악 학습 모델의 sequence encoder 재학습 자동화(주기적 batch + drift 감지)
+- ISRC 보강 큐, MusicBrainz/Wikidata/Discogs identity candidate 저장 등 Phase 2 metadata normalization 진입
+- recommendation snapshot에 explanation/axis evidence를 더해 사용자에게 노출할 reason 텍스트 안정화
 - recency baseline 대비 metric 개선 검증 자동화
 - 최신 SASRec artifact 조회를 넘어서는 model registry 승격/비활성화/롤백 정책
 
