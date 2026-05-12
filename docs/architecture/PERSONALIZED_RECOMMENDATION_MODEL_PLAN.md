@@ -661,7 +661,7 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 
 - 사용자별 음악 학습 모델의 sequence encoder 재학습 자동화(주기적 batch + drift 감지)
 - ISRC 보강 큐, MusicBrainz/Wikidata/Discogs identity candidate 저장 등 Phase 2 metadata normalization 진입
-- recommendation snapshot에 explanation/axis evidence를 더해 사용자에게 노출할 reason 텍스트 안정화
+- ~~recommendation snapshot에 explanation/axis evidence를 더해 사용자에게 노출할 reason 텍스트 안정화~~ → Spring GMS preview response의 `RecommendationItem`에 `axis_evidence`(affinity/novelty/coherence/diversity/redundancy/confidence 각 6축의 score/level/한국어 summary)를 추가하고, 프론트 GMS Preview 카드 아래에 axis별 짧은 evidence 패널을 노출.
 - recency baseline 대비 metric 개선 검증 자동화
 - 최신 SASRec artifact 조회를 넘어서는 model registry 승격/비활성화/롤백 정책
 

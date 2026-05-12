@@ -2,6 +2,7 @@ package io.myforevermusic.api.modules.gms.presentation;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import io.myforevermusic.api.modules.recommendation.application.AxisEvidence;
 import java.time.Instant;
 import java.util.List;
 
@@ -60,7 +61,8 @@ public record GmsRecommendationPreviewResponse(
         Double score,
         String sourceSpace,
         Integer energyLevel,
-        String reason
+        String reason,
+        List<AxisEvidence> axisEvidence
     ) {
         public RecommendationItem {
             if (
@@ -76,6 +78,9 @@ public record GmsRecommendationPreviewResponse(
                     && !audioFeatureTrackId.isBlank()
             ) {
                 spotifyTrackId = audioFeatureTrackId;
+            }
+            if (axisEvidence == null) {
+                axisEvidence = List.of();
             }
         }
 
@@ -118,7 +123,78 @@ public record GmsRecommendationPreviewResponse(
                 score,
                 sourceSpace,
                 energyLevel,
-                reason
+                reason,
+                List.of()
+            );
+        }
+
+        public RecommendationItem(
+            Integer rank,
+            String trackId,
+            String title,
+            String artistName,
+            String sourcePlatform,
+            String sourcePlaylistId,
+            String sourcePlaylistTitle,
+            String albumTitle,
+            String albumImageUrl,
+            String platformExternalUrl,
+            String platformUri,
+            String previewUrl,
+            String spotifyTrackId,
+            String audioFeatureTrackId,
+            Integer durationMs,
+            Double score,
+            String sourceSpace,
+            Integer energyLevel,
+            String reason
+        ) {
+            this(
+                rank,
+                trackId,
+                title,
+                artistName,
+                sourcePlatform,
+                sourcePlaylistId,
+                sourcePlaylistTitle,
+                albumTitle,
+                albumImageUrl,
+                platformExternalUrl,
+                platformUri,
+                previewUrl,
+                spotifyTrackId,
+                audioFeatureTrackId,
+                durationMs,
+                score,
+                sourceSpace,
+                energyLevel,
+                reason,
+                List.of()
+            );
+        }
+
+        public RecommendationItem withAxisEvidence(List<AxisEvidence> evidence) {
+            return new RecommendationItem(
+                rank,
+                trackId,
+                title,
+                artistName,
+                sourcePlatform,
+                sourcePlaylistId,
+                sourcePlaylistTitle,
+                albumTitle,
+                albumImageUrl,
+                platformExternalUrl,
+                platformUri,
+                previewUrl,
+                spotifyTrackId,
+                audioFeatureTrackId,
+                durationMs,
+                score,
+                sourceSpace,
+                energyLevel,
+                reason,
+                evidence == null ? List.of() : evidence
             );
         }
     }

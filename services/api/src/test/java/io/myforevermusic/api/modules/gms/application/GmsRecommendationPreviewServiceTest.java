@@ -17,6 +17,7 @@ import io.myforevermusic.api.modules.platform.infrastructure.local.InMemoryLastF
 import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
+import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluator;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationSnapshotService;
 import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryRecommendationSnapshotStore;
 import java.time.Instant;
@@ -53,7 +54,8 @@ class GmsRecommendationPreviewServiceTest {
             new InMemoryLastFmScrobbleStore(),
             new InMemoryPmsUserLibraryStore(),
             Optional.of(new FakeLastFmWebApiClient()),
-            new RecommendationSnapshotService(new InMemoryRecommendationSnapshotStore())
+            new RecommendationSnapshotService(new InMemoryRecommendationSnapshotStore()),
+            new PlaylistQualityEvaluator()
         );
 
         GmsRecommendationPreviewResponse response = service.previewRecommendations(
@@ -147,7 +149,8 @@ class GmsRecommendationPreviewServiceTest {
             scrobbleStore,
             new InMemoryPmsUserLibraryStore(),
             Optional.of(new FakeLastFmWebApiClient()),
-            new RecommendationSnapshotService(new InMemoryRecommendationSnapshotStore())
+            new RecommendationSnapshotService(new InMemoryRecommendationSnapshotStore()),
+            new PlaylistQualityEvaluator()
         );
 
         GmsRecommendationPreviewResponse response = service.previewRecommendations(
@@ -185,7 +188,8 @@ class GmsRecommendationPreviewServiceTest {
             new InMemoryLastFmScrobbleStore(),
             pmsUserLibraryStore,
             Optional.empty(),
-            new RecommendationSnapshotService(snapshotStore)
+            new RecommendationSnapshotService(snapshotStore),
+            new PlaylistQualityEvaluator()
         );
 
         GmsRecommendationPreviewResponse response = service.previewRecommendations(
@@ -226,7 +230,8 @@ class GmsRecommendationPreviewServiceTest {
             new InMemoryLastFmScrobbleStore(),
             pmsUserLibraryStore,
             Optional.empty(),
-            new RecommendationSnapshotService(new InMemoryRecommendationSnapshotStore())
+            new RecommendationSnapshotService(new InMemoryRecommendationSnapshotStore()),
+            new PlaylistQualityEvaluator()
         );
 
         GmsRecommendationPreviewResponse response = service.previewRecommendations(

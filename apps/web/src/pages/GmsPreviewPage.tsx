@@ -18,6 +18,19 @@ import {
 } from '@/services/api'
 import type { GmsRecommendationFeedbackType, GmsRecommendationPreviewResponse } from '@/types/api'
 
+const axisLevelClass = (level: string) => {
+    switch (level) {
+        case 'strong':
+            return 'border-hud-accent-primary/40 bg-hud-accent-primary/10 text-hud-accent-primary'
+        case 'moderate':
+            return 'border-hud-border-primary/30 bg-hud-bg-secondary/60 text-hud-text-primary'
+        case 'low':
+            return 'border-amber-300/30 bg-amber-300/10 text-amber-100'
+        default:
+            return 'border-hud-border-secondary bg-hud-bg-secondary/60 text-hud-text-secondary'
+    }
+}
+
 const openExternal = (url?: string | null) => {
     if (!url) {
         return
@@ -404,8 +417,8 @@ const GmsPreviewPage = () => {
                         {response ? (
                             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                                 {response.items.map((item) => (
+                                    <div key={item.track_id} className="flex flex-col gap-3">
                                     <TrackFeatureCard
-                                        key={item.track_id}
                                         title={item.title}
                                         artistName={item.artist_name}
                                         sourcePlatform={item.source_platform}
@@ -460,6 +473,26 @@ const GmsPreviewPage = () => {
                                             },
                                         ]}
                                     />
+                                    {item.axis_evidence && item.axis_evidence.length > 0 && (
+                                        <ul className="space-y-1.5 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/60 p-3">
+                                            {item.axis_evidence.map((evidence) => (
+                                                <li key={`${item.track_id}-${evidence.axis}`} className="flex items-start gap-2 text-xs">
+                                                    <span className={`mt-0.5 inline-flex h-5 min-w-[56px] items-center justify-center rounded-full border px-2 text-[10px] uppercase tracking-[0.18em] ${axisLevelClass(evidence.level)}`}>
+                                                        {evidence.axis}
+                                                    </span>
+                                                    <span className="flex-1 leading-5 text-hud-text-secondary">
+                                                        {evidence.summary}
+                                                        {evidence.score !== null && (
+                                                            <span className="ml-1 text-hud-text-muted">
+                                                                ({evidence.score.toFixed(2)})
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                    </div>
                                 ))}
                             </div>
                         ) : (

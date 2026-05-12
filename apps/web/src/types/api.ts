@@ -880,8 +880,16 @@ export interface GmsRecommendationPreviewResponse {
         source_space: string
         energy_level: number
         reason?: string | null
+        axis_evidence?: GmsAxisEvidence[]
     }>
     warnings: string[]
+}
+
+export interface GmsAxisEvidence {
+    axis: string
+    score: number | null
+    level: string
+    summary: string
 }
 
 export interface EmsCollectionSearchRequest {

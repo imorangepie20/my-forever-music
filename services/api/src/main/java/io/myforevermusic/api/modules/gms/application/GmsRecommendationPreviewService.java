@@ -10,6 +10,10 @@ import io.myforevermusic.api.modules.platform.application.LastFmScrobbleStore;
 import io.myforevermusic.api.modules.platform.infrastructure.lastfm.LastFmWebApiClient;
 import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
+import io.myforevermusic.api.modules.recommendation.application.AxisEvidence;
+import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluation;
+import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluator;
+import io.myforevermusic.api.modules.recommendation.application.RecommendationAxisEvidenceBuilder;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationSnapshotService;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -33,6 +37,7 @@ public class GmsRecommendationPreviewService {
     private final PmsUserLibraryStore pmsUserLibraryStore;
     private final Optional<LastFmWebApiClient> lastFmWebApiClient;
     private final RecommendationSnapshotService recommendationSnapshotService;
+    private final PlaylistQualityEvaluator playlistQualityEvaluator;
 
     public GmsRecommendationPreviewService(
         AiRecommendationPreviewClient aiRecommendationPreviewClient,
@@ -41,7 +46,8 @@ public class GmsRecommendationPreviewService {
         LastFmScrobbleStore lastFmScrobbleStore,
         PmsUserLibraryStore pmsUserLibraryStore,
         Optional<LastFmWebApiClient> lastFmWebApiClient,
-        RecommendationSnapshotService recommendationSnapshotService
+        RecommendationSnapshotService recommendationSnapshotService,
+        PlaylistQualityEvaluator playlistQualityEvaluator
     ) {
         this.aiRecommendationPreviewClient = aiRecommendationPreviewClient;
         this.aiSasrecRankingClient = aiSasrecRankingClient;
@@ -50,6 +56,7 @@ public class GmsRecommendationPreviewService {
         this.pmsUserLibraryStore = pmsUserLibraryStore;
         this.lastFmWebApiClient = lastFmWebApiClient;
         this.recommendationSnapshotService = recommendationSnapshotService;
+        this.playlistQualityEvaluator = playlistQualityEvaluator;
     }
 
     public GmsRecommendationPreviewResponse previewRecommendations(GmsRecommendationPreviewRequest request) {
@@ -87,6 +94,7 @@ public class GmsRecommendationPreviewService {
                 playableItems,
                 response.warnings()
             );
+            finalResponse = withAxisEvidence(finalResponse, enrichedRequest);
             recommendationSnapshotService.recordGmsPreview(enrichedRequest, finalResponse);
             return finalResponse;
         }
@@ -104,8 +112,63 @@ public class GmsRecommendationPreviewService {
             playableItems.isEmpty() ? response.items() : playableItems,
             List.copyOf(mergedWarnings)
         );
+        finalResponse = withAxisEvidence(finalResponse, enrichedRequest);
         recommendationSnapshotService.recordGmsPreview(enrichedRequest, finalResponse);
         return finalResponse;
+    }
+
+    private GmsRecommendationPreviewResponse withAxisEvidence(
+        GmsRecommendationPreviewResponse response,
+        GmsRecommendationPreviewRequest request
+    ) {
+        if (response.items() == null || response.items().isEmpty()) {
+            return response;
+        }
+        PlaylistQualityEvaluation playlistEvaluation = playlistQualityEvaluator.evaluate(response.items());
+        Double novelty = computeNoveltyScore(request.familiarityBias());
+        List<GmsRecommendationPreviewResponse.RecommendationItem> enriched = response.items().stream()
+            .map(item -> {
+                List<AxisEvidence> evidence = RecommendationAxisEvidenceBuilder.build(
+                    item.score(),
+                    novelty,
+                    playlistEvaluation,
+                    computeConfidenceScore(item)
+                );
+                return item.withAxisEvidence(evidence);
+            })
+            .toList();
+        return new GmsRecommendationPreviewResponse(
+            response.requestId(),
+            response.generatedAt(),
+            response.service(),
+            response.status(),
+            response.context(),
+            response.inputSummary(),
+            enriched,
+            response.warnings()
+        );
+    }
+
+    private Double computeNoveltyScore(Integer familiarityBias) {
+        if (familiarityBias == null) {
+            return null;
+        }
+        int clamped = Math.min(5, Math.max(1, familiarityBias));
+        return Math.min(1.0d, Math.max(0.0d, 1.0d - ((clamped - 1.0d) / 4.0d)));
+    }
+
+    private Double computeConfidenceScore(GmsRecommendationPreviewResponse.RecommendationItem item) {
+        double score = 0.55d;
+        if (item.trackId() != null && !item.trackId().isBlank()) {
+            score += 0.15d;
+        }
+        if (item.audioFeatureTrackId() != null && !item.audioFeatureTrackId().isBlank()) {
+            score += 0.15d;
+        }
+        if (item.sourcePlaylistId() != null && !item.sourcePlaylistId().isBlank()) {
+            score += 0.10d;
+        }
+        return Math.min(1.0d, Math.max(0.0d, score));
     }
 
     private List<GmsRecommendationPreviewResponse.RecommendationItem> projectPlayableItems(
