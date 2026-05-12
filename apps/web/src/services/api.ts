@@ -40,6 +40,7 @@ import type {
     EmsPoolAdminRunDeleteResponse,
     EmsPoolAdminRunDetailResponse,
     EmsPoolAdminRunsResponse,
+    PlaylistQualityRecentResponse,
     EmsOverviewRequest,
     EmsOverviewResponse,
     EmsWorkspaceAnalysisRequest,
@@ -436,6 +437,12 @@ export const cleanupEmsEmptyCollectedPlaylists = (userId: string) =>
     requestJson<EmsCollectedPlaylistsCleanupResponse>(
         `/api/v1/ems/collection/admin/playlists/cleanup-empty?user_id=${encodeURIComponent(userId)}`,
         { method: 'POST' },
+    )
+
+export const fetchRecentPlaylistQualityForAdmin = (userId: string, limit: number, signal?: AbortSignal) =>
+    requestJson<PlaylistQualityRecentResponse>(
+        `/api/v1/recommendations/admin/playlist-quality/recent?user_id=${encodeURIComponent(userId)}&limit=${encodeURIComponent(String(limit))}`,
+        { signal, cache: 'no-store' },
     )
 
 export const fetchEmsCollectedPlaylists = (platformId: string = 'spotify', signal?: AbortSignal, limit: number = 12) =>

@@ -8,6 +8,7 @@ import GmsPreviewPage from './pages/GmsPreviewPage'
 import HomePage from './pages/HomePage'
 import NotFoundPage from './pages/NotFoundPage'
 import PlaybackHarnessPage from './pages/PlaybackHarnessPage'
+import PlaylistQualityAdminPage from './pages/PlaylistQualityAdminPage'
 import PmsPlaylistDetailPage from './pages/PmsPlaylistDetailPage'
 import PmsPage from './pages/PmsPage'
 import PlatformsPage from './pages/PlatformsPage'
@@ -27,6 +28,7 @@ function App() {
                     <Route path="pms" element={<PmsPage />} />
                     <Route path="ems" element={<EmsPage />} />
                     <Route path="ems/pool-admin" element={<EmsPoolAdminPage />} />
+                    <Route path="recommendations/quality-admin" element={<PlaylistQualityAdminPage />} />
                     <Route path="gms-preview" element={<GmsPreviewPage />} />
                     <Route path="playback-harness" element={<PlaybackHarnessPage />} />
                     <Route path="ems/search/playlists/:platformId/:externalPlaylistId" element={<EmsSearchPlaylistDetailPage />} />

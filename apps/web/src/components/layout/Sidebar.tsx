@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import {
     Activity,
+    BarChart3,
     ChevronLeft,
     ChevronRight,
     Globe,
@@ -79,6 +80,12 @@ const adminMenuItems: MenuItem[] = [
         description: 'Search ingest queue monitor',
         icon: <Activity size={20} />,
         path: '/ems/pool-admin',
+    },
+    {
+        label: 'Playlist Quality',
+        description: 'Recent GMS 6-axis summary',
+        icon: <BarChart3 size={20} />,
+        path: '/recommendations/quality-admin',
     },
 ]
 

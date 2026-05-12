@@ -1022,6 +1022,27 @@ export interface EmsCollectedPlaylistsCleanupResponse {
     deleted_count: number
 }
 
+export interface PlaylistQualityRecentItem {
+    recommendation_id: string | null
+    user_id: string | null
+    created_at: string | null
+    model_version: string | null
+    track_count: number
+    avg_affinity: number | null
+    avg_novelty: number | null
+    coherence: number | null
+    diversity: number | null
+    redundancy_penalty: number | null
+    avg_confidence: number | null
+}
+
+export interface PlaylistQualityRecentResponse {
+    service: string
+    status: string
+    generated_at: string
+    playlists: PlaylistQualityRecentItem[]
+}
+
 export interface EmsCollectionPlaylistItem {
     id: number
     external_playlist_id: string
