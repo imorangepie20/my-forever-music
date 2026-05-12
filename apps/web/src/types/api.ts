@@ -1115,6 +1115,17 @@ export interface MetadataCandidateCommandResponse {
     candidate: TrackIdentityCandidateItem
 }
 
+export interface MetadataCandidateAutoAcceptResponse {
+    service: string
+    status: string
+    generated_at: string
+    threshold: number
+    reviewed_count: number
+    accepted_count: number
+    skipped_count: number
+    accepted: TrackIdentityCandidateItem[]
+}
+
 export interface SasrecAutoTrainAdminResponse {
     service: string
     status: string

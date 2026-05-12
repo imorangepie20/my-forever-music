@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Check, Compass, RefreshCw, Search, ShieldCheck, X } from 'lucide-react'
+import { AlertTriangle, BadgeCheck, Check, Compass, RefreshCw, Search, ShieldCheck, X } from 'lucide-react'
 import Button from '@/components/common/Button'
 import ConfirmDialog from '@/components/common/ConfirmDialog'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
 import {
     acceptMetadataCandidateForAdmin,
+    autoAcceptMetadataCandidatesForAdmin,
     listMetadataCandidatesForAdmin,
     lookupMusicBrainzRecordingsForAdmin,
     rejectMetadataCandidateForAdmin,
@@ -43,6 +44,7 @@ const formatDateTime = (value: string | null) => {
 type PendingResolution =
     | { kind: 'accept'; candidate: TrackIdentityCandidateItem }
     | { kind: 'reject'; candidate: TrackIdentityCandidateItem }
+    | { kind: 'autoAccept'; minScore: number; limit: number }
 
 const MetadataNormalizationAdminPage = () => {
     const { session } = useAuthSession()
@@ -63,6 +65,8 @@ const MetadataNormalizationAdminPage = () => {
     const [pendingResolution, setPendingResolution] = useState<PendingResolution | null>(null)
     const [resolving, setResolving] = useState(false)
     const [resolveNotes, setResolveNotes] = useState('')
+    const [autoAcceptMinScore, setAutoAcceptMinScore] = useState(0.95)
+    const [autoAcceptSummary, setAutoAcceptSummary] = useState<string | null>(null)
 
     const loadCandidates = useCallback(async (signal?: AbortSignal) => {
         if (!session || !isAdmin) {
@@ -121,11 +125,22 @@ const MetadataNormalizationAdminPage = () => {
         }
         setResolving(true)
         try {
-            const candidateId = pendingResolution.candidate.id
-            if (pendingResolution.kind === 'accept') {
-                await acceptMetadataCandidateForAdmin(session.userId, candidateId, resolveNotes.trim() || null)
+            if (pendingResolution.kind === 'autoAccept') {
+                const result = await autoAcceptMetadataCandidatesForAdmin(
+                    session.userId,
+                    pendingResolution.minScore,
+                    pendingResolution.limit,
+                )
+                setAutoAcceptSummary(
+                    `threshold ${result.threshold.toFixed(2)} — reviewed ${result.reviewed_count}, accepted ${result.accepted_count}, skipped ${result.skipped_count}.`,
+                )
             } else {
-                await rejectMetadataCandidateForAdmin(session.userId, candidateId, resolveNotes.trim() || null)
+                const candidateId = pendingResolution.candidate.id
+                if (pendingResolution.kind === 'accept') {
+                    await acceptMetadataCandidateForAdmin(session.userId, candidateId, resolveNotes.trim() || null)
+                } else {
+                    await rejectMetadataCandidateForAdmin(session.userId, candidateId, resolveNotes.trim() || null)
+                }
             }
             setPendingResolution(null)
             setResolveNotes('')
@@ -141,9 +156,35 @@ const MetadataNormalizationAdminPage = () => {
         if (!pendingResolution) {
             return ''
         }
+        if (pendingResolution.kind === 'autoAccept') {
+            return `Auto-accept pending candidates (score >= ${pendingResolution.minScore.toFixed(2)})`
+        }
         return pendingResolution.kind === 'accept'
             ? `Accept candidate #${pendingResolution.candidate.id}`
             : `Reject candidate #${pendingResolution.candidate.id}`
+    }, [pendingResolution])
+
+    const dialogDescription = useMemo(() => {
+        if (!pendingResolution) {
+            return undefined
+        }
+        if (pendingResolution.kind === 'autoAccept') {
+            return `최근 pending candidate 최대 ${pendingResolution.limit}건 중\ncandidate_score >= ${pendingResolution.minScore.toFixed(2)} 인 후보를 한꺼번에 accept 합니다.`
+        }
+        return `${pendingResolution.candidate.source}/${pendingResolution.candidate.candidate_kind} = ${pendingResolution.candidate.candidate_value}\nquery: ${pendingResolution.candidate.query_title}${pendingResolution.candidate.query_artist ? ` / ${pendingResolution.candidate.query_artist}` : ''}`
+    }, [pendingResolution])
+
+    const dialogConfirmLabel = useMemo(() => {
+        if (!pendingResolution) {
+            return ''
+        }
+        if (pendingResolution.kind === 'autoAccept') return 'Auto-accept'
+        return pendingResolution.kind === 'accept' ? 'Accept' : 'Reject'
+    }, [pendingResolution])
+
+    const dialogVariant = useMemo((): 'primary' | 'danger' => {
+        if (!pendingResolution) return 'primary'
+        return pendingResolution.kind === 'reject' ? 'danger' : 'primary'
     }, [pendingResolution])
 
     if (!session || !isAdmin) {
@@ -284,12 +325,42 @@ const MetadataNormalizationAdminPage = () => {
                                 {f.label}
                             </button>
                         ))}
+                        <div className="flex items-center gap-2 rounded-full border border-hud-border-secondary bg-hud-bg-primary/60 px-3 py-1.5">
+                            <label className="text-[11px] uppercase tracking-[0.18em] text-hud-text-muted" htmlFor="auto-accept-threshold">
+                                min
+                            </label>
+                            <input
+                                id="auto-accept-threshold"
+                                type="number"
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                value={autoAcceptMinScore}
+                                onChange={(e) => setAutoAcceptMinScore(Number(e.target.value) || 0)}
+                                className="w-16 bg-transparent text-sm text-hud-text-primary focus:outline-none"
+                            />
+                        </div>
+                        <Button
+                            type="button"
+                            variant="primary"
+                            onClick={() => setPendingResolution({ kind: 'autoAccept', minScore: autoAcceptMinScore, limit: 100 })}
+                            disabled={resolving}
+                        >
+                            <BadgeCheck size={16} />
+                            Auto-accept
+                        </Button>
                         <Button type="button" variant="outline" onClick={() => void loadCandidates()} disabled={candidatesLoading}>
                             <RefreshCw size={16} />
                             새로고침
                         </Button>
                     </div>
                 </div>
+                {autoAcceptSummary && (
+                    <div className="mt-4 flex items-start gap-3 rounded-xl border border-hud-accent-primary/30 bg-hud-accent-primary/10 p-4 text-sm text-hud-text-primary">
+                        <BadgeCheck size={18} className="text-hud-accent-primary" />
+                        <span>{autoAcceptSummary}</span>
+                    </div>
+                )}
                 {candidatesError && (
                     <div className="mt-4 flex items-start gap-3 rounded-xl border border-rose-300/30 bg-rose-500/10 p-4 text-sm text-rose-100">
                         <AlertTriangle size={18} />
@@ -378,14 +449,10 @@ const MetadataNormalizationAdminPage = () => {
             <ConfirmDialog
                 open={pendingResolution !== null}
                 title={dialogTitle}
-                description={
-                    pendingResolution
-                        ? `${pendingResolution.candidate.source}/${pendingResolution.candidate.candidate_kind} = ${pendingResolution.candidate.candidate_value}\nquery: ${pendingResolution.candidate.query_title}${pendingResolution.candidate.query_artist ? ` / ${pendingResolution.candidate.query_artist}` : ''}`
-                        : undefined
-                }
-                confirmLabel={pendingResolution?.kind === 'accept' ? 'Accept' : 'Reject'}
+                description={dialogDescription}
+                confirmLabel={dialogConfirmLabel}
                 cancelLabel="취소"
-                variant={pendingResolution?.kind === 'accept' ? 'primary' : 'danger'}
+                variant={dialogVariant}
                 loading={resolving}
                 onConfirm={() => void handleResolutionConfirm()}
                 onCancel={() => {

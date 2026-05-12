@@ -133,6 +133,64 @@ public class MetadataNormalizationAdminService {
         );
     }
 
+    /**
+     * Pending candidate 중 candidate_score 가 minScore 이상인 항목을 한꺼번에 accept 한다.
+     * 후속 단계의 ISRC 보강 worker 가 호출하는 같은 흐름을 운영자가 수동으로도 트리거할 수 있게 한다.
+     */
+    public AutoAcceptResult autoAcceptPendingCandidates(
+        String adminUserId,
+        double minScore,
+        int batchLimit,
+        String source,
+        String candidateKind
+    ) {
+        assertAdmin(adminUserId);
+        double threshold = Math.max(0.0d, Math.min(1.0d, minScore));
+        int safeLimit = Math.max(1, Math.min(200, batchLimit));
+        List<TrackIdentityCandidateStore.Entry> pending = candidateStore.findRecentByStatus(
+            TrackIdentityCandidateStore.STATUS_PENDING,
+            safeLimit
+        );
+
+        List<TrackIdentityCandidateStore.Entry> accepted = new ArrayList<>();
+        List<TrackIdentityCandidateStore.Entry> skipped = new ArrayList<>();
+        Instant now = Instant.now();
+        String autoNote = "auto-accepted (score>=%.2f)".formatted(threshold);
+
+        for (TrackIdentityCandidateStore.Entry candidate : pending) {
+            if (!matchesFilter(candidate, source, candidateKind)) {
+                continue;
+            }
+            Double score = candidate.candidateScore();
+            if (score == null || score < threshold) {
+                skipped.add(candidate);
+                continue;
+            }
+            accepted.add(candidateStore.updateStatus(
+                candidate.id(),
+                TrackIdentityCandidateStore.STATUS_ACCEPTED,
+                adminUserId,
+                autoNote,
+                now
+            ));
+        }
+        return new AutoAcceptResult(threshold, pending.size(), accepted, skipped);
+    }
+
+    private boolean matchesFilter(
+        TrackIdentityCandidateStore.Entry candidate,
+        String source,
+        String candidateKind
+    ) {
+        if (source != null && !source.isBlank() && !source.equals(candidate.source())) {
+            return false;
+        }
+        if (candidateKind != null && !candidateKind.isBlank() && !candidateKind.equals(candidate.candidateKind())) {
+            return false;
+        }
+        return true;
+    }
+
     private Double normalizeScore(Integer score) {
         if (score == null) {
             return null;
@@ -160,5 +218,12 @@ public class MetadataNormalizationAdminService {
     public record LookupResult(
         MusicBrainzRecordingSearchResponse response,
         List<TrackIdentityCandidateStore.Entry> savedCandidates
+    ) {}
+
+    public record AutoAcceptResult(
+        double threshold,
+        int reviewedCount,
+        List<TrackIdentityCandidateStore.Entry> accepted,
+        List<TrackIdentityCandidateStore.Entry> skipped
     ) {}
 }

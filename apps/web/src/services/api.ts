@@ -40,6 +40,7 @@ import type {
     EmsPoolAdminRunDeleteResponse,
     EmsPoolAdminRunDetailResponse,
     EmsPoolAdminRunsResponse,
+    MetadataCandidateAutoAcceptResponse,
     MetadataCandidateCommandResponse,
     MetadataCandidateListResponse,
     MetadataLookupResponse,
@@ -549,6 +550,22 @@ export const rejectMetadataCandidateForAdmin = (
             body: JSON.stringify({ notes }),
         },
     )
+
+export const autoAcceptMetadataCandidatesForAdmin = (
+    userId: string,
+    minScore: number,
+    limit: number,
+) => {
+    const params = new URLSearchParams({
+        user_id: userId,
+        min_score: String(minScore),
+        limit: String(limit),
+    })
+    return requestJson<MetadataCandidateAutoAcceptResponse>(
+        `/api/v1/recommendations/admin/metadata/candidates/auto-accept?${params.toString()}`,
+        { method: 'POST' },
+    )
+}
 
 export const fetchEmsCollectedPlaylists = (platformId: string = 'spotify', signal?: AbortSignal, limit: number = 12) =>
     requestJson<EmsCollectionPlaylistBrowseResponse>(

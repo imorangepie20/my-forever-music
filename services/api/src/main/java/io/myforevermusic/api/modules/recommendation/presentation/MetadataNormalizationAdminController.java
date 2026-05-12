@@ -102,6 +102,34 @@ public class MetadataNormalizationAdminController {
         return new CandidateCommandResponse("api", "ok", Instant.now(), CandidateItem.from(entry));
     }
 
+    @Operation(summary = "Bulk auto-accept pending candidates whose score >= min_score")
+    @PostMapping("/candidates/auto-accept")
+    public CandidateAutoAcceptResponse autoAcceptPendingCandidates(
+        @RequestParam("user_id") String userId,
+        @RequestParam(value = "min_score", defaultValue = "0.95") double minScore,
+        @RequestParam(value = "limit", defaultValue = "100") int limit,
+        @RequestParam(value = "source", required = false) String source,
+        @RequestParam(value = "candidate_kind", required = false) String candidateKind
+    ) {
+        MetadataNormalizationAdminService.AutoAcceptResult result = adminService.autoAcceptPendingCandidates(
+            userId,
+            minScore,
+            limit,
+            source,
+            candidateKind
+        );
+        return new CandidateAutoAcceptResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            result.threshold(),
+            result.reviewedCount(),
+            result.accepted().size(),
+            result.skipped().size(),
+            result.accepted().stream().map(CandidateItem::from).toList()
+        );
+    }
+
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record MetadataLookupResponse(
         String service,
@@ -196,4 +224,16 @@ public class MetadataNormalizationAdminController {
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record CandidateResolutionRequest(String notes) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CandidateAutoAcceptResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        double threshold,
+        int reviewedCount,
+        int acceptedCount,
+        int skippedCount,
+        List<CandidateItem> accepted
+    ) {}
 }
