@@ -58,4 +58,22 @@ public class InMemoryUserMusicEventStore implements UserMusicEventStore {
             .limit(Math.max(0, limit))
             .toList();
     }
+
+    @Override
+    public List<String> findActiveUserIds(Instant since, int limit) {
+        return eventById.values().stream()
+            .filter(event -> event.occurredAt() != null && !event.occurredAt().isBefore(since))
+            .map(StoredEvent::userId)
+            .distinct()
+            .limit(Math.max(0, limit))
+            .toList();
+    }
+
+    @Override
+    public long countEventsByUserIdAfter(String userId, Instant since) {
+        return eventById.values().stream()
+            .filter(event -> event.userId().equals(userId))
+            .filter(event -> event.occurredAt() != null && !event.occurredAt().isBefore(since))
+            .count();
+    }
 }

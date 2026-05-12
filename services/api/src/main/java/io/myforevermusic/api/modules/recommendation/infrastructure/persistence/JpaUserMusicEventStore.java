@@ -1,8 +1,10 @@
 package io.myforevermusic.api.modules.recommendation.infrastructure.persistence;
 
 import io.myforevermusic.api.modules.recommendation.application.UserMusicEventStore;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,5 +31,17 @@ public class JpaUserMusicEventStore implements UserMusicEventStore {
             .limit(Math.max(0, limit))
             .map(UserMusicEventEntity::toState)
             .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> findActiveUserIds(Instant since, int limit) {
+        return repository.findActiveUserIds(since, PageRequest.of(0, Math.max(1, limit)));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countEventsByUserIdAfter(String userId, Instant since) {
+        return repository.countByUserIdAndOccurredAtGreaterThanEqual(userId, since);
     }
 }

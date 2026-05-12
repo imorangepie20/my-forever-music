@@ -9,6 +9,10 @@ public interface UserMusicEventStore {
 
     List<StoredEvent> findRecentByUserId(String userId, int limit);
 
+    List<String> findActiveUserIds(Instant since, int limit);
+
+    long countEventsByUserIdAfter(String userId, Instant since);
+
     record EventDraft(
         String userId,
         String eventType,
