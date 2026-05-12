@@ -111,13 +111,21 @@ my-forever-music/
 - `services/api`의 `PMS workspace bootstrap`는 현재 정식 `PMS user library`를 raw import snapshot보다 우선 사용함
 - `services/api`는 PMS workspace bootstrap과 `services/ai` preview 호출용 GMS 브리지 엔드포인트 생성 완료
 - `services/api`는 PMS seed 기반 `EMS workspace analysis` 엔드포인트 추가 완료
-- `services/api`는 EMS provider search, search playlist track preview, EMS collection browse/detail, EMS overview, TIDAL playback target resolve endpoint를 제공
+- `services/api`는 EMS provider search 결과를 `search_pool`에 저장하고, search playlist track detail, EMS collection browse/detail, EMS overview, TIDAL playback target resolve endpoint를 제공
 - `services/api`는 `local` 프로필 기준으로 DB 없이 로컬 부팅 검증 완료
 - `services/api`의 `PMS bootstrap`과 `GMS preview -> services/ai` 브리지 응답 검증 완료
 - `services/api`는 import 전 PMS workspace가 가짜 seed를 노출하지 않도록 빈 라이브러리 상태를 반환함
 - `services/api`의 `pms_track`는 Spotify 오디오 특성 전체 스냅샷을 저장할 수 있게 확장됨
 - PMS import 시 Spotify 오디오 특성 전체 저장 기준 문서가 추가됨
 - `services/api`는 DB 활성 프로필에서 `pms_playlist / pms_track / pms_playlist_track` 기반 bootstrap 응답 가능
+- `services/api`는 EMS search 결과 적재의 silent skip을 제거함: `getSearchPlaylistTracks`가 진입 시 `ems_collected_playlist` row를 항상 보장하고, `storeSearchPlaylistTracks`는 playlist 인자를 필수로 받아 null이면 실패시킴
+- `services/api`는 EMS search 적재 후 트랙이 0개로 확인된 신규 playlist는 본 테이블에 남기지 않으며, 이미 적재된 빈 playlist는 `POST /api/v1/ems/collection/admin/playlists/cleanup-empty`로 일괄 정리할 수 있음
+- `services/api`는 TIDAL `getPlaylistTracks`가 legacy 2xx 빈 결과를 진짜 0개로 신뢰하고, legacy 실패 시에만 OpenAPI fallback을 호출하며 N+1 fallback에서 track detail이 drop된 개수를 WARN으로 로깅함
+- `services/api`는 EMS pool worker race를 `FOR UPDATE SKIP LOCKED` 기반 entry claim과 별도 `EmsPoolEntryClaimer` 빈으로 차단함 (self-invocation으로 `@Transactional`이 무시되던 문제 해소)
+- `services/api`의 EMS pool entry processor 가드는 `running` 상태 entry도 처리하도록 보완되고, admin "다시 실행" 진입 시 stuck `running` entry를 `queued`로 reset해 복구 가능함
+- `services/api`는 EMS pool admin 경로에 entry 단위 재시도(`POST .../entries/{entryId}/retry`), run 삭제(`DELETE .../pool/runs/{runId}`, FK CASCADE), 빈 EMS 플레이리스트 일괄 정리 엔드포인트를 제공함
+- `apps/web`의 `/ems/pool-admin`은 polling을 AbortController로 race-safe하게 처리하고 페이지 hidden 시 polling을 중단하며, entry 단위 재시도, run 삭제, 빈 EMS 플레이리스트 일괄 정리, last_error tooltip 표시를 제공함
+- `apps/web`의 공통 컴포넌트로 HUD 템플릿 스타일의 재사용 가능한 `ConfirmDialog`가 추가되어 pool-admin의 위험 동작을 모두 동일한 다이얼로그로 확인받음
 - `services/ai`는 최소 FastAPI 스캐폴드와 추천 preview API 초안 생성 완료
 - `infra/nginx`는 로컬/운영용 리버스 프록시 설정 템플릿 생성 완료
 - Ubuntu 서버 기준 런북과 Docker/Nginx 템플릿 생성 완료

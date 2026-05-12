@@ -187,8 +187,9 @@ docs/
 - `POST /api/v1/ems/workspace/analysis` 응답 경로 추가 완료
 - `POST /api/v1/ems/workspace/overview`는 deterministic EMS 상태와 AI 해석을 제공하지만, 현재 웹 EMS 첫 화면은 검색/재생 중심으로 구성됨
 - `GET /api/v1/ems/collection/playlists`와 `GET /api/v1/ems/collection/playlists/{playlistId}`는 EMS DB에 저장된 공개 playlist와 ordered track detail을 표시함
-- `POST /api/v1/ems/collection/search`는 연결된 provider 검색 preview를 수행하고, playlist/track 결과를 반환하되 별도 저장/가져오기 동작 전까지 EMS 테이블에 결과를 넣지 않음
-- `GET /api/v1/ems/collection/search/playlists/{platformId}/{externalPlaylistId}/tracks`는 검색 결과 playlist의 track 목록을 provider에서 조회해 재생 가능한 preview detail로 제공하되 EMS 테이블에 저장하지 않음
+- `POST /api/v1/ems/collection/search`는 연결된 provider 검색을 수행하고, 반환된 playlist/track 결과를 `ems_pool_*` 테이블에 먼저 적재한 뒤 백그라운드 워커가 `search_pool` 소스로 EMS 본 테이블에 반영함
+- `GET /api/v1/ems/collection/admin/pool/runs`와 관련 상세/재실행 API는 관리자 `jowoosungtidal@gmail.com` 계정 전용 EMS POOL 진행 상황 조회 API임
+- `GET /api/v1/ems/collection/search/playlists/{platformId}/{externalPlaylistId}/tracks`는 검색 결과 playlist의 track 목록을 provider에서 조회해 재생 가능한 detail로 제공하고, 이미 EMS에 들어간 검색 playlist와 track 링크를 `search_pool`에 저장함
 - `POST /api/v1/platforms/playback/tidal/resolve-track`는 TIDAL 재생 모드에서 타 플랫폼 track metadata를 TIDAL playable target으로 resolve 함
 - `POST /api/v1/gms/recommendations/preview`는 `services/ai`와의 브리지까지 검증 완료
 - `services/api`는 import 전 PMS workspace가 임의 demo playlist/seed를 노출하지 않고 빈 라이브러리 상태를 반환함
@@ -203,6 +204,15 @@ docs/
 - `apps/web`는 `/pms`에서 platform playlist import와 사용자별 workspace bootstrap을 사용할 수 있음
 - `apps/web`는 `/pms`, `/ems`, `/gms-preview`에서 playlist cover, album image, playable track card, global playback dock을 공유함
 - `apps/web`의 EMS 화면은 provider 검색 결과와 DB 기반 공개 playlist pool을 탭 없이 표시하고, 검색 playlist detail에서도 트랙 재생이 가능함
+- `apps/web`의 `/ems/pool-admin`은 관리자 계정 전용 화면이며, EMS POOL 진행 모니터링과 함께 run 재실행, entry 단위 재시도, run 삭제, 빈 EMS 플레이리스트 일괄 정리, last_error tooltip 표시를 제공함
+- `apps/web`의 `/ems/pool-admin`은 polling을 AbortController로 race-safe하게 처리하고 페이지 hidden 시 polling을 멈추며, 위험 액션은 공통 HUD `ConfirmDialog`로 확인함
+- `apps/web`의 공통 컴포넌트로 HUD 템플릿 스타일의 `ConfirmDialog`가 추가되어 ESC/backdrop 닫기와 loading 차단을 포함한 재사용 가능한 확인 다이얼로그 패턴을 제공함
+- `services/api`는 EMS search 결과 적재의 silent skip을 제거함: `getSearchPlaylistTracks`가 진입 시 `ems_collected_playlist` row를 항상 보장하고, `storeSearchPlaylistTracks`는 playlist 인자를 필수로 받아 null이면 실패시킴 (track 누락 핵심 원인 차단)
+- `services/api`는 EMS search 적재 후 트랙이 0개로 확인된 신규 playlist를 본 테이블에 남기지 않고, 기존에 적재된 빈 playlist는 `POST /api/v1/ems/collection/admin/playlists/cleanup-empty`로 일괄 삭제 가능함
+- `services/api`는 TIDAL `getPlaylistTracks`가 legacy 2xx 빈 결과를 진짜 0개로 신뢰하고, legacy 실패 시에만 OpenAPI fallback을 호출하며 N+1 fallback에서 track detail이 drop된 개수를 WARN으로 로깅함
+- `services/api`는 EMS pool worker가 `FOR UPDATE SKIP LOCKED` 기반 entry claim과 별도 `EmsPoolEntryClaimer` 빈으로 self-invocation 트랜잭션 문제와 race condition을 차단함
+- `services/api`의 EMS pool entry processor 가드는 `running` 상태 entry도 처리하도록 보완되고, admin "다시 실행" 진입 시 stuck `running` entry를 `queued`로 reset해 복구 가능함
+- `services/api`는 EMS pool admin 경로에 `POST .../entries/{entryId}/retry`, `DELETE .../pool/runs/{runId}` 엔드포인트를 제공해 stuck entry/run을 운영 가시성 안에서 복구함
 - `apps/web`는 EMS/PMS playlist 재생 시 DB detail track을 읽어 queue로 넘기고, TIDAL 모드에서는 track별 TIDAL target resolve 후 재생함
 - `apps/web` 공통 player는 새 재생 시작 전 기존 player state를 초기화하고, provider resolve/stream 준비 중 spinner와 상태 메시지를 표시함
 - `GET /api/v1/pms/workspace/bootstrap`는 optional `playlist_id` 기준으로 현재 음악 컨텍스트를 다시 투영함
