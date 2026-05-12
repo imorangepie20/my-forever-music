@@ -4,8 +4,7 @@ import io.myforevermusic.api.modules.recommendation.infrastructure.ai.AiSasrecTr
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,8 +27,8 @@ import org.springframework.stereotype.Component;
  * - 이벤트 수 기반: 마지막 학습 이후 새 event 수가 min-event-delta(기본 50) 이상일 때만
  *   학습. 학습 이력이 없는 사용자는 첫 학습이 매번 통과한다.
  *
- * 학습 이력은 in-memory map 으로만 추적한다. 서버 재시작 시 reset → 첫 tick 에서 모든
- * active user 가 한 번씩 학습된다. 영속 저장은 다음 단계 작업.
+ * 학습 이력은 {@link SasrecAutoTrainLogStore} 에 영속 저장된다 (local 프로필은 in-memory).
+ * 서버 재시작 후에도 직전 학습 이후 새 event 수만큼만 다시 학습 결정한다.
  */
 @Component
 public class SasrecAutoTrainScheduler {
@@ -38,8 +37,7 @@ public class SasrecAutoTrainScheduler {
 
     private final SasrecModelRegistryAdminService adminService;
     private final UserMusicEventStore eventStore;
-
-    private final Map<String, TrainState> lastTrainStateByUser = new ConcurrentHashMap<>();
+    private final SasrecAutoTrainLogStore trainLogStore;
 
     @Value("${app.recommendation.sasrec.auto-train.enabled:false}")
     private boolean enabled;
@@ -79,10 +77,12 @@ public class SasrecAutoTrainScheduler {
 
     public SasrecAutoTrainScheduler(
         SasrecModelRegistryAdminService adminService,
-        UserMusicEventStore eventStore
+        UserMusicEventStore eventStore,
+        SasrecAutoTrainLogStore trainLogStore
     ) {
         this.adminService = adminService;
         this.eventStore = eventStore;
+        this.trainLogStore = trainLogStore;
     }
 
     @Scheduled(
@@ -102,7 +102,7 @@ public class SasrecAutoTrainScheduler {
         AiSasrecTrainingClient.SasrecTrainingOptions options = buildTrainingOptions();
         for (String targetUserId : targets) {
             try {
-                if (!shouldTrain(targetUserId, now)) {
+                if (!shouldTrain(targetUserId)) {
                     continue;
                 }
                 RecommendationModelTrainingService.AutoTrainResult result = adminService.autoTrainAndPromote(
@@ -111,14 +111,24 @@ public class SasrecAutoTrainScheduler {
                     snapshotLimit > 0 ? snapshotLimit : null,
                     options
                 );
-                long eventCountAtTrain = countEventsForUser(targetUserId, now);
-                lastTrainStateByUser.put(targetUserId, new TrainState(now, eventCountAtTrain));
+                long eventCountAtTrain = countEventsForUser(targetUserId);
+                boolean promoted = result.promoteResult() != null;
+                String modelVersion = result.training() == null ? null : result.training().modelVersion();
+                trainLogStore.save(new SasrecAutoTrainLogStore.Draft(
+                    targetUserId,
+                    now,
+                    eventCountAtTrain,
+                    modelVersion,
+                    result.qualified(),
+                    promoted,
+                    result.summary()
+                ));
                 log.info(
                     "SASRec auto-train tick user={} qualified={} promoted={} model={} summary={}",
                     targetUserId,
                     result.qualified(),
-                    result.promoteResult() != null,
-                    result.training().modelVersion(),
+                    promoted,
+                    modelVersion,
                     result.summary()
                 );
             } catch (Exception ex) {
@@ -140,13 +150,20 @@ public class SasrecAutoTrainScheduler {
         }
     }
 
-    private boolean shouldTrain(String targetUserId, Instant now) {
-        TrainState previous = lastTrainStateByUser.get(targetUserId);
-        if (previous == null) {
+    private boolean shouldTrain(String targetUserId) {
+        Optional<SasrecAutoTrainLogStore.Entry> latest;
+        try {
+            latest = trainLogStore.findLatestByUserId(targetUserId);
+        } catch (Exception ex) {
+            log.warn("SASRec auto-train log lookup failed for user={}: {}", targetUserId, ex.getMessage());
+            return false;
+        }
+        if (latest.isEmpty()) {
             return true;
         }
+        Instant trainedAt = latest.get().trainedAt();
         try {
-            long delta = eventStore.countEventsByUserIdAfter(targetUserId, previous.trainedAt());
+            long delta = eventStore.countEventsByUserIdAfter(targetUserId, trainedAt);
             if (delta >= Math.max(1, minEventDelta)) {
                 return true;
             }
@@ -155,7 +172,7 @@ public class SasrecAutoTrainScheduler {
                 targetUserId,
                 delta,
                 minEventDelta,
-                previous.trainedAt()
+                trainedAt
             );
             return false;
         } catch (Exception ex) {
@@ -164,10 +181,9 @@ public class SasrecAutoTrainScheduler {
         }
     }
 
-    private long countEventsForUser(String targetUserId, Instant now) {
+    private long countEventsForUser(String targetUserId) {
         try {
-            Instant epoch = Instant.EPOCH;
-            return eventStore.countEventsByUserIdAfter(targetUserId, epoch);
+            return eventStore.countEventsByUserIdAfter(targetUserId, Instant.EPOCH);
         } catch (Exception ex) {
             log.warn("SASRec auto-train failed to count events for user={}: {}", targetUserId, ex.getMessage());
             return 0L;
@@ -184,6 +200,4 @@ public class SasrecAutoTrainScheduler {
             true
         );
     }
-
-    private record TrainState(Instant trainedAt, long eventCountAtTrain) {}
 }
