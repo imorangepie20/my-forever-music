@@ -8,10 +8,16 @@ from app.schemas.recommendation_dataset import (
     RecommendationDatasetValidationResponse,
 )
 from app.schemas.sasrec import SasrecDatasetResponse, SasrecOfflineReportResponse
-from app.schemas.sasrec import SasrecRankingRequest, SasrecRankingResponse, SasrecTrainingResponse
+from app.schemas.sasrec import (
+    SasrecModelRegistryResponse,
+    SasrecRankingRequest,
+    SasrecRankingResponse,
+    SasrecTrainingResponse,
+)
 from app.services.recommendation_dataset_service import RecommendationDatasetService
 from app.services.sasrec_dataset_service import SasrecDatasetService
 from app.services.sasrec_offline_report_service import SasrecOfflineReportService
+from app.services.sasrec_model_registry_service import SasrecModelRegistryService
 from app.services.sasrec_ranking_service import SasrecRankingService
 from app.services.sasrec_training_service import SasrecTrainingService
 
@@ -25,6 +31,7 @@ training_service = SasrecTrainingService(
     artifact_dir=get_settings().model_artifact_dir,
 )
 ranking_service = SasrecRankingService(artifact_dir=get_settings().model_artifact_dir)
+model_registry_service = SasrecModelRegistryService(artifact_dir=get_settings().model_artifact_dir)
 
 
 @router.post(
@@ -90,6 +97,15 @@ def train_sasrec_mvp(
         learning_rate=learning_rate,
         persist_artifact=persist_artifact,
     )
+
+
+@router.get(
+    "/sasrec/models/latest",
+    response_model=SasrecModelRegistryResponse,
+    summary="Resolve the latest persisted SASRec MVP artifact",
+)
+def get_latest_sasrec_model(user_id: str | None = None) -> SasrecModelRegistryResponse:
+    return model_registry_service.latest_model(user_id=user_id)
 
 
 @router.post(

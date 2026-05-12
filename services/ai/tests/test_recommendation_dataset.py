@@ -5,6 +5,7 @@ from app.schemas.recommendation_dataset import RecommendationDatasetImportReques
 from app.schemas.sasrec import SasrecRankingRequest
 from app.services.recommendation_dataset_service import RecommendationDatasetService
 from app.services.sasrec_dataset_service import SasrecDatasetService
+from app.services.sasrec_model_registry_service import SasrecModelRegistryService
 from app.services.sasrec_offline_report_service import SasrecOfflineReportService
 from app.services.sasrec_ranking_service import SasrecRankingService
 from app.services.sasrec_training_service import SasrecTrainingService
@@ -231,6 +232,23 @@ def test_sasrec_ranking_service_loads_artifact_and_ranks_candidates(tmp_path) ->
     assert len(ranking.ranked_candidates) == 2
     assert ranking.ranked_candidates[0].rank == 1
     assert ranking.ranked_candidates[0].track_id in {"track-001", "track-002", "track-003"}
+
+
+def test_sasrec_model_registry_resolves_latest_persisted_artifact(tmp_path) -> None:
+    training_result = SasrecTrainingService(artifact_dir=tmp_path).train_mvp(
+        RecommendationDatasetImportRequest.model_validate(sasrec_training_payload()),
+        max_context_length=4,
+        epochs=2,
+        hidden_size=8,
+    )
+
+    latest_model = SasrecModelRegistryService(artifact_dir=tmp_path).latest_model(user_id="user-001")
+
+    assert latest_model.status == "ok"
+    assert latest_model.user_id == "user-001"
+    assert latest_model.model_version == training_result.model_version
+    assert latest_model.vocabulary_size == 3
+    assert latest_model.train_example_count == 3
 
 
 def test_sasrec_ranking_service_reports_missing_artifact(tmp_path) -> None:

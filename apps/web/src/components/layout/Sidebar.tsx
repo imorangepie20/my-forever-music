@@ -12,6 +12,7 @@ import {
     Sparkles,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { useAuthSession } from '@/contexts/AuthSessionContext'
 
 interface SidebarProps {
     collapsed: boolean
@@ -72,7 +73,21 @@ const menuItems: MenuItem[] = [
     },
 ]
 
+const adminMenuItems: MenuItem[] = [
+    {
+        label: 'EMS Pool',
+        description: 'Search ingest queue monitor',
+        icon: <Activity size={20} />,
+        path: '/ems/pool-admin',
+    },
+]
+
 const Sidebar = ({ collapsed, open, onClose, onCollapseToggle }: SidebarProps) => {
+    const { session } = useAuthSession()
+    const items = session?.email.toLowerCase() === 'jowoosungtidal@gmail.com'
+        ? [...menuItems, ...adminMenuItems]
+        : menuItems
+
     return (
         <>
             <div
@@ -112,7 +127,7 @@ const Sidebar = ({ collapsed, open, onClose, onCollapseToggle }: SidebarProps) =
                         {!collapsed ? 'Workspace' : 'WS'}
                     </div>
                     <ul className="space-y-2">
-                        {menuItems.map((item) => (
+                        {items.map((item) => (
                             <li key={item.path}>
                                 <NavLink
                                     to={item.path}

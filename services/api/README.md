@@ -72,8 +72,8 @@ services/api/
 - PMS import 명령 엔드포인트: `POST /api/v1/pms/import/playlists`
 - PMS workspace bootstrap 엔드포인트: `GET /api/v1/pms/workspace/bootstrap`
 - EMS workspace analysis 엔드포인트: `POST /api/v1/ems/workspace/analysis`
-- EMS provider search 엔드포인트: `POST /api/v1/ems/collection/search`
-- EMS search playlist track preview 엔드포인트: `GET /api/v1/ems/collection/search/playlists/{platformId}/{externalPlaylistId}/tracks`
+- EMS provider search 엔드포인트: `POST /api/v1/ems/collection/search` (`search_pool` 소스로 EMS 저장)
+- EMS search playlist track detail 엔드포인트: `GET /api/v1/ems/collection/search/playlists/{platformId}/{externalPlaylistId}/tracks` (`search_pool` playlist-track 링크 저장)
 - GMS AI preview 브리지 엔드포인트: `POST /api/v1/gms/recommendations/preview`
 - GMS feedback 저장 엔드포인트: `POST /api/v1/gms/recommendations/feedback`
 - PMS personal playlist 엔드포인트: `GET /api/v1/pms/personal-playlists/bootstrap`, `POST /api/v1/pms/personal-playlists`, `POST /api/v1/pms/personal-playlists/tracks`
@@ -152,6 +152,10 @@ API 계약 문서 인덱스는 [docs/api/README.md](/Users/woosungjo/music-space
 - `APP_VERSION`
 - `AI_SERVICE_BASE_URL`
 - `AI_RECOMMENDATION_PREVIEW_PATH`
+- `AI_SASREC_TRAINING_PATH`
+- `AI_SASREC_RANKING_PATH`
+- `AI_SASREC_LATEST_MODEL_PATH`
+- `AI_SASREC_MODEL_VERSION`
 - `RECCOBEATS_ENABLED`
 - `RECCOBEATS_API_BASE_URL`
 - `SPOTIFY_OAUTH_ENABLED`
@@ -185,6 +189,20 @@ AI 서비스와 함께 로컬 실행 예시:
 
 ```bash
 AI_SERVICE_BASE_URL=http://localhost:8000 ./gradlew bootRun
+```
+
+학습된 SASRec MVP artifact를 GMS preview 재정렬에 반영하려면 AI service의 `/v1/recommendations/datasets/sasrec/train` 응답에서 받은 `model_version`을 함께 지정할 수 있다. 이 값이 비어 있으면 API는 AI service의 `/v1/recommendations/datasets/sasrec/models/latest`에서 해당 사용자 최신 artifact를 조회하고, 찾지 못한 경우 기존 PMS playable 후보 정렬만 사용한다.
+
+```bash
+AI_SERVICE_BASE_URL=http://localhost:8000 \
+AI_SASREC_MODEL_VERSION=sasrec-your-model-version \
+./gradlew bootRun
+```
+
+사용자 행동/추천 snapshot export payload를 바로 AI SASRec 학습으로 넘기는 운영 경계:
+
+```bash
+curl -X POST "http://localhost:8081/api/v1/recommendations/datasets/users/{userId}/sasrec/train?event_limit=300&snapshot_limit=200&epochs=30&persist_artifact=true"
 ```
 
 PostgreSQL을 붙여 PMS bootstrap을 DB 기반으로 확인하려면:

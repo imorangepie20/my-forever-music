@@ -86,8 +86,11 @@
 | PMS Personal Playlist API | `POST` | `/api/v1/pms/personal-playlists/tracks` | `services/api` | 공개 API |
 | EMS Workspace Analysis API | `POST` | `/api/v1/ems/workspace/analysis` | `services/api` | 공개 API |
 | EMS Workspace Overview API | `POST` | `/api/v1/ems/workspace/overview` | `services/api` | 공개 API |
-| EMS Collection API | `POST` | `/api/v1/ems/collection/search` | `services/api` | 검색 preview API |
-| EMS Collection API | `GET` | `/api/v1/ems/collection/search/playlists/{platformId}/{externalPlaylistId}/tracks` | `services/api` | 검색 playlist track preview API |
+| EMS Collection API | `POST` | `/api/v1/ems/collection/search` | `services/api` | 검색 결과 EMS POOL 적재 + 백그라운드 본 저장 API |
+| EMS Collection API | `GET` | `/api/v1/ems/collection/search/playlists/{platformId}/{externalPlaylistId}/tracks` | `services/api` | 검색 playlist track detail + EMS `search_pool` 링크 API |
+| EMS Pool Admin API | `GET` | `/api/v1/ems/collection/admin/pool/runs` | `services/api` | 관리자 전용 EMS POOL 진행 목록 |
+| EMS Pool Admin API | `GET` | `/api/v1/ems/collection/admin/pool/runs/{runId}` | `services/api` | 관리자 전용 EMS POOL 상세/entry 목록 |
+| EMS Pool Admin API | `POST` | `/api/v1/ems/collection/admin/pool/runs/{runId}/process` | `services/api` | 관리자 전용 EMS POOL 재실행 |
 | EMS Collection API | `POST` | `/api/v1/ems/collection/discovery/run` | `services/api` | 운영/개발 수집 API |
 | EMS Collection API | `GET` | `/api/v1/ems/collection/discovery/status` | `services/api` | 운영/개발 수집 상태 API |
 | EMS Collection API | `GET` | `/api/v1/ems/collection/playlists` | `services/api` | 공개 API |

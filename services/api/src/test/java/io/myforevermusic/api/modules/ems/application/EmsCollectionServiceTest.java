@@ -1,6 +1,7 @@
 package io.myforevermusic.api.modules.ems.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -11,6 +12,10 @@ import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollected
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedPlaylistTrackRepository;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackEntity;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackRepository;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsPoolEntryEntity;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsPoolEntryRepository;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsPoolIngestRunEntity;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsPoolIngestRunRepository;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsTrackAudioFeatures;
 import io.myforevermusic.api.modules.auth.application.AuthAccountStore;
 import io.myforevermusic.api.modules.auth.application.AuthRegisteredAccount;
@@ -29,10 +34,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -62,8 +69,17 @@ class EmsCollectionServiceTest {
     @Mock
     private EmsCollectedPlaylistTrackRepository playlistTrackRepository;
 
+    @Mock
+    private EmsPoolIngestRunRepository poolRunRepository;
+
+    @Mock
+    private EmsPoolEntryRepository poolEntryRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @Test
-    void shouldPreviewSpotifySearchWithoutWritingToEmsStorage() {
+    void shouldQueueSpotifySearchResultsInEmsPool() {
         PlatformAccountCredential credential = credential("spotify");
         when(platformCredentialService.findUsableCredential("user-001", "spotify"))
             .thenReturn(Optional.of(credential));
@@ -98,22 +114,29 @@ class EmsCollectionServiceTest {
                     180000
                 )
             ), 1));
+        EmsPoolIngestRunEntity run = poolRun("user-001", "spotify", "vocal jazz", 1, 1);
+        when(poolRunRepository.save(any(EmsPoolIngestRunEntity.class))).thenReturn(run);
 
         EmsCollectionService service = service();
         EmsCollectionService.EmsCollectionSearchPreviewResult result =
             service.previewSearch("user-001", "spotify", "vocal jazz");
 
+        assertThat(result.poolRunId()).isEqualTo(55L);
         assertThat(result.resultPlaylistCount()).isEqualTo(1);
         assertThat(result.resultTrackCount()).isEqualTo(1);
         assertThat(result.playlists()).extracting(EmsCollectionService.EmsCollectionSearchPlaylistPreview::title)
             .containsExactly("Vocal Jazz");
         assertThat(result.tracks()).extracting(EmsCollectionService.EmsCollectionSearchTrackPreview::title)
             .containsExactly("Search Preview Track");
+        ArgumentCaptor<Iterable<EmsPoolEntryEntity>> captor = ArgumentCaptor.forClass(Iterable.class);
+        verify(poolEntryRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(2);
+        verify(eventPublisher).publishEvent(new EmsPoolRunQueuedEvent(55L));
         verifyNoInteractions(playlistRepository, trackRepository, playlistTrackRepository, reccoBeatsAudioFeaturesClient);
     }
 
     @Test
-    void shouldPreviewPreferredProviderSearchWithoutCrossProviderLookup() {
+    void shouldQueuePreferredProviderSearchResultsWithoutCrossProviderLookup() {
         PlatformAccountCredential tidalCredential = credential("tidal");
         when(authAccountStore.findByUserId("user-001"))
             .thenReturn(Optional.of(account("tidal")));
@@ -143,10 +166,13 @@ class EmsCollectionServiceTest {
                 "USRC17607839",
                 180000
             )), 99));
+        when(poolRunRepository.save(any(EmsPoolIngestRunEntity.class)))
+            .thenReturn(poolRun("user-001", "tidal", "jazz", 1, 1));
 
         EmsCollectionService.EmsCollectionSearchPreviewResult result =
             service().previewSearch("user-001", null, "jazz");
 
+        assertThat(result.poolRunId()).isEqualTo(55L);
         assertThat(result.platformId()).isEqualTo("tidal");
         assertThat(result.resultPlaylistCount()).isEqualTo(7);
         assertThat(result.resultTrackCount()).isEqualTo(99);
@@ -155,7 +181,92 @@ class EmsCollectionServiceTest {
         assertThat(result.tracks()).extracting(EmsCollectionService.EmsCollectionSearchTrackPreview::sourcePlatform)
             .containsExactly("tidal");
         verifyNoInteractions(spotifyWebApiClient);
+        verify(poolEntryRepository).saveAll(any());
         verifyNoInteractions(playlistRepository, trackRepository, playlistTrackRepository, reccoBeatsAudioFeaturesClient);
+    }
+
+    @Test
+    void shouldLinkSearchPlaylistTracksToStoredSearchPoolPlaylist() {
+        PlatformAccountCredential credential = credential("tidal");
+        EmsCollectedPlaylistEntity playlistEntity = collectedPlaylist(
+            "tidal-playlist-001",
+            "tidal",
+            "Stored search playlist",
+            1
+        );
+        ReflectionTestUtils.setField(playlistEntity, "id", 7L);
+        EmsCollectedTrackEntity trackEntity = collectedTrack(
+            "tidal-track-001",
+            "tidal",
+            "TIDAL Track",
+            "TIDAL Artist",
+            "USRC17607839"
+        );
+        ReflectionTestUtils.setField(trackEntity, "id", 8L);
+
+        when(platformCredentialService.findUsableCredential("user-001", "tidal"))
+            .thenReturn(Optional.of(credential));
+        when(tidalWebApiClient.getPlaylistTracks(credential, "tidal-playlist-001"))
+            .thenReturn(List.of(new io.myforevermusic.api.modules.platform.infrastructure.tidal.TidalWebApiClient.TidalPlaylistTrack(
+                "tidal-track-001",
+                "TIDAL Track",
+                "TIDAL Artist",
+                "TIDAL Album",
+                null,
+                "https://tidal.com/browse/track/tidal-track-001",
+                "tidal:track:tidal-track-001",
+                null,
+                "USRC17607839",
+                180000
+            )));
+        when(playlistRepository.findBySourcePlatformAndExternalPlaylistId("tidal", "tidal-playlist-001"))
+            .thenReturn(Optional.of(playlistEntity));
+        when(trackRepository.findBySourcePlatformAndExternalTrackId("tidal", "tidal-track-001"))
+            .thenReturn(Optional.of(trackEntity));
+
+        EmsCollectionService.EmsCollectionSearchPlaylistTracksPreview result =
+            service().getSearchPlaylistTracks("user-001", "tidal", "tidal-playlist-001");
+
+        assertThat(result.trackCount()).isEqualTo(1);
+        assertThat(result.tracks()).extracting(EmsCollectionService.EmsCollectionSearchTrackPreview::externalTrackId)
+            .containsExactly("tidal-track-001");
+        verify(playlistTrackRepository).upsertPlaylistTrackLink(7L, 8L, 0);
+        verifyNoInteractions(reccoBeatsAudioFeaturesClient);
+    }
+
+    @Test
+    void shouldClampSearchPoolPlaylistMetadataToDatabaseColumnLengths() {
+        PlatformAccountCredential credential = credential("spotify");
+        String longDescription = "k-pop ".repeat(260);
+        when(platformCredentialService.findUsableCredential("user-001", "spotify"))
+            .thenReturn(Optional.of(credential));
+        when(spotifyWebApiClient.searchPlaylists(credential, "k-pop"))
+            .thenReturn(new SpotifySearchResult<>(List.of(
+                new SpotifyPlaylistSummary(
+                    "playlist-kpop",
+                    "K-Pop Search",
+                    longDescription,
+                    "owner-001",
+                    "Curator",
+                    false,
+                    10,
+                    null,
+                    "https://open.spotify.com/playlist/playlist-kpop",
+                    "spotify:playlist:playlist-kpop"
+                )
+            ), 1));
+        when(spotifyWebApiClient.searchTracks(credential, "k-pop"))
+            .thenReturn(new SpotifySearchResult<>(List.of(), 0));
+        when(poolRunRepository.save(any(EmsPoolIngestRunEntity.class)))
+            .thenReturn(poolRun("user-001", "spotify", "k-pop", 1, 0));
+
+        service().previewSearch("user-001", "spotify", "k-pop");
+
+        ArgumentCaptor<Iterable<EmsPoolEntryEntity>> captor = ArgumentCaptor.forClass(Iterable.class);
+        verify(poolEntryRepository).saveAll(captor.capture());
+        EmsPoolEntryEntity entry = captor.getValue().iterator().next();
+        assertThat(entry.getDescription()).hasSize(1000);
+        assertThat(entry.getEntryType()).isEqualTo(EmsPoolEntryEntity.TYPE_PLAYLIST);
     }
 
     @Test
@@ -294,8 +405,30 @@ class EmsCollectionServiceTest {
             authAccountStore,
             playlistRepository,
             trackRepository,
-            playlistTrackRepository
+            playlistTrackRepository,
+            poolRunRepository,
+            poolEntryRepository,
+            eventPublisher
         );
+    }
+
+    private EmsPoolIngestRunEntity poolRun(
+        String userId,
+        String platformId,
+        String query,
+        int playlistCount,
+        int trackCount
+    ) {
+        EmsPoolIngestRunEntity run = new EmsPoolIngestRunEntity(
+            userId,
+            platformId,
+            query,
+            playlistCount,
+            trackCount,
+            Instant.parse("2026-05-10T00:00:00Z")
+        );
+        ReflectionTestUtils.setField(run, "id", 55L);
+        return run;
     }
 
     private AuthRegisteredAccount account(String preferredPlatformId) {
@@ -329,6 +462,53 @@ class EmsCollectionServiceTest {
             Instant.parse("2026-05-10T00:00:00Z"),
             Instant.parse("2026-05-09T00:00:00Z"),
             Instant.parse("2026-05-09T00:00:00Z")
+        );
+    }
+
+    private EmsCollectedPlaylistEntity collectedPlaylist(
+        String externalPlaylistId,
+        String platformId,
+        String title,
+        int trackCount
+    ) {
+        return new EmsCollectedPlaylistEntity(
+            externalPlaylistId,
+            title,
+            platformId,
+            "",
+            "",
+            null,
+            null,
+            "spotify".equals(platformId) ? "spotify:playlist:%s".formatted(externalPlaylistId) : null,
+            trackCount,
+            "public_pool",
+            null,
+            Instant.parse("2026-05-09T00:00:00Z")
+        );
+    }
+
+    private EmsCollectedTrackEntity collectedTrack(
+        String externalTrackId,
+        String platformId,
+        String title,
+        String artistName,
+        String isrc
+    ) {
+        return new EmsCollectedTrackEntity(
+            externalTrackId,
+            title,
+            artistName,
+            platformId,
+            isrc,
+            null,
+            null,
+            null,
+            "spotify".equals(platformId) ? "spotify:track:%s".formatted(externalTrackId) : null,
+            null,
+            180000,
+            "search_pool",
+            Instant.parse("2026-05-09T00:00:00Z"),
+            unavailableAudioFeatures()
         );
     }
 

@@ -14,6 +14,7 @@ import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCol
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPlaylistTracksPreview;
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPreviewResult;
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchTrackPreview;
+import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler.EmsPublicPlaylistDiscoveryFailure;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler.EmsPublicPlaylistDiscoveryRun;
@@ -43,12 +44,16 @@ class EmsCollectionControllerWebMvcTest {
     @MockBean
     private EmsPublicPlaylistDiscoveryScheduler emsPublicPlaylistDiscoveryScheduler;
 
+    @MockBean
+    private EmsPoolIngestService emsPoolIngestService;
+
     @Test
-    void shouldPreviewEmsSearchResultsWithoutCollection() throws Exception {
+    void shouldReturnEmsSearchResultsStoredInSearchPool() throws Exception {
         when(emsCollectionService.previewSearch("user-001", null, "jazz"))
             .thenReturn(new EmsCollectionSearchPreviewResult(
                 "all",
                 "jazz",
+                44L,
                 List.of(new EmsCollectionSearchPlaylistPreview(
                     "playlist-001",
                     "Stored Outside EMS",
@@ -87,6 +92,8 @@ class EmsCollectionControllerWebMvcTest {
                     }
                     """))
             .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("ems_search_pooled"))
+            .andExpect(jsonPath("$.pool_run_id").value(44))
             .andExpect(jsonPath("$.result_playlist_count").value(5))
             .andExpect(jsonPath("$.result_track_count").value(9))
             .andExpect(jsonPath("$.playlists[0].title").value("Stored Outside EMS"))

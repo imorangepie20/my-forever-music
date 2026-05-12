@@ -7,6 +7,7 @@ import io.myforevermusic.api.modules.auth.application.AuthRegistrationService;
 import io.myforevermusic.api.modules.auth.infrastructure.local.InMemoryAuthAccountStore;
 import io.myforevermusic.api.modules.auth.presentation.AuthRegistrationRequest;
 import io.myforevermusic.api.modules.gms.infrastructure.ai.AiRecommendationPreviewClient;
+import io.myforevermusic.api.modules.gms.infrastructure.ai.AiSasrecRankingClient;
 import io.myforevermusic.api.modules.gms.presentation.GmsRecommendationPreviewRequest;
 import io.myforevermusic.api.modules.gms.presentation.GmsRecommendationPreviewResponse;
 import io.myforevermusic.api.modules.platform.application.LastFmProperties;
@@ -47,6 +48,7 @@ class GmsRecommendationPreviewServiceTest {
         CapturingAiRecommendationPreviewClient aiClient = new CapturingAiRecommendationPreviewClient();
         GmsRecommendationPreviewService service = new GmsRecommendationPreviewService(
             aiClient,
+            Optional.empty(),
             authAccountStore,
             new InMemoryLastFmScrobbleStore(),
             new InMemoryPmsUserLibraryStore(),
@@ -140,6 +142,7 @@ class GmsRecommendationPreviewServiceTest {
         CapturingAiRecommendationPreviewClient aiClient = new CapturingAiRecommendationPreviewClient();
         GmsRecommendationPreviewService service = new GmsRecommendationPreviewService(
             aiClient,
+            Optional.empty(),
             authAccountStore,
             scrobbleStore,
             new InMemoryPmsUserLibraryStore(),
@@ -177,6 +180,7 @@ class GmsRecommendationPreviewServiceTest {
         pmsUserLibraryStore.savePlaylists("user-001", List.of(sampleLibraryPlaylist()));
         GmsRecommendationPreviewService service = new GmsRecommendationPreviewService(
             new SingleItemAiRecommendationPreviewClient(),
+            Optional.empty(),
             authAccountStore,
             new InMemoryLastFmScrobbleStore(),
             pmsUserLibraryStore,
@@ -209,12 +213,54 @@ class GmsRecommendationPreviewServiceTest {
             .isEqualTo("gms-baseline-v1");
     }
 
+    @Test
+    void shouldRerankPlayableGmsPreviewItemsWithSasrecWhenModelIsConfigured() {
+        InMemoryAuthAccountStore authAccountStore = new InMemoryAuthAccountStore();
+        InMemoryPmsUserLibraryStore pmsUserLibraryStore = new InMemoryPmsUserLibraryStore();
+        pmsUserLibraryStore.savePlaylists("user-001", List.of(sampleLibraryPlaylistForSasrec()));
+        FakeSasrecRankingClient sasrecRankingClient = new FakeSasrecRankingClient();
+        GmsRecommendationPreviewService service = new GmsRecommendationPreviewService(
+            new TwoItemAiRecommendationPreviewClient(),
+            Optional.of(sasrecRankingClient),
+            authAccountStore,
+            new InMemoryLastFmScrobbleStore(),
+            pmsUserLibraryStore,
+            Optional.empty(),
+            new RecommendationSnapshotService(new InMemoryRecommendationSnapshotStore())
+        );
+
+        GmsRecommendationPreviewResponse response = service.previewRecommendations(
+            new GmsRecommendationPreviewRequest(
+                "request-004",
+                "user-001",
+                "playlist-001",
+                "gms",
+                "upbeat",
+                4,
+                2,
+                5,
+                List.of("track-001"),
+                List.of("Neon Bloom"),
+                List.of("synth-pop"),
+                true
+            )
+        );
+
+        assertThat(response.items()).extracting(GmsRecommendationPreviewResponse.RecommendationItem::trackId)
+            .containsExactly("track-002", "track-001");
+        assertThat(sasrecRankingClient.contextTrackIds).containsExactly("track-001");
+        assertThat(sasrecRankingClient.candidateTrackIds).contains("track-001", "track-002");
+        assertThat(response.context().engine()).contains("sasrec:sasrec-test-v1");
+        assertThat(response.warnings()).anyMatch(warning -> warning.contains("SASRec model 'sasrec-test-v1' reranked"));
+        assertThat(response.items().getFirst().reason()).contains("SASRec personalized ranking adjusted");
+    }
+
     private static final class CapturingAiRecommendationPreviewClient extends AiRecommendationPreviewClient {
 
         private GmsRecommendationPreviewRequest capturedRequest;
 
         private CapturingAiRecommendationPreviewClient() {
-            super(new io.myforevermusic.api.modules.gms.infrastructure.ai.AiServiceProperties("http://localhost:8000", "/v1/recommendations/preview", "/v1/ems/overview"), new ObjectMapper());
+            super(new io.myforevermusic.api.modules.gms.infrastructure.ai.AiServiceProperties("http://localhost:8000", "/v1/recommendations/preview", "/v1/ems/overview", "/v1/recommendations/datasets/sasrec/train", "/v1/recommendations/datasets/sasrec/rank", "/v1/recommendations/datasets/sasrec/models/latest", ""), new ObjectMapper());
         }
 
         @Override
@@ -251,7 +297,7 @@ class GmsRecommendationPreviewServiceTest {
     private static final class SingleItemAiRecommendationPreviewClient extends AiRecommendationPreviewClient {
 
         private SingleItemAiRecommendationPreviewClient() {
-            super(new io.myforevermusic.api.modules.gms.infrastructure.ai.AiServiceProperties("http://localhost:8000", "/v1/recommendations/preview", "/v1/ems/overview"), new ObjectMapper());
+            super(new io.myforevermusic.api.modules.gms.infrastructure.ai.AiServiceProperties("http://localhost:8000", "/v1/recommendations/preview", "/v1/ems/overview", "/v1/recommendations/datasets/sasrec/train", "/v1/recommendations/datasets/sasrec/rank", "/v1/recommendations/datasets/sasrec/models/latest", ""), new ObjectMapper());
         }
 
         @Override
@@ -303,6 +349,114 @@ class GmsRecommendationPreviewServiceTest {
         }
     }
 
+    private static final class TwoItemAiRecommendationPreviewClient extends AiRecommendationPreviewClient {
+
+        private TwoItemAiRecommendationPreviewClient() {
+            super(new io.myforevermusic.api.modules.gms.infrastructure.ai.AiServiceProperties("http://localhost:8000", "/v1/recommendations/preview", "/v1/ems/overview", "/v1/recommendations/datasets/sasrec/train", "/v1/recommendations/datasets/sasrec/rank", "/v1/recommendations/datasets/sasrec/models/latest", ""), new ObjectMapper());
+        }
+
+        @Override
+        public GmsRecommendationPreviewResponse requestPreview(GmsRecommendationPreviewRequest request) {
+            return new GmsRecommendationPreviewResponse(
+                "recommendation-004",
+                Instant.parse("2026-05-04T01:00:00Z"),
+                "ai",
+                "ok",
+                new GmsRecommendationPreviewResponse.RecommendationContext(
+                    "gms-hybrid-blend",
+                    "rule-based-preview-v1",
+                    "gms",
+                    "upbeat",
+                    4,
+                    List.of("track-001", "neon-bloom")
+                ),
+                new GmsRecommendationPreviewResponse.RecommendationInputSummary(
+                    request.userId(),
+                    request.playlistId(),
+                    request.seedTrackIds().size(),
+                    request.seedArtistNames().size(),
+                    request.seedGenres().size(),
+                    request.familiarityBias(),
+                    request.limit()
+                ),
+                List.of(
+                    new GmsRecommendationPreviewResponse.RecommendationItem(
+                        1,
+                        "ai-track-placeholder-001",
+                        "AI Placeholder One",
+                        "AI Artist",
+                        "spotify",
+                        "playlist-001",
+                        "Night Drive Archive",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        0.75,
+                        "gms",
+                        4,
+                        "AI candidate one."
+                    ),
+                    new GmsRecommendationPreviewResponse.RecommendationItem(
+                        2,
+                        "ai-track-placeholder-002",
+                        "AI Placeholder Two",
+                        "AI Artist",
+                        "spotify",
+                        "playlist-001",
+                        "Night Drive Archive",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        0.71,
+                        "gms",
+                        4,
+                        "AI candidate two."
+                    )
+                ),
+                List.of()
+            );
+        }
+    }
+
+    private static final class FakeSasrecRankingClient extends AiSasrecRankingClient {
+
+        private List<String> contextTrackIds = List.of();
+        private List<String> candidateTrackIds = List.of();
+
+        private FakeSasrecRankingClient() {
+            super(new io.myforevermusic.api.modules.gms.infrastructure.ai.AiServiceProperties("http://localhost:8000", "/v1/recommendations/preview", "/v1/ems/overview", "/v1/recommendations/datasets/sasrec/train", "/v1/recommendations/datasets/sasrec/rank", "/v1/recommendations/datasets/sasrec/models/latest", "sasrec-test-v1"), new ObjectMapper());
+        }
+
+        @Override
+        public Optional<SasrecRankingResponse> rankCandidates(
+            String userId,
+            List<String> contextTrackIds,
+            List<String> candidateTrackIds,
+            int limit
+        ) {
+            this.contextTrackIds = contextTrackIds;
+            this.candidateTrackIds = candidateTrackIds;
+            return Optional.of(new SasrecRankingResponse(
+                "sasrec-ranking",
+                "ok",
+                "sasrec-test-v1",
+                List.of(
+                    new SasrecRankedCandidate(1, "track-002", 2, 0.98d),
+                    new SasrecRankedCandidate(2, "track-001", 1, 0.12d)
+                ),
+                List.of()
+            ));
+        }
+    }
+
     private static final class FakeLastFmWebApiClient extends LastFmWebApiClient {
 
         private FakeLastFmWebApiClient() {
@@ -346,6 +500,56 @@ class GmsRecommendationPreviewServiceTest {
                     null,
                     1,
                     true,
+                    PmsTrackAudioFeatures.unresolved()
+                )
+            )
+        );
+    }
+
+    private PmsUserLibraryStore.LibraryPlaylistState sampleLibraryPlaylistForSasrec() {
+        return new PmsUserLibraryStore.LibraryPlaylistState(
+            "user-001",
+            "playlist-001",
+            "spotify-playlist-001",
+            "Night Drive Archive",
+            "spotify",
+            "Forever Listener",
+            "Synced from imported playlists.",
+            null,
+            "https://open.spotify.com/playlist/spotify-playlist-001",
+            "spotify:playlist:spotify-playlist-001",
+            Instant.parse("2026-05-04T00:00:00Z"),
+            List.of(
+                new PmsUserLibraryStore.LibraryTrackState(
+                    "track-001",
+                    "spotify-track-001",
+                    "Midnight Receiver",
+                    "Neon Bloom",
+                    "spotify",
+                    "synth-pop",
+                    "Signal Bloom",
+                    null,
+                    "https://open.spotify.com/track/spotify-track-001",
+                    "spotify:track:spotify-track-001",
+                    null,
+                    1,
+                    true,
+                    PmsTrackAudioFeatures.unresolved()
+                ),
+                new PmsUserLibraryStore.LibraryTrackState(
+                    "track-002",
+                    "spotify-track-002",
+                    "Afterimage Drive",
+                    "Signal Glass",
+                    "spotify",
+                    "synth-pop",
+                    "Signal Bloom",
+                    null,
+                    "https://open.spotify.com/track/spotify-track-002",
+                    "spotify:track:spotify-track-002",
+                    null,
+                    2,
+                    false,
                     PmsTrackAudioFeatures.unresolved()
                 )
             )

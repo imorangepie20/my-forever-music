@@ -3,6 +3,7 @@ package io.myforevermusic.api.modules.gms.application;
 import io.myforevermusic.api.modules.auth.application.AuthAccountStore;
 import io.myforevermusic.api.modules.auth.application.AuthRegisteredAccount;
 import io.myforevermusic.api.modules.gms.infrastructure.ai.AiRecommendationPreviewClient;
+import io.myforevermusic.api.modules.gms.infrastructure.ai.AiSasrecRankingClient;
 import io.myforevermusic.api.modules.gms.presentation.GmsRecommendationPreviewRequest;
 import io.myforevermusic.api.modules.gms.presentation.GmsRecommendationPreviewResponse;
 import io.myforevermusic.api.modules.platform.application.LastFmScrobbleStore;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Service;
 public class GmsRecommendationPreviewService {
 
     private final AiRecommendationPreviewClient aiRecommendationPreviewClient;
+    private final Optional<AiSasrecRankingClient> aiSasrecRankingClient;
     private final AuthAccountStore authAccountStore;
     private final LastFmScrobbleStore lastFmScrobbleStore;
     private final PmsUserLibraryStore pmsUserLibraryStore;
@@ -34,6 +36,7 @@ public class GmsRecommendationPreviewService {
 
     public GmsRecommendationPreviewService(
         AiRecommendationPreviewClient aiRecommendationPreviewClient,
+        Optional<AiSasrecRankingClient> aiSasrecRankingClient,
         AuthAccountStore authAccountStore,
         LastFmScrobbleStore lastFmScrobbleStore,
         PmsUserLibraryStore pmsUserLibraryStore,
@@ -41,6 +44,7 @@ public class GmsRecommendationPreviewService {
         RecommendationSnapshotService recommendationSnapshotService
     ) {
         this.aiRecommendationPreviewClient = aiRecommendationPreviewClient;
+        this.aiSasrecRankingClient = aiSasrecRankingClient;
         this.authAccountStore = authAccountStore;
         this.lastFmScrobbleStore = lastFmScrobbleStore;
         this.pmsUserLibraryStore = pmsUserLibraryStore;
@@ -50,11 +54,14 @@ public class GmsRecommendationPreviewService {
 
     public GmsRecommendationPreviewResponse previewRecommendations(GmsRecommendationPreviewRequest request) {
         List<String> enrichmentWarnings = new ArrayList<>();
+        List<String> appliedSasrecModelVersions = new ArrayList<>();
         GmsRecommendationPreviewRequest enrichedRequest = enrichWithLastFmArtists(request, enrichmentWarnings);
         GmsRecommendationPreviewResponse response = aiRecommendationPreviewClient.requestPreview(enrichedRequest);
         List<GmsRecommendationPreviewResponse.RecommendationItem> playableItems = projectPlayableItems(
             enrichedRequest,
-            response.items()
+            response.items(),
+            enrichmentWarnings,
+            appliedSasrecModelVersions
         );
         if ((response.items() != null && !response.items().isEmpty()) && playableItems.isEmpty()) {
             throw new IllegalArgumentException(
@@ -75,7 +82,7 @@ public class GmsRecommendationPreviewService {
                 response.generatedAt(),
                 response.service(),
                 response.status(),
-                response.context(),
+                applySasrecContext(response.context(), appliedSasrecModelVersions),
                 response.inputSummary(),
                 playableItems,
                 response.warnings()
@@ -92,7 +99,7 @@ public class GmsRecommendationPreviewService {
             response.generatedAt(),
             response.service(),
             response.status(),
-            response.context(),
+            applySasrecContext(response.context(), appliedSasrecModelVersions),
             response.inputSummary(),
             playableItems.isEmpty() ? response.items() : playableItems,
             List.copyOf(mergedWarnings)
@@ -103,7 +110,9 @@ public class GmsRecommendationPreviewService {
 
     private List<GmsRecommendationPreviewResponse.RecommendationItem> projectPlayableItems(
         GmsRecommendationPreviewRequest request,
-        List<GmsRecommendationPreviewResponse.RecommendationItem> aiItems
+        List<GmsRecommendationPreviewResponse.RecommendationItem> aiItems,
+        List<String> enrichmentWarnings,
+        List<String> appliedSasrecModelVersions
     ) {
         if (aiItems == null || aiItems.isEmpty() || request.userId() == null || request.userId().isBlank()) {
             return List.of();
@@ -130,15 +139,26 @@ public class GmsRecommendationPreviewService {
                 .thenComparing(ranked -> ranked.candidate().sortOrder())
                 .thenComparing(ranked -> ranked.candidate().trackId()))
             .filter(ranked -> seenTrackIds.add(ranked.candidate().trackId()))
-            .limit(aiItems.size())
             .toList();
 
         if (rankedCandidates.isEmpty()) {
             return List.of();
         }
 
-        return IntStream.range(0, Math.min(aiItems.size(), rankedCandidates.size()))
-            .mapToObj(index -> toRecommendationItem(aiItems.get(index), rankedCandidates.get(index)))
+        rankedCandidates = applySasrecRanking(
+            request,
+            rankedCandidates,
+            aiItems.size(),
+            enrichmentWarnings,
+            appliedSasrecModelVersions
+        );
+        rankedCandidates = rankedCandidates.stream()
+            .limit(aiItems.size())
+            .toList();
+
+        List<RankedLibraryCandidate> finalRankedCandidates = rankedCandidates;
+        return IntStream.range(0, Math.min(aiItems.size(), finalRankedCandidates.size()))
+            .mapToObj(index -> toRecommendationItem(aiItems.get(index), finalRankedCandidates.get(index)))
             .toList();
     }
 
@@ -189,6 +209,11 @@ public class GmsRecommendationPreviewService {
             mergedReason = buildLibraryReason(candidate);
         } else {
             mergedReason = "%s %s".formatted(aiItem.reason(), buildLibraryReason(candidate));
+        }
+        if (rankedCandidate.sasrecRanked()) {
+            mergedReason = "%s SASRec personalized ranking adjusted this candidate using recent user sequence context.".formatted(
+                mergedReason
+            );
         }
 
         return new GmsRecommendationPreviewResponse.RecommendationItem(
@@ -241,6 +266,164 @@ public class GmsRecommendationPreviewService {
         score += 0.09d * moodAlignment(candidate, request.mood());
 
         return Math.min(0.99d, score);
+    }
+
+    private List<RankedLibraryCandidate> applySasrecRanking(
+        GmsRecommendationPreviewRequest request,
+        List<RankedLibraryCandidate> rankedCandidates,
+        int limit,
+        List<String> enrichmentWarnings,
+        List<String> appliedSasrecModelVersions
+    ) {
+        if (aiSasrecRankingClient.isEmpty() || rankedCandidates.size() < 2 || limit < 1) {
+            return rankedCandidates;
+        }
+
+        List<String> contextTrackIds = resolveSasrecContextTrackIds(request, rankedCandidates);
+        if (contextTrackIds.isEmpty()) {
+            return rankedCandidates;
+        }
+
+        List<String> candidateTrackIds = rankedCandidates.stream()
+            .map(ranked -> ranked.candidate().trackId())
+            .filter(Objects::nonNull)
+            .filter(trackId -> !trackId.isBlank())
+            .distinct()
+            .toList();
+        if (candidateTrackIds.isEmpty()) {
+            return rankedCandidates;
+        }
+
+        Optional<AiSasrecRankingClient.SasrecRankingResponse> rankingResponse = aiSasrecRankingClient.get()
+            .rankCandidates(
+                request.userId(),
+                contextTrackIds,
+                candidateTrackIds,
+                Math.min(100, Math.max(limit, candidateTrackIds.size()))
+            );
+        if (rankingResponse.isEmpty()) {
+            return rankedCandidates;
+        }
+
+        AiSasrecRankingClient.SasrecRankingResponse response = rankingResponse.get();
+        if (response.warnings() != null && !response.warnings().isEmpty()) {
+            response.warnings().forEach(warning -> enrichmentWarnings.add("SASRec ranking note: " + warning));
+        }
+        if (!"ok".equals(response.status()) || response.rankedCandidates() == null || response.rankedCandidates().isEmpty()) {
+            enrichmentWarnings.add(
+                "SASRec ranking was skipped because model '%s' returned status '%s'.".formatted(
+                    response.modelVersion(),
+                    response.status()
+                )
+            );
+            return rankedCandidates;
+        }
+
+        Map<String, Integer> rankByTrackId = response.rankedCandidates().stream()
+            .collect(java.util.stream.Collectors.toMap(
+                AiSasrecRankingClient.SasrecRankedCandidate::trackId,
+                AiSasrecRankingClient.SasrecRankedCandidate::rank,
+                Math::min
+            ));
+        Map<String, Double> scoreByTrackId = response.rankedCandidates().stream()
+            .collect(java.util.stream.Collectors.toMap(
+                AiSasrecRankingClient.SasrecRankedCandidate::trackId,
+                AiSasrecRankingClient.SasrecRankedCandidate::score,
+                Math::max
+            ));
+        double minScore = scoreByTrackId.values().stream().mapToDouble(Double::doubleValue).min().orElse(0.0d);
+        double maxScore = scoreByTrackId.values().stream().mapToDouble(Double::doubleValue).max().orElse(minScore);
+
+        List<RankedLibraryCandidate> reranked = rankedCandidates.stream()
+            .map(ranked -> blendSasrecScore(ranked, scoreByTrackId.get(ranked.candidate().trackId()), minScore, maxScore))
+            .sorted((left, right) -> {
+                int leftRank = rankByTrackId.getOrDefault(left.candidate().trackId(), Integer.MAX_VALUE);
+                int rightRank = rankByTrackId.getOrDefault(right.candidate().trackId(), Integer.MAX_VALUE);
+                if (leftRank != rightRank) {
+                    return Integer.compare(leftRank, rightRank);
+                }
+                int scoreOrder = Double.compare(right.affinityScore(), left.affinityScore());
+                if (scoreOrder != 0) {
+                    return scoreOrder;
+                }
+                return left.candidate().trackId().compareTo(right.candidate().trackId());
+            })
+            .toList();
+
+        enrichmentWarnings.add(
+            "SASRec model '%s' reranked playable GMS candidates from the PMS library.".formatted(response.modelVersion())
+        );
+        appliedSasrecModelVersions.add(response.modelVersion());
+        return reranked;
+    }
+
+    private GmsRecommendationPreviewResponse.RecommendationContext applySasrecContext(
+        GmsRecommendationPreviewResponse.RecommendationContext context,
+        List<String> appliedSasrecModelVersions
+    ) {
+        if (context == null || appliedSasrecModelVersions.isEmpty()) {
+            return context;
+        }
+
+        String modelVersion = appliedSasrecModelVersions.getLast();
+        String engine = context.engine();
+        String nextEngine = engine == null || engine.isBlank()
+            ? "gms-baseline-v1+sasrec:%s".formatted(modelVersion)
+            : "%s+sasrec:%s".formatted(engine, modelVersion);
+        return new GmsRecommendationPreviewResponse.RecommendationContext(
+            context.strategy(),
+            nextEngine,
+            context.mode(),
+            context.mood(),
+            context.energyLevel(),
+            context.seedBasis()
+        );
+    }
+
+    private RankedLibraryCandidate blendSasrecScore(
+        RankedLibraryCandidate ranked,
+        Double sasrecRawScore,
+        double minScore,
+        double maxScore
+    ) {
+        if (sasrecRawScore == null) {
+            return ranked;
+        }
+        double normalizedSasrecScore = maxScore == minScore
+            ? 1.0d
+            : (sasrecRawScore - minScore) / (maxScore - minScore);
+        double blendedScore = (ranked.affinityScore() * 0.70d) + (normalizedSasrecScore * 0.30d);
+        return new RankedLibraryCandidate(ranked.candidate(), roundScore(blendedScore), true);
+    }
+
+    private List<String> resolveSasrecContextTrackIds(
+        GmsRecommendationPreviewRequest request,
+        List<RankedLibraryCandidate> rankedCandidates
+    ) {
+        List<String> seedTrackIds = rawDistinctValues(request.seedTrackIds());
+        if (!seedTrackIds.isEmpty()) {
+            return seedTrackIds;
+        }
+
+        List<String> seededCandidateIds = rankedCandidates.stream()
+            .filter(ranked -> ranked.candidate().seed())
+            .map(ranked -> ranked.candidate().trackId())
+            .filter(Objects::nonNull)
+            .filter(trackId -> !trackId.isBlank())
+            .distinct()
+            .toList();
+        if (!seededCandidateIds.isEmpty()) {
+            return seededCandidateIds;
+        }
+
+        return rankedCandidates.stream()
+            .filter(ranked -> requestedPlaylistMatch(request.playlistId(), ranked.candidate()))
+            .map(ranked -> ranked.candidate().trackId())
+            .filter(Objects::nonNull)
+            .filter(trackId -> !trackId.isBlank())
+            .limit(20)
+            .distinct()
+            .toList();
     }
 
     private double energyAlignment(PmsTrackAudioFeatures features, Integer requestedEnergyLevel) {
@@ -305,6 +488,19 @@ public class GmsRecommendationPreviewService {
 
         return values.stream()
             .map(this::normalizeValue)
+            .filter(value -> !value.isBlank())
+            .distinct()
+            .toList();
+    }
+
+    private List<String> rawDistinctValues(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+
+        return values.stream()
+            .filter(Objects::nonNull)
+            .map(String::trim)
             .filter(value -> !value.isBlank())
             .distinct()
             .toList();
@@ -454,7 +650,14 @@ public class GmsRecommendationPreviewService {
 
     private record RankedLibraryCandidate(
         LibraryCandidateTrack candidate,
-        double affinityScore
+        double affinityScore,
+        boolean sasrecRanked
     ) {
+        private RankedLibraryCandidate(
+            LibraryCandidateTrack candidate,
+            double affinityScore
+        ) {
+            this(candidate, affinityScore, false);
+        }
     }
 }

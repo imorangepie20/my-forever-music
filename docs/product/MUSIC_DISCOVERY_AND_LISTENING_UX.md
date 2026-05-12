@@ -84,20 +84,22 @@ Public Playlist Pool은 이미 EMS DB에 저장된 외부 공개 플레이리스
 
 개별 트랙 데이터는 내부 후보 데이터, 검색 playlist detail 화면, DB playlist detail 화면에서만 사용하고, 기본 EMS 화면의 관리 대상 목록처럼 노출하지 않습니다.
 
-### 3-3. 검색 결과 저장 금지
+### 3-3. 검색 결과의 EMS Pool 편입
 
-사용자 검색은 provider 공개 검색 결과를 미리 보는 동작입니다.
+사용자 검색은 provider 공개 검색 결과를 EMS 후보 풀로 확장하는 동작입니다.
 
-- 검색 결과는 사용자가 별도 저장/가져오기 동작을 실행하기 전까지 EMS 테이블에 넣지 않습니다.
-- 검색 결과를 기본 EMS playlist pool과 섞지 않습니다.
-- 검색 결과 playlist의 track detail은 provider에서 즉시 조회해 재생할 수 있지만, EMS canonical data가 아닙니다.
+- 검색 결과 playlist/track metadata는 먼저 `ems_pool_*` 테이블에 적재합니다.
+- EMS POOL에 들어온 record는 Spring background worker가 event/scheduler 기반으로 `search_pool` 소스의 EMS 본 테이블에 반영합니다.
+- 일반 사용자는 검색 결과를 즉시 확인하고, 관리자만 `/ems/pool-admin`에서 POOL 적재 진행률과 실패 항목을 확인합니다.
+- 검색 결과 playlist의 track detail을 열면 provider에서 track 목록을 조회하고, 해당 playlist-track 링크도 `search_pool`에 저장합니다.
+- 검색 결과는 사용자가 연결한 provider 경계 안에서만 조회하며, 검색 단계에서 다른 provider로 교차 변환하지 않습니다.
 - EMS Public Playlist Pool에서 표시되는 playlist와 track detail은 DB에 저장된 데이터입니다.
 
 ## 4. 공개 플레이리스트 수집과 노출
 
-공개 플레이리스트는 사용자의 검색 행동으로 만들어지지 않습니다.
+공개 플레이리스트는 scheduler/import 기반 수집과 사용자 검색 기반 EMS POOL 수집으로 함께 확장됩니다.
 
-서비스가 능동적으로 provider 공개 검색 API를 호출하고, 결과 playlist와 track metadata를 EMS DB에 저장합니다.
+서비스가 능동적으로 provider 공개 검색 API를 호출하고, 결과 playlist와 track metadata를 EMS POOL에 저장한 뒤 백그라운드에서 EMS DB 본 저장소에 반영합니다.
 
 초기 수집 정책:
 

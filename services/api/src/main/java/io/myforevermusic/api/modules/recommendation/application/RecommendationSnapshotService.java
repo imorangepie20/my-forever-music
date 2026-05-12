@@ -76,7 +76,7 @@ public class RecommendationSnapshotService {
             item.artistName(),
             item.sourceSpace(),
             item.sourcePlatform(),
-            MODEL_VERSION,
+            resolveModelVersion(response),
             item.audioFeatureTrackId(),
             clamp(item.score()),
             noveltyScore(request.familiarityBias()),
@@ -95,6 +95,18 @@ public class RecommendationSnapshotService {
             return null;
         }
         return clamp(1.0d - ((Math.min(5, Math.max(1, familiarityBias)) - 1.0d) / 4.0d));
+    }
+
+    private String resolveModelVersion(GmsRecommendationPreviewResponse response) {
+        if (
+            response.context() != null
+                && response.context().engine() != null
+                && !response.context().engine().isBlank()
+                && response.context().engine().contains("sasrec:")
+        ) {
+            return response.context().engine();
+        }
+        return MODEL_VERSION;
     }
 
     private Double confidenceScore(GmsRecommendationPreviewResponse.RecommendationItem item) {

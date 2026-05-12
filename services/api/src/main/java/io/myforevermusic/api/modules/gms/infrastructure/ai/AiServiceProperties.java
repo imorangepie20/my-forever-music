@@ -9,6 +9,10 @@ import org.springframework.validation.annotation.Validated;
 public record AiServiceProperties(
     @NotBlank String baseUrl,
     @NotBlank String recommendationPreviewPath,
-    @NotBlank String emsOverviewPath
+    @NotBlank String emsOverviewPath,
+    @NotBlank String sasrecTrainingPath,
+    @NotBlank String sasrecRankingPath,
+    @NotBlank String sasrecLatestModelPath,
+    String sasrecModelVersion
 ) {
 }

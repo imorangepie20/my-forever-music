@@ -144,3 +144,17 @@ class SasrecRankingResponse(BaseModel):
     model_version: str
     ranked_candidates: list[SasrecRankedCandidate]
     warnings: list[str]
+
+
+class SasrecModelRegistryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    service: str
+    status: str
+    user_id: str | None = None
+    model_version: str | None = None
+    artifact_dir: str | None = None
+    generated_at: str | None = None
+    vocabulary_size: int | None = None
+    train_example_count: int | None = None
+    warnings: list[str]

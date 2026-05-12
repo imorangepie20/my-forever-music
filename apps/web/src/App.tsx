@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import MainLayout from './layouts/MainLayout'
 import EmsPage from './pages/EmsPage'
 import EmsPlaylistDetailPage from './pages/EmsPlaylistDetailPage'
+import EmsPoolAdminPage from './pages/EmsPoolAdminPage'
 import EmsSearchPlaylistDetailPage from './pages/EmsSearchPlaylistDetailPage'
 import GmsPreviewPage from './pages/GmsPreviewPage'
 import HomePage from './pages/HomePage'
@@ -25,6 +26,7 @@ function App() {
                     <Route path="platforms/oauth/callback" element={<PlatformOAuthCallbackPage />} />
                     <Route path="pms" element={<PmsPage />} />
                     <Route path="ems" element={<EmsPage />} />
+                    <Route path="ems/pool-admin" element={<EmsPoolAdminPage />} />
                     <Route path="gms-preview" element={<GmsPreviewPage />} />
                     <Route path="playback-harness" element={<PlaybackHarnessPage />} />
                     <Route path="ems/search/playlists/:platformId/:externalPlaylistId" element={<EmsSearchPlaylistDetailPage />} />

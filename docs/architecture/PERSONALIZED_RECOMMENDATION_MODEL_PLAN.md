@@ -278,7 +278,7 @@ feature는 원본 테이블에서 직접 조립하지 않고, 모델 입력용 s
 - 최근 많이 들은 artist의 관련 track
 - 낮은 노출 빈도의 novelty 후보
 
-검색 preview 결과는 사용자가 명시적으로 저장/가져오기 전까지 candidate store에 넣지 않습니다.
+EMS 검색 결과는 일회성 preview로 버리지 않고 EMS POOL에 먼저 적재한 뒤 `search_pool` 소스로 EMS candidate pool에 편입합니다. 검색 직후에는 playlist/track 메타데이터를 `ems_pool_*` 테이블에 저장하고, 백그라운드 worker가 event/scheduler 기반으로 EMS 본 테이블에 반영합니다. 사용자가 검색 playlist detail을 열면 해당 track 목록과 playlist-track 링크를 보강합니다. POOL 진행률과 실패 항목은 관리자 전용 `/ems/pool-admin` 화면에서 확인합니다.
 
 ### 7-2. Ranking
 
@@ -638,15 +638,23 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - SASRec MVP는 1-layer Transformer encoder로 next-item prediction을 학습하고, final loss와 leave-last-out metric을 반환
 - SASRec MVP 학습 결과를 `AI_MODEL_ARTIFACT_DIR/sasrec/{model_version}/model.pt`와 `metadata.json`으로 저장
 - 학습 응답은 recency baseline metric, SASRec metric, metric delta, artifact path를 함께 반환
+- Spring API `POST /api/v1/recommendations/datasets/users/{userId}/sasrec/train` 경로 추가
+- 이 경로는 Spring dataset exporter 결과를 AI service `/v1/recommendations/datasets/sasrec/train`에 그대로 전달해 사용자별 SASRec MVP artifact를 생성
 - AI service `POST /v1/recommendations/datasets/sasrec/rank` 후보 랭킹 경로 추가
 - rank 경로는 저장된 `model.pt`와 `metadata.json`을 로드해 context track 기준 candidate track logits를 정렬
+- AI service `GET /v1/recommendations/datasets/sasrec/models/latest` 최신 SASRec artifact 조회 경로 추가
+- Spring API GMS preview가 `AI_SASREC_MODEL_VERSION` 설정 시 AI service `POST /v1/recommendations/datasets/sasrec/rank`를 호출해 PMS 라이브러리 기반 playable 후보를 재정렬
+- `AI_SASREC_MODEL_VERSION` 미설정 시 Spring API가 사용자 기준 최신 SASRec artifact를 AI service에서 조회해 재정렬에 사용
+- SASRec 재정렬은 새 플랫폼 검색이나 외부 변환 없이, 이미 DB/PMS에 있는 candidate track id와 request seed/context track id만 사용
+- SASRec raw score는 GMS affinity score와 70:30으로 혼합하고, ranking 실패 또는 model 미설정 시 기존 GMS playable 후보 정렬로 유지
+- SASRec 적용 시 GMS response context engine과 recommendation snapshot `model_version`에 `sasrec:{model_version}`을 남겨 이후 학습 데이터에서 모델 기여도를 추적
 
 아직 남은 범위:
 
 - PMS/GMS 외 화면의 명시적 저장/좋아요/반복 재생 이벤트 확장
 - playlist-level 6축 evaluator의 API 노출과 운영 dashboard 연결
 - recency baseline 대비 metric 개선 검증 자동화
-- Spring API에서 SASRec rank endpoint 호출 연결
+- 최신 SASRec artifact 조회를 넘어서는 model registry 승격/비활성화/롤백 정책
 
 ## 14. 내부 참고 문서
 

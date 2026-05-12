@@ -34,6 +34,10 @@ const pageCopy: Record<string, { title: string; subtitle: string }> = {
         title: 'EMS Model Workspace',
         subtitle: 'Evaluate candidates against the PMS library and listening signals.',
     },
+    '/ems/pool-admin': {
+        title: 'EMS Pool Admin',
+        subtitle: 'Monitor search-result queue ingestion into the EMS collection database.',
+    },
     '/gms-preview': {
         title: 'GMS Approval Preview',
         subtitle: 'Review generated candidates, approve saves, and feed PMS learning events.',

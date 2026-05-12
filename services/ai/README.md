@@ -178,6 +178,14 @@ PyTorch SASRec MVP 학습 엔드포인트:
 
 기본적으로 `AI_MODEL_ARTIFACT_DIR/sasrec/{model_version}/` 아래에 `model.pt`와 `metadata.json`을 저장합니다. API 검증이나 임시 실행에서 파일 저장을 원하지 않으면 `persist_artifact=false` 쿼리 파라미터를 사용합니다.
 
+저장된 최신 artifact는 아래 경로에서 확인할 수 있습니다.
+
+```http
+GET /v1/recommendations/datasets/sasrec/models/latest?user_id={userId}
+```
+
+Spring API는 `AI_SASREC_MODEL_VERSION`이 비어 있을 때 이 경로를 조회해 GMS preview 재정렬에 사용할 사용자 최신 SASRec 모델을 찾습니다.
+
 SASRec MVP 후보 랭킹 엔드포인트:
 
 - 경로: `POST /v1/recommendations/datasets/sasrec/rank`

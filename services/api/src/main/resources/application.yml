@@ -68,6 +68,10 @@ app:
     base-url: ${AI_SERVICE_BASE_URL:http://127.0.0.1:8000}
     recommendation-preview-path: ${AI_RECOMMENDATION_PREVIEW_PATH:/v1/recommendations/preview}
     ems-overview-path: ${AI_EMS_OVERVIEW_PATH:/v1/ems/overview}
+    sasrec-training-path: ${AI_SASREC_TRAINING_PATH:/v1/recommendations/datasets/sasrec/train}
+    sasrec-ranking-path: ${AI_SASREC_RANKING_PATH:/v1/recommendations/datasets/sasrec/rank}
+    sasrec-latest-model-path: ${AI_SASREC_LATEST_MODEL_PATH:/v1/recommendations/datasets/sasrec/models/latest}
+    sasrec-model-version: ${AI_SASREC_MODEL_VERSION:}
   audio-features:
     reccobeats:
       enabled: ${RECCOBEATS_ENABLED:true}
