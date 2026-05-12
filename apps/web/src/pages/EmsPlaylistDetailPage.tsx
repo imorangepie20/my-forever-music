@@ -1,9 +1,10 @@
 import { startTransition, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ExternalLink, Play, RefreshCw } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Heart, Play, RefreshCw } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
 import MusicArtwork from '@/components/music/MusicArtwork'
+import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { usePlayback } from '@/contexts/PlaybackContext'
 import { toEmsTrackPlaybackItem } from '@/lib/emsPlayback'
 import {
@@ -11,7 +12,7 @@ import {
     resolveSpotifyTrackId,
     resolveTidalTrackId,
 } from '@/lib/musicPlayback'
-import { ApiError, fetchEmsCollectedPlaylistDetail } from '@/services/api'
+import { ApiError, fetchEmsCollectedPlaylistDetail, recordUserMusicEvent } from '@/services/api'
 import type { EmsCollectionPlaylistDetailResponse } from '@/types/api'
 
 const openExternal = (url?: string | null) => {
@@ -26,9 +27,12 @@ const EmsPlaylistDetailPage = () => {
     const navigate = useNavigate()
     const { playlistId } = useParams<{ playlistId: string }>()
     const { playQueue, isLoading: playbackLoading } = usePlayback()
+    const { session } = useAuthSession()
     const [detail, setDetail] = useState<EmsCollectionPlaylistDetailResponse | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [likedTrackIds, setLikedTrackIds] = useState<Set<number>>(() => new Set())
+    const [likePendingTrackId, setLikePendingTrackId] = useState<number | null>(null)
 
     useEffect(() => {
         const controller = new AbortController()
@@ -88,6 +92,39 @@ const EmsPlaylistDetailPage = () => {
         }
 
         void playQueue(playbackItems, index)
+    }
+
+    const handleLikeTrack = (track: EmsCollectionPlaylistDetailResponse['tracks'][number]) => {
+        if (!session?.userId || likedTrackIds.has(track.id) || likePendingTrackId !== null) {
+            return
+        }
+        setLikePendingTrackId(track.id)
+        void recordUserMusicEvent({
+            user_id: session.userId,
+            event_type: 'track_saved',
+            source_space: 'ems',
+            source_platform: track.source_platform,
+            item_id: String(track.id),
+            item_kind: 'track',
+            track_id: String(track.id),
+            external_track_id: track.external_track_id,
+            platform_uri: track.platform_uri,
+            title: track.title,
+            artist_name: track.artist_name,
+            album_title: track.album_title,
+            isrc: track.isrc,
+            duration_ms: track.duration_ms,
+            occurred_at: new Date().toISOString(),
+        })
+            .then(() => {
+                setLikedTrackIds((prev) => {
+                    const next = new Set(prev)
+                    next.add(track.id)
+                    return next
+                })
+            })
+            .catch(() => undefined)
+            .finally(() => setLikePendingTrackId(null))
     }
 
     if (isLoading) {
@@ -261,6 +298,23 @@ const EmsPlaylistDetailPage = () => {
                                     <span className="w-12 text-sm text-hud-text-muted">
                                         {durationLabel ?? '--:--'}
                                     </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleLikeTrack(track)}
+                                        disabled={!session?.userId || likedTrackIds.has(track.id) || likePendingTrackId === track.id}
+                                        className={`flex h-10 w-10 items-center justify-center rounded-lg transition-hud hover:bg-hud-bg-secondary disabled:cursor-not-allowed disabled:opacity-50 ${
+                                            likedTrackIds.has(track.id)
+                                                ? 'text-hud-accent-primary'
+                                                : 'text-hud-text-secondary hover:text-hud-text-primary'
+                                        }`}
+                                        aria-label={likedTrackIds.has(track.id) ? `Liked ${track.title}` : `Save ${track.title}`}
+                                        aria-pressed={likedTrackIds.has(track.id)}
+                                    >
+                                        <Heart
+                                            size={17}
+                                            fill={likedTrackIds.has(track.id) ? 'currentColor' : 'none'}
+                                        />
+                                    </button>
                                     {track.platform_external_url && (
                                         <button
                                             type="button"

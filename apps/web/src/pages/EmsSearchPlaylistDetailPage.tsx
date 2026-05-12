@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useState } from 'react'
-import { ArrowLeft, ExternalLink, Play, RefreshCw } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Heart, Play, RefreshCw } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
@@ -14,7 +14,7 @@ import {
 import {
     formatDuration,
 } from '@/lib/musicPlayback'
-import { ApiError, fetchEmsSearchPlaylistTracks } from '@/services/api'
+import { ApiError, fetchEmsSearchPlaylistTracks, recordUserMusicEvent } from '@/services/api'
 import type { EmsCollectionSearchPlaylistItem, EmsCollectionSearchTrackItem } from '@/types/api'
 
 const openExternal = (url?: string | null) => {
@@ -53,6 +53,8 @@ const EmsSearchPlaylistDetailPage = () => {
     const [trackCount, setTrackCount] = useState(() => playlist?.track_count ?? 0)
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [likedTrackKeys, setLikedTrackKeys] = useState<Set<string>>(() => new Set())
+    const [likePendingTrackKey, setLikePendingTrackKey] = useState<string | null>(null)
 
     useEffect(() => {
         const controller = new AbortController()
@@ -112,6 +114,41 @@ const EmsSearchPlaylistDetailPage = () => {
         if (playbackItems[index]) {
             void playQueue(playbackItems, index)
         }
+    }
+
+    const trackKey = (track: EmsCollectionSearchTrackItem) => `${track.source_platform}:${track.external_track_id}`
+
+    const handleLikeTrack = (track: EmsCollectionSearchTrackItem) => {
+        const key = trackKey(track)
+        if (!session?.userId || likedTrackKeys.has(key) || likePendingTrackKey !== null) {
+            return
+        }
+        setLikePendingTrackKey(key)
+        void recordUserMusicEvent({
+            user_id: session.userId,
+            event_type: 'track_saved',
+            source_space: 'ems',
+            source_platform: track.source_platform,
+            item_id: track.external_track_id,
+            item_kind: 'track',
+            external_track_id: track.external_track_id,
+            platform_uri: track.platform_uri,
+            title: track.title,
+            artist_name: track.artist_name,
+            album_title: track.album_title,
+            isrc: track.isrc,
+            duration_ms: track.duration_ms,
+            occurred_at: new Date().toISOString(),
+        })
+            .then(() => {
+                setLikedTrackKeys((prev) => {
+                    const next = new Set(prev)
+                    next.add(key)
+                    return next
+                })
+            })
+            .catch(() => undefined)
+            .finally(() => setLikePendingTrackKey(null))
     }
 
     if (isLoading) {
@@ -273,6 +310,27 @@ const EmsSearchPlaylistDetailPage = () => {
                                     <span className="w-12 text-sm text-hud-text-muted">
                                         {durationLabel ?? '--:--'}
                                     </span>
+                                    {(() => {
+                                        const key = trackKey(track)
+                                        const liked = likedTrackKeys.has(key)
+                                        const pending = likePendingTrackKey === key
+                                        return (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleLikeTrack(track)}
+                                                disabled={!session?.userId || liked || pending}
+                                                className={`flex h-10 w-10 items-center justify-center rounded-lg transition-hud hover:bg-hud-bg-secondary disabled:cursor-not-allowed disabled:opacity-50 ${
+                                                    liked
+                                                        ? 'text-hud-accent-primary'
+                                                        : 'text-hud-text-secondary hover:text-hud-text-primary'
+                                                }`}
+                                                aria-label={liked ? `Liked ${track.title}` : `Save ${track.title}`}
+                                                aria-pressed={liked}
+                                            >
+                                                <Heart size={17} fill={liked ? 'currentColor' : 'none'} />
+                                            </button>
+                                        )
+                                    })()}
                                     {track.platform_external_url && (
                                         <button
                                             type="button"

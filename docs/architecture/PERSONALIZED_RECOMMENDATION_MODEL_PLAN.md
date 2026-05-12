@@ -650,10 +650,10 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - SASRec 적용 시 GMS response context engine과 recommendation snapshot `model_version`에 `sasrec:{model_version}`을 남겨 이후 학습 데이터에서 모델 기여도를 추적
 - 공통 플레이어 TIDAL repeat-one 자동 재시작 시점에 `replay` 이벤트를 적재해 반복 재생 신호를 학습 데이터에 포함
 - 공통 플레이어 Spotify 재생 경로에서 SDK state change의 직전/현재 비교(직전 position이 duration의 95% 이상)로 `play_completed`를 적재하고, 같은 트랙이 0초 근처에서 재개되면 `replay`도 적재
+- EMS playlist detail, EMS 검색 playlist detail, PMS playlist detail 화면의 track row에 하트 모양 like 버튼을 노출하고, 누르면 `track_saved` 이벤트를 `source_space=ems` 또는 `source_space=pms`로 적재 (현재는 학습 신호용. 라이브러리 저장 흐름과는 별개 — PMS personal playlist 추가는 `added_to_playlist`로 분리)
 
 아직 남은 범위:
 
-- EMS/PMS playlist detail 화면의 명시적 저장/좋아요 액션과 그에 따른 `track_saved` 이벤트 적재
 - playlist-level 6축 evaluator의 API 노출과 운영 dashboard 연결
 - recency baseline 대비 metric 개선 검증 자동화
 - 최신 SASRec artifact 조회를 넘어서는 model registry 승격/비활성화/롤백 정책
