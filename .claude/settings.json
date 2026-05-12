@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git status --porcelain 2>/dev/null | head -30 | jq -Rsc 'select(length > 0) | {systemMessage: (\"[end-of-task] uncommitted changes:\\n\" + . + \"\\n진척 문서(README.md, docs/PROJECT_GUIDE.md) 업데이트 후 commit 제안 필요. push는 사용자 명시 지시 시에만.\")}'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
