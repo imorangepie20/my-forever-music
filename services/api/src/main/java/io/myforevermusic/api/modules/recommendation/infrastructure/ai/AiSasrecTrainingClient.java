@@ -142,6 +142,7 @@ public class AiSasrecTrainingClient {
         Map<String, Object> metrics,
         Map<String, Object> baselineMetrics,
         Map<String, Object> metricDelta,
+        Map<String, Object> qualification,
         Map<String, Object> modelArtifact,
         List<Map<String, Object>> evaluationExamples,
         List<String> warnings

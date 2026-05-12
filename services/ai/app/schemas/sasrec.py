@@ -93,6 +93,14 @@ class SasrecMetricDelta(BaseModel):
     ndcg_at_k: float
 
 
+class SasrecMetricQualification(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    qualified: bool
+    threshold: float
+    reason: str
+
+
 class SasrecModelArtifact(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -113,6 +121,7 @@ class SasrecTrainingResponse(BaseModel):
     metrics: SasrecOfflineMetrics
     baseline_metrics: SasrecOfflineMetrics
     metric_delta: SasrecMetricDelta
+    qualification: SasrecMetricQualification
     model_artifact: SasrecModelArtifact
     evaluation_examples: list[SasrecEvaluationExample]
     warnings: list[str]

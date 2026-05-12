@@ -13,6 +13,7 @@ from app.schemas.recommendation_dataset import RecommendationDatasetImportReques
 from app.schemas.sasrec import (
     SasrecEvaluationExample,
     SasrecMetricDelta,
+    SasrecMetricQualification,
     SasrecModelArtifact,
     SasrecOfflineMetrics,
     SasrecTrainingExample,
@@ -107,8 +108,15 @@ class SasrecTrainingService:
 
         metrics = self._compute_metrics(predictions, resolved_k)
         metric_delta = self._metric_delta(metrics, baseline_report.metrics)
+        qualification = self._evaluate_qualification(
+            metric_delta,
+            train_example_count=len(train_examples),
+            evaluation_example_count=len(predictions),
+        )
         if evaluation_examples and not predictions:
             warnings.append("SASRec MVP evaluation skipped because no model was trained.")
+        if not qualification.qualified:
+            warnings.append(qualification.reason)
 
         return SasrecTrainingResponse(
             service="sasrec-mvp-training",
@@ -127,6 +135,7 @@ class SasrecTrainingService:
             metrics=metrics,
             baseline_metrics=baseline_report.metrics,
             metric_delta=metric_delta,
+            qualification=qualification,
             model_artifact=artifact,
             evaluation_examples=predictions,
             warnings=warnings,
@@ -277,6 +286,52 @@ class SasrecTrainingService:
             hit_rate_at_k=round(metrics.hit_rate_at_k - baseline_metrics.hit_rate_at_k, 4),
             mrr_at_k=round(metrics.mrr_at_k - baseline_metrics.mrr_at_k, 4),
             ndcg_at_k=round(metrics.ndcg_at_k - baseline_metrics.ndcg_at_k, 4),
+        )
+
+    def _evaluate_qualification(
+        self,
+        delta: SasrecMetricDelta,
+        train_example_count: int,
+        evaluation_example_count: int,
+    ) -> SasrecMetricQualification:
+        threshold = 0.0
+        if train_example_count == 0 or evaluation_example_count == 0:
+            return SasrecMetricQualification(
+                qualified=False,
+                threshold=threshold,
+                reason="SASRec was not trained or evaluated (insufficient data).",
+            )
+
+        regressions: list[str] = []
+        if delta.hit_rate_at_k < threshold:
+            regressions.append(f"hit_rate_at_k {delta.hit_rate_at_k:+.4f}")
+        if delta.mrr_at_k < threshold:
+            regressions.append(f"mrr_at_k {delta.mrr_at_k:+.4f}")
+        if delta.ndcg_at_k < threshold:
+            regressions.append(f"ndcg_at_k {delta.ndcg_at_k:+.4f}")
+
+        if regressions:
+            return SasrecMetricQualification(
+                qualified=False,
+                threshold=threshold,
+                reason=f"SASRec underperforms recency baseline on {', '.join(regressions)}.",
+            )
+
+        improvements = [
+            value
+            for value in (delta.hit_rate_at_k, delta.mrr_at_k, delta.ndcg_at_k)
+            if value > threshold
+        ]
+        if improvements:
+            return SasrecMetricQualification(
+                qualified=True,
+                threshold=threshold,
+                reason="SASRec improves at least one metric over recency baseline without regression.",
+            )
+        return SasrecMetricQualification(
+            qualified=True,
+            threshold=threshold,
+            reason="SASRec matches recency baseline on all metrics (no regression, no improvement).",
         )
 
     def _model_version(

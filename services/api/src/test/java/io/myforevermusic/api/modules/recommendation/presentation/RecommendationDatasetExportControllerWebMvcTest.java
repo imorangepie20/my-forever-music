@@ -83,6 +83,7 @@ class RecommendationDatasetExportControllerWebMvcTest {
             Map.of("hit_rate_at_k", 0.5d),
             Map.of("hit_rate_at_k", 0.25d),
             Map.of("hit_rate_at_k", 0.25d),
+            Map.of("qualified", true, "threshold", 0.0d, "reason", "test fixture qualified"),
             Map.of("saved", true),
             List.of()
         ));

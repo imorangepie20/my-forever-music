@@ -17,6 +17,7 @@ public record RecommendationModelTrainingResponse(
     Map<String, Object> metrics,
     Map<String, Object> baselineMetrics,
     Map<String, Object> metricDelta,
+    Map<String, Object> qualification,
     Map<String, Object> modelArtifact,
     List<String> warnings
 ) {
@@ -41,6 +42,7 @@ public record RecommendationModelTrainingResponse(
             trainingResponse.metrics(),
             trainingResponse.baselineMetrics(),
             trainingResponse.metricDelta(),
+            trainingResponse.qualification(),
             trainingResponse.modelArtifact(),
             trainingResponse.warnings()
         );

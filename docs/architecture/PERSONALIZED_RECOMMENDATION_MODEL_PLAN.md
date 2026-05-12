@@ -653,6 +653,7 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - EMS playlist detail, EMS 검색 playlist detail, PMS playlist detail 화면의 track row에 하트 모양 like 버튼을 노출하고, 누르면 `track_saved` 이벤트를 `source_space=ems` 또는 `source_space=pms`로 적재 (현재는 학습 신호용. 라이브러리 저장 흐름과는 별개 — PMS personal playlist 추가는 `added_to_playlist`로 분리)
 - 관리자 전용 `GET /api/v1/recommendations/admin/playlist-quality/recent` endpoint를 통해 recent recommendation snapshot을 `recommendation_id`로 그룹화하고 affinity/novelty/confidence는 그룹 평균, coherence/diversity/redundancy는 playlist-level 값으로 6축 quality summary를 조회
 - 관리자 전용 `/recommendations/quality-admin` 화면에 6축 평균 카드와 최근 추천 playlist별 점수 테이블을 표시 (Sidebar admin 메뉴 등록)
+- AI service SASRec MVP 학습 응답에 `qualification`(qualified bool, threshold, reason) 자동 평가를 추가하고 Spring API/training 응답까지 통과해, recency baseline 대비 회귀가 없을 때만 qualified=true로 표시 (회귀 시 warnings에도 reason 적재)
 
 아직 남은 범위:
 - recency baseline 대비 metric 개선 검증 자동화
