@@ -291,8 +291,10 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
         }
 
         let nextIndex = currentIndexRef.current + 1
+        let isReplay = false
         if (repeatModeRef.current === 'one') {
             nextIndex = currentIndexRef.current
+            isReplay = true
         } else if (nextIndex >= nextQueue.length && repeatModeRef.current === 'all') {
             nextIndex = 0
         }
@@ -301,6 +303,10 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
         if (!session?.userId || !nextItem) {
             setIsPlaying(false)
             return
+        }
+
+        if (isReplay) {
+            recordPlaybackEvent('replay', nextItem, { positionMs: 0 })
         }
 
         setPositionMs(0)

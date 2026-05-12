@@ -648,10 +648,12 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - SASRec 재정렬은 새 플랫폼 검색이나 외부 변환 없이, 이미 DB/PMS에 있는 candidate track id와 request seed/context track id만 사용
 - SASRec raw score는 GMS affinity score와 70:30으로 혼합하고, ranking 실패 또는 model 미설정 시 기존 GMS playable 후보 정렬로 유지
 - SASRec 적용 시 GMS response context engine과 recommendation snapshot `model_version`에 `sasrec:{model_version}`을 남겨 이후 학습 데이터에서 모델 기여도를 추적
+- 공통 플레이어 TIDAL repeat-one 자동 재시작 시점에 `replay` 이벤트를 적재해 반복 재생 신호를 학습 데이터에 포함
 
 아직 남은 범위:
 
-- PMS/GMS 외 화면의 명시적 저장/좋아요/반복 재생 이벤트 확장
+- Spotify 재생 경로의 트랙 종료/auto-replay 감지 (`play_completed`, `replay` 누락)
+- EMS/PMS playlist detail 화면의 명시적 저장/좋아요 액션과 그에 따른 `track_saved` 이벤트 적재
 - playlist-level 6축 evaluator의 API 노출과 운영 dashboard 연결
 - recency baseline 대비 metric 개선 검증 자동화
 - 최신 SASRec artifact 조회를 넘어서는 model registry 승격/비활성화/롤백 정책
