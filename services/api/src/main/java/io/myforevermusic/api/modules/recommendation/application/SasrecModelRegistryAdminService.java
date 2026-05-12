@@ -3,6 +3,9 @@ package io.myforevermusic.api.modules.recommendation.application;
 import io.myforevermusic.api.modules.auth.application.AuthAccountStore;
 import io.myforevermusic.api.modules.recommendation.infrastructure.ai.AiSasrecRegistryClient;
 import io.myforevermusic.api.modules.recommendation.infrastructure.ai.AiSasrecRegistryClient.SasrecRegistryResponse;
+import io.myforevermusic.api.modules.recommendation.infrastructure.ai.AiSasrecTrainingClient;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -14,13 +17,17 @@ public class SasrecModelRegistryAdminService {
 
     private final AiSasrecRegistryClient registryClient;
     private final AuthAccountStore authAccountStore;
+    private final RecommendationModelTrainingService trainingService;
 
+    @Autowired
     public SasrecModelRegistryAdminService(
         AiSasrecRegistryClient registryClient,
-        AuthAccountStore authAccountStore
+        AuthAccountStore authAccountStore,
+        @Lazy RecommendationModelTrainingService trainingService
     ) {
         this.registryClient = registryClient;
         this.authAccountStore = authAccountStore;
+        this.trainingService = trainingService;
     }
 
     public SasrecRegistryResponse latest(String adminUserId) {
@@ -47,6 +54,16 @@ public class SasrecModelRegistryAdminService {
     public SasrecRegistryResponse rollback(String adminUserId) {
         assertAdmin(adminUserId);
         return registryClient.rollback(adminUserId);
+    }
+
+    public RecommendationModelTrainingService.AutoTrainResult autoTrainAndPromote(
+        String adminUserId,
+        Integer eventLimit,
+        Integer snapshotLimit,
+        AiSasrecTrainingClient.SasrecTrainingOptions trainingOptions
+    ) {
+        assertAdmin(adminUserId);
+        return trainingService.autoTrainAndPromote(adminUserId, eventLimit, snapshotLimit, trainingOptions);
     }
 
     private void assertAdmin(String userId) {

@@ -2,8 +2,10 @@ package io.myforevermusic.api.modules.recommendation.presentation;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import io.myforevermusic.api.modules.recommendation.application.RecommendationModelTrainingService;
 import io.myforevermusic.api.modules.recommendation.application.SasrecModelRegistryAdminService;
 import io.myforevermusic.api.modules.recommendation.infrastructure.ai.AiSasrecRegistryClient.SasrecRegistryResponse;
+import io.myforevermusic.api.modules.recommendation.infrastructure.ai.AiSasrecTrainingClient;
 import io.swagger.v3.oas.annotations.Operation;
 import java.time.Instant;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,6 +55,36 @@ public class SasrecModelRegistryAdminController {
         return SasrecRegistryAdminResponse.from(adminService.rollback(userId));
     }
 
+    @Operation(summary = "Run a SASRec training pass and auto-promote when qualified")
+    @PostMapping("/auto-train")
+    public SasrecAutoTrainAdminResponse autoTrain(
+        @RequestParam("user_id") String userId,
+        @RequestParam(value = "event_limit", required = false) Integer eventLimit,
+        @RequestParam(value = "snapshot_limit", required = false) Integer snapshotLimit,
+        @RequestParam(value = "max_context_length", defaultValue = "32") int maxContextLength,
+        @RequestParam(value = "k", defaultValue = "10") int k,
+        @RequestParam(value = "epochs", defaultValue = "30") int epochs,
+        @RequestParam(value = "hidden_size", defaultValue = "32") int hiddenSize,
+        @RequestParam(value = "learning_rate", defaultValue = "0.01") double learningRate,
+        @RequestParam(value = "persist_artifact", defaultValue = "true") boolean persistArtifact
+    ) {
+        AiSasrecTrainingClient.SasrecTrainingOptions options = new AiSasrecTrainingClient.SasrecTrainingOptions(
+            maxContextLength,
+            k,
+            epochs,
+            hiddenSize,
+            learningRate,
+            persistArtifact
+        );
+        RecommendationModelTrainingService.AutoTrainResult result = adminService.autoTrainAndPromote(
+            userId,
+            eventLimit,
+            snapshotLimit,
+            options
+        );
+        return SasrecAutoTrainAdminResponse.from(result);
+    }
+
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record SasrecRegistryAdminResponse(
         String service,
@@ -78,6 +110,36 @@ public class SasrecModelRegistryAdminController {
                 response.vocabularySize(),
                 response.trainExampleCount(),
                 response.warnings() == null ? java.util.List.of() : response.warnings()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record SasrecAutoTrainAdminResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        boolean qualified,
+        boolean promoted,
+        String modelVersion,
+        String summary,
+        RecommendationModelTrainingResponse training,
+        SasrecRegistryAdminResponse promoteResult
+    ) {
+        static SasrecAutoTrainAdminResponse from(RecommendationModelTrainingService.AutoTrainResult result) {
+            SasrecRegistryAdminResponse promoteResult = result.promoteResult() == null
+                ? null
+                : SasrecRegistryAdminResponse.from(result.promoteResult());
+            return new SasrecAutoTrainAdminResponse(
+                "api",
+                "ok",
+                Instant.now(),
+                result.qualified(),
+                promoteResult != null,
+                result.training().modelVersion(),
+                result.summary(),
+                result.training(),
+                promoteResult
             );
         }
     }

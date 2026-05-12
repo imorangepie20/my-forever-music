@@ -1064,6 +1064,25 @@ export interface SasrecRegistryAdminResponse {
     warnings: string[]
 }
 
+export interface SasrecAutoTrainAdminResponse {
+    service: string
+    status: string
+    generated_at: string
+    qualified: boolean
+    promoted: boolean
+    model_version: string | null
+    summary: string
+    training: {
+        model_version: string | null
+        metrics?: { hit_rate_at_k?: number; mrr_at_k?: number; ndcg_at_k?: number }
+        baseline_metrics?: { hit_rate_at_k?: number; mrr_at_k?: number; ndcg_at_k?: number }
+        metric_delta?: { hit_rate_at_k?: number; mrr_at_k?: number; ndcg_at_k?: number }
+        qualification?: { qualified?: boolean; threshold?: number; reason?: string }
+        warnings?: string[]
+    }
+    promote_result: SasrecRegistryAdminResponse | null
+}
+
 export interface EmsCollectionPlaylistItem {
     id: number
     external_playlist_id: string

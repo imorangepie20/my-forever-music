@@ -659,7 +659,7 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 
 §13-5 첫 단계 운영 범위가 닫힘. 후속 강화 항목:
 
-- 사용자별 음악 학습 모델의 sequence encoder 재학습 자동화(주기적 batch + drift 감지)
+- 사용자별 음악 학습 모델의 sequence encoder 재학습 자동화 — 1차 적용: `RecommendationModelTrainingService.autoTrainAndPromote(adminUserId)`가 train 후 qualification=true 이면 `SasrecModelRegistryAdminService.promote`를 호출해 active model 로 자동 승격. 관리자 전용 `POST /api/v1/recommendations/admin/sasrec/models/auto-train` endpoint와 `/recommendations/sasrec-admin` 화면의 Auto-Train 버튼으로 노출. 다음 단계로 주기적 batch scheduler + drift 감지가 남아 있음.
 - ISRC 보강 큐, MusicBrainz/Wikidata/Discogs identity candidate 저장 등 Phase 2 metadata normalization 진입
 - ~~recommendation snapshot에 explanation/axis evidence를 더해 사용자에게 노출할 reason 텍스트 안정화~~ → Spring GMS preview response의 `RecommendationItem`에 `axis_evidence`(affinity/novelty/coherence/diversity/redundancy/confidence 각 6축의 score/level/한국어 summary)를 추가하고, 프론트 GMS Preview 카드 아래에 axis별 짧은 evidence 패널을 노출.
 - recency baseline 대비 metric 개선 검증 자동화

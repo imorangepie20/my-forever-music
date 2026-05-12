@@ -41,6 +41,7 @@ import type {
     EmsPoolAdminRunDetailResponse,
     EmsPoolAdminRunsResponse,
     PlaylistQualityRecentResponse,
+    SasrecAutoTrainAdminResponse,
     SasrecRegistryAdminResponse,
     EmsOverviewRequest,
     EmsOverviewResponse,
@@ -467,6 +468,12 @@ export const disableSasrecModelForAdmin = (userId: string, modelVersion: string)
 export const rollbackSasrecModelForAdmin = (userId: string) =>
     requestJson<SasrecRegistryAdminResponse>(
         `/api/v1/recommendations/admin/sasrec/models/rollback?user_id=${encodeURIComponent(userId)}`,
+        { method: 'POST' },
+    )
+
+export const autoTrainSasrecForAdmin = (userId: string) =>
+    requestJson<SasrecAutoTrainAdminResponse>(
+        `/api/v1/recommendations/admin/sasrec/models/auto-train?user_id=${encodeURIComponent(userId)}`,
         { method: 'POST' },
     )
 

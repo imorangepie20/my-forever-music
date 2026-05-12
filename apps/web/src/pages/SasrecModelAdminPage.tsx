@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, BadgeCheck, BoxSelect, RefreshCw, RotateCcw, ShieldCheck, Undo2 } from 'lucide-react'
+import { AlertTriangle, BadgeCheck, BoxSelect, RefreshCw, RotateCcw, ShieldCheck, Sparkles, Undo2 } from 'lucide-react'
 import Button from '@/components/common/Button'
 import ConfirmDialog from '@/components/common/ConfirmDialog'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
 import {
+    autoTrainSasrecForAdmin,
     disableSasrecModelForAdmin,
     fetchLatestSasrecModelForAdmin,
     promoteSasrecModelForAdmin,
     rollbackSasrecModelForAdmin,
 } from '@/services/api'
-import type { SasrecRegistryAdminResponse } from '@/types/api'
+import type { SasrecAutoTrainAdminResponse, SasrecRegistryAdminResponse } from '@/types/api'
 
 const ADMIN_EMAIL = 'jowoosungtidal@gmail.com'
 
@@ -30,6 +31,7 @@ type PendingAction =
     | { kind: 'promote'; modelVersion: string }
     | { kind: 'disable'; modelVersion: string }
     | { kind: 'rollback' }
+    | { kind: 'autoTrain' }
 
 const SasrecModelAdminPage = () => {
     const { session } = useAuthSession()
@@ -40,6 +42,7 @@ const SasrecModelAdminPage = () => {
     const [notice, setNotice] = useState<string | null>(null)
     const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
     const [versionInput, setVersionInput] = useState('')
+    const [autoTrainResult, setAutoTrainResult] = useState<SasrecAutoTrainAdminResponse | null>(null)
 
     const isAdmin = session?.email.toLowerCase() === ADMIN_EMAIL
 
@@ -76,6 +79,18 @@ const SasrecModelAdminPage = () => {
         setError(null)
         setNotice(null)
         try {
+            if (pendingAction.kind === 'autoTrain') {
+                const result = await autoTrainSasrecForAdmin(session.userId)
+                setAutoTrainResult(result)
+                setNotice(result.summary)
+                if (result.promote_result) {
+                    setRegistry(result.promote_result)
+                } else {
+                    await load()
+                }
+                setPendingAction(null)
+                return
+            }
             let response: SasrecRegistryAdminResponse
             if (pendingAction.kind === 'promote') {
                 response = await promoteSasrecModelForAdmin(session.userId, pendingAction.modelVersion)
@@ -143,7 +158,37 @@ const SasrecModelAdminPage = () => {
         if (pendingAction.kind === 'disable') {
             return `${pendingAction.modelVersion}을 disable 합니다.\nactive 였다면 직전 history 항목으로 자동 교체됩니다.`
         }
+        if (pendingAction.kind === 'autoTrain') {
+            return '관리자 계정 기준 SASRec MVP 학습을 한 번 실행하고, qualification=true 이면 자동으로 active model 로 promote 합니다.\n학습 시간이 30초~몇 분 소요될 수 있습니다.'
+        }
         return 'rollback history의 가장 최근 항목을 active로 되돌립니다.\nhistory가 비어 있으면 실패합니다.'
+    }
+
+    const dialogTitle = () => {
+        switch (pendingAction?.kind) {
+            case 'promote': return 'SASRec 모델 promote'
+            case 'disable': return 'SASRec 모델 disable'
+            case 'rollback': return 'SASRec 모델 rollback'
+            case 'autoTrain': return 'SASRec auto-train & promote'
+            default: return ''
+        }
+    }
+
+    const dialogConfirmLabel = () => {
+        switch (pendingAction?.kind) {
+            case 'promote': return 'Promote'
+            case 'disable': return 'Disable'
+            case 'rollback': return 'Rollback'
+            case 'autoTrain': return 'Train'
+            default: return '확인'
+        }
+    }
+
+    const dialogVariant = (): 'primary' | 'danger' => {
+        if (pendingAction?.kind === 'promote' || pendingAction?.kind === 'autoTrain') {
+            return 'primary'
+        }
+        return 'danger'
     }
 
     return (
@@ -230,6 +275,15 @@ const SasrecModelAdminPage = () => {
                             <Undo2 size={16} />
                             Rollback
                         </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setPendingAction({ kind: 'autoTrain' })}
+                            disabled={busy}
+                        >
+                            <Sparkles size={16} />
+                            Auto-Train
+                        </Button>
                     </div>
                     <p className="mt-4 text-xs leading-6 text-hud-text-muted">
                         promote는 history에 직전 active를 push 합니다.<br />
@@ -241,17 +295,11 @@ const SasrecModelAdminPage = () => {
 
             <ConfirmDialog
                 open={pendingAction !== null}
-                title={
-                    pendingAction?.kind === 'promote'
-                        ? 'SASRec 모델 promote'
-                        : pendingAction?.kind === 'disable'
-                            ? 'SASRec 모델 disable'
-                            : 'SASRec 모델 rollback'
-                }
+                title={dialogTitle()}
                 description={dialogDescription()}
-                confirmLabel={pendingAction?.kind === 'rollback' ? 'Rollback' : pendingAction?.kind === 'disable' ? 'Disable' : 'Promote'}
+                confirmLabel={dialogConfirmLabel()}
                 cancelLabel="취소"
-                variant={pendingAction?.kind === 'promote' ? 'primary' : 'danger'}
+                variant={dialogVariant()}
                 loading={busy}
                 onConfirm={() => void runPending()}
                 onCancel={() => {
@@ -260,6 +308,48 @@ const SasrecModelAdminPage = () => {
                     }
                 }}
             />
+
+            {autoTrainResult && (
+                <section className="rounded-2xl border border-hud-border-secondary bg-hud-bg-secondary/80 p-6">
+                    <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                        Auto-Train 결과
+                    </p>
+                    <p className="mt-2 break-all text-base font-semibold text-hud-text-primary">
+                        {autoTrainResult.summary}
+                    </p>
+                    <dl className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+                        <Field
+                            label="Qualified"
+                            value={autoTrainResult.qualified ? 'yes' : 'no'}
+                        />
+                        <Field
+                            label="Promoted"
+                            value={autoTrainResult.promoted ? 'yes' : 'no'}
+                        />
+                        <Field
+                            label="Model"
+                            value={autoTrainResult.model_version ?? '-'}
+                            multiline
+                        />
+                        <Field
+                            label="Hit@K Δ"
+                            value={autoTrainResult.training.metric_delta?.hit_rate_at_k?.toFixed(4) ?? '-'}
+                        />
+                    </dl>
+                    {autoTrainResult.training.qualification?.reason && (
+                        <p className="mt-3 text-xs text-hud-text-secondary">
+                            {autoTrainResult.training.qualification.reason}
+                        </p>
+                    )}
+                    {autoTrainResult.training.warnings && autoTrainResult.training.warnings.length > 0 && (
+                        <ul className="mt-3 space-y-1 rounded-xl border border-amber-300/30 bg-amber-300/10 p-3 text-xs text-amber-100">
+                            {autoTrainResult.training.warnings.map((warning, idx) => (
+                                <li key={`${warning}-${idx}`}>{warning}</li>
+                            ))}
+                        </ul>
+                    )}
+                </section>
+            )}
 
             <p className="text-xs text-hud-text-muted">
                 <RotateCcw size={12} className="mr-1 inline" />
