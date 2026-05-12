@@ -109,6 +109,33 @@ def get_latest_sasrec_model(user_id: str | None = None) -> SasrecModelRegistryRe
 
 
 @router.post(
+    "/sasrec/models/{model_version}/promote",
+    response_model=SasrecModelRegistryResponse,
+    summary="Promote a SASRec artifact as the active model for a user",
+)
+def promote_sasrec_model(model_version: str, user_id: str) -> SasrecModelRegistryResponse:
+    return model_registry_service.promote(user_id=user_id, model_version=model_version)
+
+
+@router.post(
+    "/sasrec/models/{model_version}/disable",
+    response_model=SasrecModelRegistryResponse,
+    summary="Disable a SASRec artifact so it is no longer eligible for serving",
+)
+def disable_sasrec_model(model_version: str, user_id: str) -> SasrecModelRegistryResponse:
+    return model_registry_service.disable(user_id=user_id, model_version=model_version)
+
+
+@router.post(
+    "/sasrec/models/rollback",
+    response_model=SasrecModelRegistryResponse,
+    summary="Roll back the active SASRec artifact to the previously promoted version",
+)
+def rollback_sasrec_model(user_id: str) -> SasrecModelRegistryResponse:
+    return model_registry_service.rollback(user_id=user_id)
+
+
+@router.post(
     "/sasrec/rank",
     response_model=SasrecRankingResponse,
     summary="Load a persisted SASRec MVP artifact and rank candidate tracks",

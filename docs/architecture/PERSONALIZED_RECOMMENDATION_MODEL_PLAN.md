@@ -654,8 +654,11 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - 관리자 전용 `GET /api/v1/recommendations/admin/playlist-quality/recent` endpoint를 통해 recent recommendation snapshot을 `recommendation_id`로 그룹화하고 affinity/novelty/confidence는 그룹 평균, coherence/diversity/redundancy는 playlist-level 값으로 6축 quality summary를 조회
 - 관리자 전용 `/recommendations/quality-admin` 화면에 6축 평균 카드와 최근 추천 playlist별 점수 테이블을 표시 (Sidebar admin 메뉴 등록)
 - AI service SASRec MVP 학습 응답에 `qualification`(qualified bool, threshold, reason) 자동 평가를 추가하고 Spring API/training 응답까지 통과해, recency baseline 대비 회귀가 없을 때만 qualified=true로 표시 (회귀 시 warnings에도 reason 적재)
+- AI service `SasrecModelRegistryService`에 `registry.json` 기반 promote/disable/rollback/latest 정책을 추가하고, `POST /v1/recommendations/datasets/sasrec/models/{version}/promote`, `.../disable`, `POST .../models/rollback` 엔드포인트로 노출 (latest_model은 promoted 우선 + disabled 제외 시간순 정렬)
 
 아직 남은 범위:
+
+- Spring API와 운영 admin UI에 promote/disable/rollback 액션 노출
 - recency baseline 대비 metric 개선 검증 자동화
 - 최신 SASRec artifact 조회를 넘어서는 model registry 승격/비활성화/롤백 정책
 
