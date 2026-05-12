@@ -136,7 +136,7 @@ const Sidebar = ({ collapsed, open, onClose, onCollapseToggle }: SidebarProps) =
                     </div>
                 </div>
 
-                <nav className="flex-1 px-3 py-5">
+                <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-5">
                     <div className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-hud-text-muted">
                         {!collapsed ? 'Workspace' : 'WS'}
                     </div>
