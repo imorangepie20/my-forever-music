@@ -3,14 +3,18 @@ package io.myforevermusic.api.modules.recommendation.presentation;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.myforevermusic.api.modules.recommendation.application.MetadataNormalizationAdminService;
+import io.myforevermusic.api.modules.recommendation.application.MetadataNormalizationAdminService.LookupResult;
+import io.myforevermusic.api.modules.recommendation.application.TrackIdentityCandidateStore;
 import io.myforevermusic.api.modules.recommendation.infrastructure.musicbrainz.MusicBrainzClient.MusicBrainzArtistCredit;
 import io.myforevermusic.api.modules.recommendation.infrastructure.musicbrainz.MusicBrainzClient.MusicBrainzRecording;
-import io.myforevermusic.api.modules.recommendation.infrastructure.musicbrainz.MusicBrainzClient.MusicBrainzRecordingSearchResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,10 +35,11 @@ public class MetadataNormalizationAdminController {
         @RequestParam("user_id") String userId,
         @RequestParam("title") String title,
         @RequestParam(value = "artist", required = false) String artist,
-        @RequestParam(value = "limit", defaultValue = "10") int limit
+        @RequestParam(value = "limit", defaultValue = "10") int limit,
+        @RequestParam(value = "persist", defaultValue = "false") boolean persist
     ) {
-        MusicBrainzRecordingSearchResponse response = adminService.lookupMusicBrainz(userId, title, artist, limit);
-        List<MetadataLookupCandidate> candidates = Optional.ofNullable(response.recordings())
+        LookupResult result = adminService.lookupMusicBrainz(userId, title, artist, limit, persist);
+        List<MetadataLookupCandidate> candidates = Optional.ofNullable(result.response().recordings())
             .orElse(List.of())
             .stream()
             .map(MetadataLookupCandidate::from)
@@ -45,9 +50,56 @@ public class MetadataNormalizationAdminController {
             Instant.now(),
             title,
             artist,
-            response.count() == null ? candidates.size() : response.count(),
-            candidates
+            result.response().count() == null ? candidates.size() : result.response().count(),
+            candidates,
+            result.savedCandidates().stream().map(CandidateItem::from).toList()
         );
+    }
+
+    @Operation(summary = "List recent track identity candidates (filter by status)")
+    @GetMapping("/candidates")
+    public CandidateListResponse listCandidates(
+        @RequestParam("user_id") String userId,
+        @RequestParam(value = "status", required = false) String status,
+        @RequestParam(value = "limit", defaultValue = "30") int limit
+    ) {
+        List<TrackIdentityCandidateStore.Entry> entries = adminService.listCandidates(userId, status, limit);
+        return new CandidateListResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            entries.stream().map(CandidateItem::from).toList()
+        );
+    }
+
+    @Operation(summary = "Accept a track identity candidate")
+    @PostMapping("/candidates/{candidateId}/accept")
+    public CandidateCommandResponse acceptCandidate(
+        @PathVariable Long candidateId,
+        @RequestParam("user_id") String userId,
+        @RequestBody(required = false) CandidateResolutionRequest request
+    ) {
+        TrackIdentityCandidateStore.Entry entry = adminService.acceptCandidate(
+            userId,
+            candidateId,
+            request == null ? null : request.notes()
+        );
+        return new CandidateCommandResponse("api", "ok", Instant.now(), CandidateItem.from(entry));
+    }
+
+    @Operation(summary = "Reject a track identity candidate")
+    @PostMapping("/candidates/{candidateId}/reject")
+    public CandidateCommandResponse rejectCandidate(
+        @PathVariable Long candidateId,
+        @RequestParam("user_id") String userId,
+        @RequestBody(required = false) CandidateResolutionRequest request
+    ) {
+        TrackIdentityCandidateStore.Entry entry = adminService.rejectCandidate(
+            userId,
+            candidateId,
+            request == null ? null : request.notes()
+        );
+        return new CandidateCommandResponse("api", "ok", Instant.now(), CandidateItem.from(entry));
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
@@ -58,7 +110,8 @@ public class MetadataNormalizationAdminController {
         String title,
         String artist,
         int totalCount,
-        List<MetadataLookupCandidate> candidates
+        List<MetadataLookupCandidate> candidates,
+        List<CandidateItem> savedCandidates
     ) {}
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
@@ -89,4 +142,58 @@ public class MetadataNormalizationAdminController {
             );
         }
     }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CandidateListResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        List<CandidateItem> candidates
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CandidateCommandResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        CandidateItem candidate
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CandidateItem(
+        Long id,
+        String queryTitle,
+        String queryArtist,
+        String source,
+        String candidateKind,
+        String candidateValue,
+        Double candidateScore,
+        String status,
+        String createdBy,
+        Instant createdAt,
+        String resolvedBy,
+        Instant resolvedAt,
+        String notes
+    ) {
+        static CandidateItem from(TrackIdentityCandidateStore.Entry entry) {
+            return new CandidateItem(
+                entry.id(),
+                entry.queryTitle(),
+                entry.queryArtist(),
+                entry.source(),
+                entry.candidateKind(),
+                entry.candidateValue(),
+                entry.candidateScore(),
+                entry.status(),
+                entry.createdBy(),
+                entry.createdAt(),
+                entry.resolvedBy(),
+                entry.resolvedAt(),
+                entry.notes()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CandidateResolutionRequest(String notes) {}
 }
