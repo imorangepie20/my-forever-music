@@ -692,20 +692,16 @@ public class TidalWebApiClient {
     ) {
         String countryCode = countryCodeForCredential(credential);
         try {
-            boolean legacyUnavailable = false;
             try {
-                List<TidalPlaylistTrack> legacyTracks = getLegacyPlaylistTracks(credential, playlistId, countryCode);
-                if (!legacyTracks.isEmpty()) {
-                    return legacyTracks;
-                }
+                return getLegacyPlaylistTracks(credential, playlistId, countryCode);
             } catch (IllegalArgumentException exception) {
-                legacyUnavailable = true;
-                log.info("TIDAL legacy playlist tracks unavailable for {}: {}", playlistId, exception.getMessage());
+                log.info(
+                    "TIDAL legacy playlist tracks unavailable for {}: {}. Falling back to OpenAPI track details.",
+                    playlistId,
+                    exception.getMessage()
+                );
             }
 
-            if (!legacyUnavailable) {
-                log.info("TIDAL legacy playlist tracks returned no tracks for {}. Falling back to OpenAPI track details.", playlistId);
-            }
             List<String> trackIds = getPlaylistTrackIds(credential, playlistId, countryCode);
             if (trackIds.isEmpty()) {
                 log.info("TIDAL OpenAPI playlist item relationship returned no track ids for {}.", playlistId);
@@ -716,6 +712,15 @@ public class TidalWebApiClient {
                 .map(trackId -> getTrackDetail(credential, trackId, countryCode))
                 .filter(Objects::nonNull)
                 .toList();
+            int missing = trackIds.size() - tracks.size();
+            if (missing > 0) {
+                log.warn(
+                    "TIDAL OpenAPI track detail dropped {}/{} tracks for playlist {} (per-id error/404).",
+                    missing,
+                    trackIds.size(),
+                    playlistId
+                );
+            }
             if (tracks.isEmpty()) {
                 log.info("TIDAL OpenAPI track detail returned no tracks for playlist {}.", playlistId);
                 return List.of();

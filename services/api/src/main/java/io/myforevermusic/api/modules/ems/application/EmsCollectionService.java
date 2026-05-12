@@ -6,6 +6,10 @@ import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollected
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedPlaylistTrackRepository;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackEntity;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackRepository;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsPoolEntryEntity;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsPoolEntryRepository;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsPoolIngestRunEntity;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsPoolIngestRunRepository;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsTrackAudioFeatures;
 import io.myforevermusic.api.common.error.ApiResourceNotFoundException;
 import io.myforevermusic.api.modules.auth.application.AuthAccountStore;
@@ -24,8 +28,10 @@ import io.myforevermusic.api.modules.platform.infrastructure.tidal.TidalWebApiCl
 import io.myforevermusic.api.modules.platform.infrastructure.tidal.TidalWebApiClient.TidalSearchResult;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.context.ApplicationEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -35,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class EmsCollectionService {
 
     private static final Logger log = LoggerFactory.getLogger(EmsCollectionService.class);
+    private static final String SEARCH_POOL_SOURCE = "search_pool";
     private static final List<String> TIDAL_HOME_PAGE_SOURCE_IDS = List.of(
         "THE_HITS",
         "POPULAR_MIXES",
@@ -50,6 +57,9 @@ public class EmsCollectionService {
     private final EmsCollectedPlaylistRepository playlistRepository;
     private final EmsCollectedTrackRepository trackRepository;
     private final EmsCollectedPlaylistTrackRepository playlistTrackRepository;
+    private final EmsPoolIngestRunRepository poolRunRepository;
+    private final EmsPoolEntryRepository poolEntryRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public EmsCollectionService(
         SpotifyWebApiClient spotifyWebApiClient,
@@ -59,7 +69,10 @@ public class EmsCollectionService {
         AuthAccountStore authAccountStore,
         EmsCollectedPlaylistRepository playlistRepository,
         EmsCollectedTrackRepository trackRepository,
-        EmsCollectedPlaylistTrackRepository playlistTrackRepository
+        EmsCollectedPlaylistTrackRepository playlistTrackRepository,
+        EmsPoolIngestRunRepository poolRunRepository,
+        EmsPoolEntryRepository poolEntryRepository,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.spotifyWebApiClient = spotifyWebApiClient;
         this.tidalWebApiClient = tidalWebApiClient;
@@ -69,13 +82,18 @@ public class EmsCollectionService {
         this.playlistRepository = playlistRepository;
         this.trackRepository = trackRepository;
         this.playlistTrackRepository = playlistTrackRepository;
+        this.poolRunRepository = poolRunRepository;
+        this.poolEntryRepository = poolEntryRepository;
+        this.eventPublisher = eventPublisher;
     }
 
+    @Transactional
     public EmsCollectionSearchPreviewResult previewSearch(String userId, String platformId, String query) {
         List<EmsCollectionSearchPlaylistPreview> playlists = new ArrayList<>();
         List<EmsCollectionSearchTrackPreview> tracks = new ArrayList<>();
         int totalPlaylistCount = 0;
         int totalTrackCount = 0;
+        Instant searchedAt = Instant.now();
 
         String requestedPlatformId = resolveSearchPlatformId(userId, platformId);
         PlatformAccountCredential credential = platformCredentialService
@@ -98,21 +116,44 @@ public class EmsCollectionService {
         totalPlaylistCount += totals.playlistCount();
         totalTrackCount += totals.trackCount();
 
-        return new EmsCollectionSearchPreviewResult(
+        EmsPoolIngestRunEntity poolRun = queueSearchPoolCandidates(
+            userId,
             requestedPlatformId,
             query,
             playlists,
             tracks,
+            searchedAt
+        );
+
+        return new EmsCollectionSearchPreviewResult(
+            requestedPlatformId,
+            query,
+            poolRun.getId(),
+            playlists,
+            tracks,
             totalPlaylistCount,
             totalTrackCount,
-            Instant.now()
+            searchedAt
         );
     }
 
+    @Transactional
     public EmsCollectionSearchPlaylistTracksPreview getSearchPlaylistTracks(
         String userId,
         String platformId,
         String externalPlaylistId
+    ) {
+        Instant searchedAt = Instant.now();
+        EmsCollectedPlaylistEntity playlist = ensureCollectedPlaylistShell(platformId, externalPlaylistId, searchedAt);
+        return fetchAndStoreSearchPlaylistTracks(userId, playlist, platformId, externalPlaylistId, searchedAt);
+    }
+
+    private EmsCollectionSearchPlaylistTracksPreview fetchAndStoreSearchPlaylistTracks(
+        String userId,
+        EmsCollectedPlaylistEntity playlist,
+        String platformId,
+        String externalPlaylistId,
+        Instant collectedAt
     ) {
         PlatformAccountCredential credential = platformCredentialService
             .findUsableCredential(userId, platformId)
@@ -120,23 +161,210 @@ public class EmsCollectionService {
                 "Connect %s before loading EMS search playlist tracks.".formatted(platformId)
             ));
 
+        List<EmsCollectionSearchTrackPreview> tracks;
         if ("spotify".equals(platformId)) {
-            List<EmsCollectionSearchTrackPreview> tracks = spotifyWebApiClient.getPlaylistTracks(credential, externalPlaylistId)
+            tracks = spotifyWebApiClient.getPlaylistTracks(credential, externalPlaylistId)
                 .stream()
                 .map(this::toSpotifySearchTrackPreview)
                 .toList();
-            return new EmsCollectionSearchPlaylistTracksPreview(platformId, externalPlaylistId, tracks, tracks.size(), Instant.now());
-        }
-
-        if ("tidal".equals(platformId)) {
-            List<EmsCollectionSearchTrackPreview> tracks = tidalWebApiClient.getPlaylistTracks(credential, externalPlaylistId)
+        } else if ("tidal".equals(platformId)) {
+            tracks = tidalWebApiClient.getPlaylistTracks(credential, externalPlaylistId)
                 .stream()
                 .map(this::toTidalSearchTrackPreview)
                 .toList();
-            return new EmsCollectionSearchPlaylistTracksPreview(platformId, externalPlaylistId, tracks, tracks.size(), Instant.now());
+        } else {
+            throw new IllegalArgumentException("Unsupported EMS search platform: %s".formatted(platformId));
         }
 
-        throw new IllegalArgumentException("Unsupported EMS search platform: %s".formatted(platformId));
+        storeSearchPlaylistTracks(playlist, tracks, collectedAt);
+        discardPlaylistIfEmpty(playlist);
+        return new EmsCollectionSearchPlaylistTracksPreview(platformId, externalPlaylistId, tracks, tracks.size(), collectedAt);
+    }
+
+    private void discardPlaylistIfEmpty(EmsCollectedPlaylistEntity playlist) {
+        if (playlist == null || playlist.getId() == null) {
+            return;
+        }
+        long linkCount = playlistTrackRepository.countTracksByPlaylistId(playlist.getId());
+        if (linkCount > 0) {
+            return;
+        }
+        playlistRepository.delete(playlist);
+        log.info(
+            "EMS collected playlist {} ({}:{}) discarded because no tracks were stored.",
+            playlist.getId(),
+            playlist.getSourcePlatform(),
+            playlist.getExternalPlaylistId()
+        );
+    }
+
+    @Transactional
+    public int cleanupEmptyCollectedPlaylists() {
+        int deleted = playlistRepository.deletePlaylistsWithoutTracks();
+        if (deleted > 0) {
+            log.info("EMS cleanup removed {} collected playlists without tracks.", deleted);
+        }
+        return deleted;
+    }
+
+    private EmsPoolIngestRunEntity queueSearchPoolCandidates(
+        String userId,
+        String platformId,
+        String query,
+        List<EmsCollectionSearchPlaylistPreview> playlists,
+        List<EmsCollectionSearchTrackPreview> tracks,
+        Instant queuedAt
+    ) {
+        EmsPoolIngestRunEntity run = poolRunRepository.save(new EmsPoolIngestRunEntity(
+            truncate(userId, 100),
+            truncate(platformId, 50),
+            normalizeRequiredText(query, "search", 200),
+            playlists.size(),
+            tracks.size(),
+            queuedAt
+        ));
+
+        Map<String, EmsPoolEntryEntity> entriesByKey = new LinkedHashMap<>();
+        for (EmsCollectionSearchPlaylistPreview playlist : playlists) {
+            entriesByKey.putIfAbsent(
+                "playlist:%s:%s".formatted(playlist.sourcePlatform(), playlist.externalPlaylistId()),
+                new EmsPoolEntryEntity(
+                    run,
+                    EmsPoolEntryEntity.TYPE_PLAYLIST,
+                    normalizeRequiredText(playlist.sourcePlatform(), platformId, 50),
+                    normalizeRequiredText(playlist.externalPlaylistId(), "unknown-playlist", 160),
+                    normalizeRequiredText(playlist.title(), "Untitled EMS Playlist", 200),
+                    null,
+                    normalizeOptionalText(playlist.curator(), 120),
+                    normalizeDescription(playlist.description()),
+                    truncate(playlist.coverImageUrl(), 500),
+                    truncate(playlist.platformExternalUrl(), 500),
+                    truncate(playlist.platformUri(), 200),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    playlist.trackCount(),
+                    queuedAt
+                )
+            );
+        }
+        for (EmsCollectionSearchTrackPreview track : tracks) {
+            entriesByKey.putIfAbsent(
+                "track:%s:%s".formatted(track.sourcePlatform(), track.externalTrackId()),
+                new EmsPoolEntryEntity(
+                    run,
+                    EmsPoolEntryEntity.TYPE_TRACK,
+                    normalizeRequiredText(track.sourcePlatform(), platformId, 50),
+                    normalizeRequiredText(track.externalTrackId(), "unknown-track", 160),
+                    normalizeRequiredText(track.title(), "Untitled EMS Track", 200),
+                    normalizeRequiredText(track.artistName(), "Unknown Artist", 200),
+                    null,
+                    null,
+                    null,
+                    truncate(track.platformExternalUrl(), 500),
+                    truncate(track.platformUri(), 200),
+                    truncate(track.isrc(), 32),
+                    truncate(track.albumTitle(), 200),
+                    truncate(track.albumImageUrl(), 500),
+                    truncate(track.previewUrl(), 500),
+                    track.durationMs(),
+                    0,
+                    queuedAt
+                )
+            );
+        }
+        poolEntryRepository.saveAll(entriesByKey.values());
+        eventPublisher.publishEvent(new EmsPoolRunQueuedEvent(run.getId()));
+        return run;
+    }
+
+    @Transactional
+    public EmsSearchPoolCollectionResult collectSearchPoolEntry(String userId, EmsPoolEntryEntity entry) {
+        Instant collectedAt = Instant.now();
+        if (EmsPoolEntryEntity.TYPE_PLAYLIST.equals(entry.getEntryType())) {
+            EmsCollectionSearchPlaylistPreview playlistPreview = new EmsCollectionSearchPlaylistPreview(
+                entry.getExternalId(),
+                entry.getTitle(),
+                entry.getSourcePlatform(),
+                entry.getCurator(),
+                entry.getDescription(),
+                entry.getCoverImageUrl(),
+                entry.getPlatformExternalUrl(),
+                entry.getPlatformUri(),
+                entry.getTrackCount()
+            );
+            EmsCollectedPlaylistEntity playlist = upsertPlaylistFromSearchPreview(
+                playlistPreview, entry.getRun().getSearchQuery(), collectedAt
+            );
+            EmsCollectionSearchPlaylistTracksPreview tracks = fetchAndStoreSearchPlaylistTracks(
+                userId,
+                playlist,
+                entry.getSourcePlatform(),
+                entry.getExternalId(),
+                collectedAt
+            );
+            return new EmsSearchPoolCollectionResult(1, tracks.trackCount());
+        }
+
+        if (EmsPoolEntryEntity.TYPE_TRACK.equals(entry.getEntryType())) {
+            EmsCollectionSearchTrackPreview track = new EmsCollectionSearchTrackPreview(
+                entry.getExternalId(),
+                entry.getTitle(),
+                entry.getArtistName(),
+                entry.getSourcePlatform(),
+                entry.getIsrc(),
+                entry.getAlbumTitle(),
+                entry.getAlbumImageUrl(),
+                entry.getPlatformExternalUrl(),
+                entry.getPlatformUri(),
+                entry.getPreviewUrl(),
+                entry.getDurationMs()
+            );
+            upsertTrackFromSearchPreview(track, collectedAt);
+            return new EmsSearchPoolCollectionResult(0, 1);
+        }
+
+        throw new IllegalArgumentException("Unsupported EMS pool entry type: %s".formatted(entry.getEntryType()));
+    }
+
+    private void storeSearchPlaylistTracks(
+        EmsCollectedPlaylistEntity playlist,
+        List<EmsCollectionSearchTrackPreview> tracks,
+        Instant collectedAt
+    ) {
+        if (playlist == null) {
+            throw new IllegalStateException(
+                "EMS collected playlist must be persisted before linking search tracks."
+            );
+        }
+        for (int i = 0; i < tracks.size(); i++) {
+            EmsCollectedTrackEntity track = upsertTrackFromSearchPreview(tracks.get(i), collectedAt);
+            linkPlaylistTrack(playlist, track, i);
+        }
+    }
+
+    private EmsCollectedPlaylistEntity ensureCollectedPlaylistShell(
+        String platformId,
+        String externalPlaylistId,
+        Instant now
+    ) {
+        return playlistRepository.findBySourcePlatformAndExternalPlaylistId(platformId, externalPlaylistId)
+            .orElseGet(() -> playlistRepository.save(new EmsCollectedPlaylistEntity(
+                truncate(externalPlaylistId, 160),
+                "Untitled EMS Playlist",
+                truncate(platformId, 50),
+                "",
+                "",
+                null,
+                null,
+                null,
+                0,
+                SEARCH_POOL_SOURCE,
+                null,
+                now
+            )));
     }
 
     private String resolveSearchPlatformId(String userId, String platformId) {
@@ -819,31 +1047,31 @@ public class EmsCollectionService {
         return playlistRepository.findBySourcePlatformAndExternalPlaylistId("spotify", playlist.playlistId())
             .map(existing -> {
                 existing.applyCollectedMetadata(
-                    playlist.name(),
-                    playlist.ownerDisplayName(),
-                    playlist.description() != null ? playlist.description() : "",
-                    playlist.coverImageUrl(),
-                    playlist.externalUrl(),
-                    playlist.spotifyUri(),
+                    normalizeRequiredText(playlist.name(), "Untitled Spotify Playlist", 200),
+                    normalizeOptionalText(playlist.ownerDisplayName(), 120),
+                    normalizeDescription(playlist.description()),
+                    truncate(playlist.coverImageUrl(), 500),
+                    truncate(playlist.externalUrl(), 500),
+                    truncate(playlist.spotifyUri(), 200),
                     playlist.trackCount(),
-                    source,
-                    query,
+                    truncate(source, 50),
+                    truncate(query, 200),
                     now
                 );
                 return existing;
             })
             .orElseGet(() -> playlistRepository.save(new EmsCollectedPlaylistEntity(
                 playlist.playlistId(),
-                playlist.name(),
+                normalizeRequiredText(playlist.name(), "Untitled Spotify Playlist", 200),
                 "spotify",
-                playlist.ownerDisplayName(),
-                playlist.description() != null ? playlist.description() : "",
-                playlist.coverImageUrl(),
-                playlist.externalUrl(),
-                playlist.spotifyUri(),
+                normalizeOptionalText(playlist.ownerDisplayName(), 120),
+                normalizeDescription(playlist.description()),
+                truncate(playlist.coverImageUrl(), 500),
+                truncate(playlist.externalUrl(), 500),
+                truncate(playlist.spotifyUri(), 200),
                 playlist.trackCount(),
-                source,
-                query,
+                truncate(source, 50),
+                truncate(query, 200),
                 now
             )));
     }
@@ -875,31 +1103,71 @@ public class EmsCollectionService {
         return playlistRepository.findBySourcePlatformAndExternalPlaylistId("tidal", playlist.playlistId())
             .map(existing -> {
                 existing.applyCollectedMetadata(
-                    playlist.name(),
+                    normalizeRequiredText(playlist.name(), "Untitled TIDAL Playlist", 200),
                     "",
-                    playlist.description() != null ? playlist.description() : "",
-                    playlist.coverImageUrl(),
-                    playlist.externalUrl(),
+                    normalizeDescription(playlist.description()),
+                    truncate(playlist.coverImageUrl(), 500),
+                    truncate(playlist.externalUrl(), 500),
                     null,
                     playlist.trackCount(),
-                    source,
-                    query,
+                    truncate(source, 50),
+                    truncate(query, 200),
                     now
                 );
                 return existing;
             })
             .orElseGet(() -> playlistRepository.save(new EmsCollectedPlaylistEntity(
                 playlist.playlistId(),
-                playlist.name(),
+                normalizeRequiredText(playlist.name(), "Untitled TIDAL Playlist", 200),
                 "tidal",
                 "",
-                playlist.description() != null ? playlist.description() : "",
-                playlist.coverImageUrl(),
-                playlist.externalUrl(),
+                normalizeDescription(playlist.description()),
+                truncate(playlist.coverImageUrl(), 500),
+                truncate(playlist.externalUrl(), 500),
                 null,
                 playlist.trackCount(),
-                source,
-                query,
+                truncate(source, 50),
+                truncate(query, 200),
+                now
+            )));
+    }
+
+    private EmsCollectedPlaylistEntity upsertPlaylistFromSearchPreview(
+        EmsCollectionSearchPlaylistPreview playlist,
+        String query,
+        Instant now
+    ) {
+        return playlistRepository.findBySourcePlatformAndExternalPlaylistId(
+                playlist.sourcePlatform(),
+                playlist.externalPlaylistId()
+            )
+            .map(existing -> {
+                existing.applyCollectedMetadata(
+                    normalizeRequiredText(playlist.title(), "Untitled EMS Playlist", 200),
+                    normalizeOptionalText(playlist.curator(), 120),
+                    normalizeDescription(playlist.description()),
+                    truncate(playlist.coverImageUrl(), 500),
+                    truncate(playlist.platformExternalUrl(), 500),
+                    truncate(spotifyUriFor(playlist.sourcePlatform(), playlist.platformUri()), 200),
+                    playlist.trackCount(),
+                    SEARCH_POOL_SOURCE,
+                    truncate(query, 200),
+                    now
+                );
+                return existing;
+            })
+            .orElseGet(() -> playlistRepository.save(new EmsCollectedPlaylistEntity(
+                playlist.externalPlaylistId(),
+                normalizeRequiredText(playlist.title(), "Untitled EMS Playlist", 200),
+                playlist.sourcePlatform(),
+                normalizeOptionalText(playlist.curator(), 120),
+                normalizeDescription(playlist.description()),
+                truncate(playlist.coverImageUrl(), 500),
+                truncate(playlist.platformExternalUrl(), 500),
+                truncate(spotifyUriFor(playlist.sourcePlatform(), playlist.platformUri()), 200),
+                playlist.trackCount(),
+                SEARCH_POOL_SOURCE,
+                truncate(query, 200),
                 now
             )));
     }
@@ -925,6 +1193,34 @@ public class EmsCollectionService {
         );
     }
 
+    private EmsCollectedTrackEntity upsertTrackFromSearchPreview(
+        EmsCollectionSearchTrackPreview track,
+        Instant now
+    ) {
+        return upsertCollectedTrack(
+            track.externalTrackId(),
+            track.title(),
+            track.artistName(),
+            track.sourcePlatform(),
+            track.isrc(),
+            track.albumTitle(),
+            track.albumImageUrl(),
+            track.platformExternalUrl(),
+            track.platformUri(),
+            track.previewUrl(),
+            track.durationMs(),
+            SEARCH_POOL_SOURCE,
+            now,
+            unavailableAudioFeatures(
+                "spotify".equals(track.sourcePlatform()) ? track.externalTrackId() : null,
+                track.platformExternalUrl(),
+                spotifyUriFor(track.sourcePlatform(), track.platformUri()),
+                track.durationMs(),
+                now
+            )
+        );
+    }
+
     private EmsCollectedTrackEntity upsertCollectedTrack(
         String externalTrackId,
         String title,
@@ -942,18 +1238,18 @@ public class EmsCollectionService {
         EmsTrackAudioFeatures audioFeatures
     ) {
         trackRepository.upsertByExternalTrack(
-            externalTrackId,
-            title,
-            artistName,
-            sourcePlatform,
-            isrc,
-            albumTitle,
-            albumImageUrl,
-            platformExternalUrl,
-            platformUri,
-            previewUrl,
+            truncate(externalTrackId, 160),
+            normalizeRequiredText(title, "Untitled EMS Track", 200),
+            normalizeRequiredText(artistName, "Unknown Artist", 200),
+            truncate(sourcePlatform, 50),
+            truncate(isrc, 32),
+            truncate(albumTitle, 200),
+            truncate(albumImageUrl, 500),
+            truncate(platformExternalUrl, 500),
+            truncate(platformUri, 200),
+            truncate(previewUrl, 500),
             durationMs,
-            collectionSource,
+            truncate(collectionSource, 50),
             collectedAt,
             audioFeatures.getAudioFeatureTrackId(),
             audioFeatures.getAudioFeatureSource(),
@@ -987,6 +1283,30 @@ public class EmsCollectionService {
         playlistTrackRepository.upsertPlaylistTrackLink(playlist.getId(), track.getId(), order);
     }
 
+    private String spotifyUriFor(String sourcePlatform, String platformUri) {
+        return "spotify".equals(sourcePlatform) ? platformUri : null;
+    }
+
+    private String normalizeRequiredText(String value, String fallback, int maxLength) {
+        String normalized = hasText(value) ? value : fallback;
+        return truncate(normalized, maxLength);
+    }
+
+    private String normalizeOptionalText(String value, int maxLength) {
+        return truncate(hasText(value) ? value : "", maxLength);
+    }
+
+    private String normalizeDescription(String value) {
+        return normalizeOptionalText(value, 1000);
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
+    }
+
     public record EmsCollectionSearchResult(
         String platformId,
         String query,
@@ -998,6 +1318,7 @@ public class EmsCollectionService {
     public record EmsCollectionSearchPreviewResult(
         String platformId,
         String query,
+        Long poolRunId,
         List<EmsCollectionSearchPlaylistPreview> playlists,
         List<EmsCollectionSearchTrackPreview> tracks,
         int resultPlaylistCount,
@@ -1037,6 +1358,11 @@ public class EmsCollectionService {
         List<EmsCollectionSearchTrackPreview> tracks,
         int trackCount,
         Instant searchedAt
+    ) {}
+
+    public record EmsSearchPoolCollectionResult(
+        int collectedPlaylistCount,
+        int collectedTrackCount
     ) {}
 
     public record EmsAudioFeatureCoverage(
