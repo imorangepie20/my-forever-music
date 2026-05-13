@@ -5,10 +5,14 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService;
 import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.GmsPlaylistPreviewCandidate;
 import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.GmsPlaylistPreviewResult;
+import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.SaveResult;
 import io.swagger.v3.oas.annotations.Operation;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +35,53 @@ public class GmsPlaylistPreviewController {
     ) {
         GmsPlaylistPreviewResult result = service.preview(userId, limit);
         return GmsPlaylistPreviewResponse.from(result);
+    }
+
+    @Operation(summary = "Save an EMS playlist into the user's PMS personal playlist library")
+    @PostMapping("/{playlistId}/save")
+    public GmsPlaylistSaveResponse save(
+        @PathVariable Long playlistId,
+        @RequestParam("user_id") String userId,
+        @RequestBody(required = false) GmsPlaylistSaveRequest request
+    ) {
+        SaveResult result = service.saveToPms(
+            userId,
+            playlistId,
+            request == null ? null : request.title()
+        );
+        return GmsPlaylistSaveResponse.from(result);
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record GmsPlaylistSaveRequest(String title) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record GmsPlaylistSaveResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        String userId,
+        Long emsPlaylistId,
+        String personalPlaylistId,
+        String personalPlaylistTitle,
+        int personalPlaylistTrackCount,
+        int addedTrackCount,
+        Instant savedAt
+    ) {
+        static GmsPlaylistSaveResponse from(SaveResult result) {
+            return new GmsPlaylistSaveResponse(
+                "api",
+                "ok",
+                Instant.now(),
+                result.userId(),
+                result.emsPlaylistId(),
+                result.personalPlaylistId(),
+                result.personalPlaylistTitle(),
+                result.personalPlaylistTrackCount(),
+                result.addedTrackCount(),
+                result.savedAt()
+            );
+        }
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)

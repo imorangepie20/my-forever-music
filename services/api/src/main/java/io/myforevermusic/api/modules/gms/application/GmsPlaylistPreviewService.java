@@ -3,8 +3,13 @@ package io.myforevermusic.api.modules.gms.application;
 import io.myforevermusic.api.modules.auth.application.AuthAccountStore;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedPlaylistEntity;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedPlaylistRepository;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedPlaylistTrackEntity;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedPlaylistTrackRepository;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackEntity;
+import io.myforevermusic.api.modules.pms.application.PmsPersonalPlaylistStore;
 import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
+import io.myforevermusic.api.modules.recommendation.application.UserMusicEventService;
+import io.myforevermusic.api.modules.recommendation.presentation.UserMusicEventRequest;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -32,17 +37,23 @@ public class GmsPlaylistPreviewService {
     private final PmsUserLibraryStore pmsUserLibraryStore;
     private final EmsCollectedPlaylistRepository playlistRepository;
     private final EmsCollectedPlaylistTrackRepository playlistTrackRepository;
+    private final PmsPersonalPlaylistStore personalPlaylistStore;
+    private final UserMusicEventService userMusicEventService;
 
     public GmsPlaylistPreviewService(
         AuthAccountStore authAccountStore,
         PmsUserLibraryStore pmsUserLibraryStore,
         EmsCollectedPlaylistRepository playlistRepository,
-        EmsCollectedPlaylistTrackRepository playlistTrackRepository
+        EmsCollectedPlaylistTrackRepository playlistTrackRepository,
+        PmsPersonalPlaylistStore personalPlaylistStore,
+        UserMusicEventService userMusicEventService
     ) {
         this.authAccountStore = authAccountStore;
         this.pmsUserLibraryStore = pmsUserLibraryStore;
         this.playlistRepository = playlistRepository;
         this.playlistTrackRepository = playlistTrackRepository;
+        this.personalPlaylistStore = personalPlaylistStore;
+        this.userMusicEventService = userMusicEventService;
     }
 
     public GmsPlaylistPreviewResult preview(String userId, Integer limit) {
@@ -180,5 +191,136 @@ public class GmsPlaylistPreviewService {
         String modelStage,
         Instant generatedAt,
         List<GmsPlaylistPreviewCandidate> candidates
+    ) {}
+
+    public SaveResult saveToPms(String userId, Long emsPlaylistId, String customTitle) {
+        if (userId == null || userId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "user_id is required.");
+        }
+        if (emsPlaylistId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "playlist_id is required.");
+        }
+
+        long pmsTrackCount = pmsUserLibraryStore.findPlaylists(userId).stream()
+            .mapToLong(playlist -> playlist.trackCount())
+            .sum();
+        if (pmsTrackCount == 0L) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "GMS playlist save requires an imported PMS user library (current stage = cold-start)."
+            );
+        }
+
+        EmsCollectedPlaylistEntity emsPlaylist = playlistRepository.findById(emsPlaylistId)
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "EMS playlist not found: " + emsPlaylistId
+            ));
+
+        List<EmsCollectedPlaylistTrackEntity> trackLinks =
+            playlistTrackRepository.findByPlaylistIdOrderBySortOrderAsc(emsPlaylistId);
+        if (trackLinks.isEmpty()) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "EMS playlist has no tracks to import."
+            );
+        }
+
+        String personalPlaylistId = "gms-ems-%d".formatted(emsPlaylistId);
+        String resolvedTitle = (customTitle != null && !customTitle.isBlank())
+            ? customTitle
+            : "%s (GMS)".formatted(emsPlaylist.getTitle());
+
+        PmsPersonalPlaylistStore.PersonalPlaylistState playlist = personalPlaylistStore
+            .findPlaylist(userId, personalPlaylistId)
+            .orElseGet(() -> personalPlaylistStore.createPlaylist(
+                new PmsPersonalPlaylistStore.CreatePlaylistDraft(
+                    userId,
+                    personalPlaylistId,
+                    resolvedTitle,
+                    "Imported from EMS via GMS: %s".formatted(emsPlaylist.getTitle())
+                )
+            ));
+
+        Set<String> existingTrackIds = new HashSet<>();
+        if (playlist.tracks() != null) {
+            playlist.tracks().forEach(track -> existingTrackIds.add(track.trackId()));
+        }
+
+        Instant now = Instant.now();
+        int addedCount = 0;
+        for (int i = 0; i < trackLinks.size(); i++) {
+            EmsCollectedTrackEntity emsTrack = trackLinks.get(i).getTrack();
+            String trackId = "ems-%d".formatted(emsTrack.getId());
+            if (existingTrackIds.contains(trackId)) {
+                continue;
+            }
+            PmsPersonalPlaylistStore.PersonalTrackState trackState = new PmsPersonalPlaylistStore.PersonalTrackState(
+                trackId,
+                emsTrack.getTitle(),
+                emsTrack.getArtistName(),
+                emsTrack.getSourcePlatform(),
+                emsTrack.getAlbumTitle(),
+                emsTrack.getAlbumImageUrl(),
+                emsTrack.getPlatformExternalUrl(),
+                emsTrack.getSpotifyUri(),
+                emsTrack.getPreviewUrl(),
+                "spotify".equalsIgnoreCase(emsTrack.getSourcePlatform()) ? emsTrack.getExternalTrackId() : null,
+                emsTrack.getDurationMs(),
+                i,
+                "gms-playlist-import",
+                now
+            );
+            playlist = personalPlaylistStore.addTrack(new PmsPersonalPlaylistStore.AddTrackDraft(
+                userId,
+                personalPlaylistId,
+                trackState,
+                "gms-playlist-import"
+            ));
+            userMusicEventService.recordEvent(new UserMusicEventRequest(
+                userId,
+                "added_to_playlist",
+                "gms",
+                emsTrack.getSourcePlatform(),
+                null,
+                trackId,
+                "track",
+                trackId,
+                personalPlaylistId,
+                emsTrack.getExternalTrackId(),
+                emsTrack.getSpotifyUri(),
+                emsTrack.getTitle(),
+                emsTrack.getArtistName(),
+                emsTrack.getAlbumTitle(),
+                null,
+                emsTrack.getDurationMs(),
+                null,
+                null,
+                null,
+                null,
+                now
+            ));
+            addedCount++;
+        }
+
+        return new SaveResult(
+            userId,
+            emsPlaylistId,
+            personalPlaylistId,
+            playlist.title(),
+            playlist.trackCount(),
+            addedCount,
+            now
+        );
+    }
+
+    public record SaveResult(
+        String userId,
+        Long emsPlaylistId,
+        String personalPlaylistId,
+        String personalPlaylistTitle,
+        int personalPlaylistTrackCount,
+        int addedTrackCount,
+        Instant savedAt
     ) {}
 }
