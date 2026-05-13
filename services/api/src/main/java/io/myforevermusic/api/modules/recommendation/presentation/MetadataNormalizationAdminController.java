@@ -487,6 +487,8 @@ public class MetadataNormalizationAdminController {
         Long canonicalTrackId,
         String displayTitle,
         String displayArtistName,
+        String releaseYear,
+        String releaseCountry,
         Instant createdAt,
         Instant updatedAt
     ) {
@@ -495,6 +497,8 @@ public class MetadataNormalizationAdminController {
                 entry.canonicalTrackId(),
                 entry.displayTitle(),
                 entry.displayArtistName(),
+                entry.releaseYear(),
+                entry.releaseCountry(),
                 entry.createdAt(),
                 entry.updatedAt()
             );

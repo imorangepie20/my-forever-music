@@ -20,6 +20,8 @@ class CanonicalTrackIdentityStoreTest {
             "MusicBrainz",
             0.99d,
             7L,
+            null,
+            null,
             Instant.parse("2026-05-13T00:00:00Z")
         ));
 
@@ -45,6 +47,8 @@ class CanonicalTrackIdentityStoreTest {
             "musicbrainz",
             0.98d,
             1L,
+            null,
+            null,
             Instant.parse("2026-05-13T00:00:00Z")
         ));
 
@@ -56,6 +60,8 @@ class CanonicalTrackIdentityStoreTest {
             "MusicBrainz",
             0.95d,
             2L,
+            null,
+            null,
             Instant.parse("2026-05-13T00:01:00Z")
         ));
 
@@ -80,10 +86,68 @@ class CanonicalTrackIdentityStoreTest {
             "musicbrainz",
             0.91d,
             null,
+            null,
+            null,
             Instant.parse("2026-05-13T00:00:00Z")
         ));
 
         assertThat(result.identity().identityKind()).isEqualTo("mbid");
         assertThat(result.identity().identityValue()).isEqualTo("a0b1c2d3-e4f5-6789-abcd-ef0123456789");
+    }
+
+    @Test
+    void shouldFillReleaseContextOnCreateAndPreserveOnUpsert() {
+        CanonicalTrackIdentityStore store = new InMemoryCanonicalTrackIdentityStore();
+
+        CanonicalTrackIdentityStore.UpsertResult created = store.upsertIdentity(new CanonicalTrackIdentityStore.Draft(
+            "Release Track",
+            "Release Artist",
+            "discogs_master_id",
+            "12345",
+            "discogs",
+            0.92d,
+            null,
+            "1975",
+            "UK",
+            Instant.parse("2026-05-13T00:00:00Z")
+        ));
+        assertThat(created.canonicalTrack().releaseYear()).isEqualTo("1975");
+        assertThat(created.canonicalTrack().releaseCountry()).isEqualTo("UK");
+
+        CanonicalTrackIdentityStore.CanonicalTrackEntry filled = store.fillReleaseContextIfMissing(
+            created.canonicalTrack().canonicalTrackId(),
+            "1976",
+            "US",
+            Instant.parse("2026-05-13T00:05:00Z")
+        );
+        assertThat(filled.releaseYear()).isEqualTo("1975");
+        assertThat(filled.releaseCountry()).isEqualTo("UK");
+    }
+
+    @Test
+    void fillReleaseContextWritesWhenExistingValuesAreNull() {
+        CanonicalTrackIdentityStore store = new InMemoryCanonicalTrackIdentityStore();
+        CanonicalTrackIdentityStore.UpsertResult created = store.upsertIdentity(new CanonicalTrackIdentityStore.Draft(
+            "Track Without Release",
+            "Artist",
+            "isrc",
+            "USRC17607900",
+            "musicbrainz",
+            0.9d,
+            null,
+            null,
+            null,
+            Instant.parse("2026-05-13T00:00:00Z")
+        ));
+        assertThat(created.canonicalTrack().releaseYear()).isNull();
+
+        CanonicalTrackIdentityStore.CanonicalTrackEntry filled = store.fillReleaseContextIfMissing(
+            created.canonicalTrack().canonicalTrackId(),
+            "1975",
+            "UK",
+            Instant.parse("2026-05-13T00:05:00Z")
+        );
+        assertThat(filled.releaseYear()).isEqualTo("1975");
+        assertThat(filled.releaseCountry()).isEqualTo("UK");
     }
 }

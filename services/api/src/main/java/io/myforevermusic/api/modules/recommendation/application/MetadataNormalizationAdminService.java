@@ -267,6 +267,7 @@ public class MetadataNormalizationAdminService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "candidate value is empty.");
         }
 
+        DiscogsReleaseContext discogsContext = extractDiscogsReleaseContext(candidate);
         Instant now = Instant.now();
         CanonicalTrackIdentityStore.UpsertResult result;
         try {
@@ -278,10 +279,27 @@ public class MetadataNormalizationAdminService {
                 candidate.source(),
                 candidate.candidateScore(),
                 candidate.id(),
+                discogsContext.year(),
+                discogsContext.country(),
                 now
             ));
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+        }
+        if (!result.createdCanonicalTrack() && discogsContext.hasAnyField()) {
+            CanonicalTrackIdentityStore.CanonicalTrackEntry filled = canonicalTrackIdentityStore
+                .fillReleaseContextIfMissing(
+                    result.canonicalTrack().canonicalTrackId(),
+                    discogsContext.year(),
+                    discogsContext.country(),
+                    now
+                );
+            result = new CanonicalTrackIdentityStore.UpsertResult(
+                filled,
+                result.identity(),
+                result.createdCanonicalTrack(),
+                result.createdIdentity()
+            );
         }
 
         CanonicalRowLinkResult links = linkRowsToCanonicalTrack(candidate, result);
@@ -758,6 +776,28 @@ public class MetadataNormalizationAdminService {
             quality,
             serializeMetadata(result)
         );
+    }
+
+    private DiscogsReleaseContext extractDiscogsReleaseContext(TrackIdentityCandidateStore.Entry candidate) {
+        if (!"discogs".equalsIgnoreCase(candidate.source()) || candidate.metadata() == null) {
+            return DiscogsReleaseContext.empty();
+        }
+        try {
+            DiscogsSearchResult parsed = objectMapper.readValue(candidate.metadata(), DiscogsSearchResult.class);
+            return new DiscogsReleaseContext(parsed.year(), parsed.country());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
+            return DiscogsReleaseContext.empty();
+        }
+    }
+
+    private record DiscogsReleaseContext(String year, String country) {
+        static DiscogsReleaseContext empty() {
+            return new DiscogsReleaseContext(null, null);
+        }
+
+        boolean hasAnyField() {
+            return (year != null && !year.isBlank()) || (country != null && !country.isBlank());
+        }
     }
 
     private String discogsDescription(DiscogsSearchResult result) {

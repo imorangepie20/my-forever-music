@@ -1308,6 +1308,8 @@ export interface CanonicalTrackItem {
     canonical_track_id: number
     display_title: string
     display_artist_name: string | null
+    release_year: string | null
+    release_country: string | null
     created_at: string
     updated_at: string
 }

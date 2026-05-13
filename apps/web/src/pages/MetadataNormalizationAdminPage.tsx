@@ -245,8 +245,16 @@ const MetadataNormalizationAdminPage = () => {
                     session.userId,
                     pendingResolution.candidate.id,
                 )
+                const releaseParts: string[] = []
+                if (result.canonical_track.release_year) {
+                    releaseParts.push(`year ${result.canonical_track.release_year}`)
+                }
+                if (result.canonical_track.release_country) {
+                    releaseParts.push(`country ${result.canonical_track.release_country}`)
+                }
+                const releaseSuffix = releaseParts.length > 0 ? ` (release: ${releaseParts.join(', ')})` : ''
                 setCanonicalPromotionSummary(
-                    `candidate #${result.candidate.id} -> canonical track #${result.canonical_track.canonical_track_id}, identity #${result.identity.canonical_track_identity_id}; created=${result.created_identity ? 'yes' : 'already existed'}; linked EMS ${result.links.ems_linked_count}, PMS imported ${result.links.pms_imported_linked_count}, PMS user ${result.links.pms_user_linked_count}, conflicts ${result.links.total_conflict_count}.`,
+                    `candidate #${result.candidate.id} -> canonical track #${result.canonical_track.canonical_track_id}${releaseSuffix}, identity #${result.identity.canonical_track_identity_id}; created=${result.created_identity ? 'yes' : 'already existed'}; linked EMS ${result.links.ems_linked_count}, PMS imported ${result.links.pms_imported_linked_count}, PMS user ${result.links.pms_user_linked_count}, conflicts ${result.links.total_conflict_count}.`,
                 )
             } else {
                 const candidateId = pendingResolution.candidate.id

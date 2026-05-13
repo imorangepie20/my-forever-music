@@ -363,6 +363,34 @@ class MetadataNormalizationAdminServiceTest {
     }
 
     @Test
+    void shouldPopulateReleaseContextWhenPromotingDiscogsCandidate() {
+        TrackIdentityCandidateStore.Entry candidate = candidateStore.save(new TrackIdentityCandidateStore.Draft(
+            "Bohemian Rhapsody",
+            "Queen",
+            "discogs",
+            "discogs_master_id",
+            "12345",
+            0.95d,
+            "{\"id\":12345,\"type\":\"master\",\"title\":\"Queen - Bohemian Rhapsody\",\"country\":\"UK\",\"year\":\"1975\"}",
+            ADMIN_USER_ID,
+            Instant.parse("2026-05-12T00:00:00Z")
+        ));
+        TrackIdentityCandidateStore.Entry accepted = candidateStore.updateStatus(
+            candidate.id(),
+            TrackIdentityCandidateStore.STATUS_ACCEPTED,
+            ADMIN_USER_ID,
+            "accepted",
+            Instant.parse("2026-05-12T00:01:00Z")
+        );
+
+        MetadataNormalizationAdminService.CanonicalPromotionResult result =
+            service.promoteCandidateToCanonicalIdentity(ADMIN_USER_ID, accepted.id());
+
+        assertThat(result.canonicalTrack().releaseYear()).isEqualTo("1975");
+        assertThat(result.canonicalTrack().releaseCountry()).isEqualTo("UK");
+    }
+
+    @Test
     void shouldListCanonicalLinkConflictsForPromotedIsrcCandidate() {
         TrackIdentityCandidateStore.Entry accepted = acceptedIsrcCandidate("TIDAL Track", "TIDAL Artist", ISRC);
         TrackIdentityCandidateStore.Entry applied = candidateStore.updateStatus(

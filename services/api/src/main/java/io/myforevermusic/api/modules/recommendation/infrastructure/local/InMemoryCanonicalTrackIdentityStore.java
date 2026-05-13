@@ -36,6 +36,8 @@ public class InMemoryCanonicalTrackIdentityStore implements CanonicalTrackIdenti
             canonicalTrackId,
             normalizeDisplayTitle(draft.displayTitle()),
             normalizeOptional(draft.displayArtistName()),
+            normalizeOptional(draft.releaseYear()),
+            normalizeOptional(draft.releaseCountry()),
             now,
             now
         );
@@ -77,6 +79,41 @@ public class InMemoryCanonicalTrackIdentityStore implements CanonicalTrackIdenti
             .filter(identity -> canonicalTrackId.equals(identity.canonicalTrackId()))
             .sorted(Comparator.comparing(IdentityEntry::createdAt).thenComparing(IdentityEntry::canonicalTrackIdentityId))
             .toList();
+    }
+
+    @Override
+    public CanonicalTrackEntry fillReleaseContextIfMissing(
+        Long canonicalTrackId,
+        String releaseYear,
+        String releaseCountry,
+        Instant now
+    ) {
+        CanonicalTrackEntry existing = tracks.get(canonicalTrackId);
+        if (existing == null) {
+            throw new IllegalArgumentException("canonical track was not found: " + canonicalTrackId);
+        }
+        String nextYear = (existing.releaseYear() == null || existing.releaseYear().isBlank())
+            ? normalizeOptional(releaseYear)
+            : existing.releaseYear();
+        String nextCountry = (existing.releaseCountry() == null || existing.releaseCountry().isBlank())
+            ? normalizeOptional(releaseCountry)
+            : existing.releaseCountry();
+        if (java.util.Objects.equals(nextYear, existing.releaseYear())
+            && java.util.Objects.equals(nextCountry, existing.releaseCountry())) {
+            return existing;
+        }
+        Instant resolvedNow = now == null ? Instant.now() : now;
+        CanonicalTrackEntry updated = new CanonicalTrackEntry(
+            existing.canonicalTrackId(),
+            existing.displayTitle(),
+            existing.displayArtistName(),
+            nextYear,
+            nextCountry,
+            existing.createdAt(),
+            resolvedNow
+        );
+        tracks.put(canonicalTrackId, updated);
+        return updated;
     }
 
     private String normalizeDisplayTitle(String value) {

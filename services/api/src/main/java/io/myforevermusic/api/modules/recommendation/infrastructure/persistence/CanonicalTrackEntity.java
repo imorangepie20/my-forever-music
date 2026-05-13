@@ -24,6 +24,12 @@ public class CanonicalTrackEntity {
     @Column(name = "display_artist_name", length = 500)
     private String displayArtistName;
 
+    @Column(name = "release_year", length = 20)
+    private String releaseYear;
+
+    @Column(name = "release_country", length = 50)
+    private String releaseCountry;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -32,9 +38,17 @@ public class CanonicalTrackEntity {
 
     protected CanonicalTrackEntity() {}
 
-    public CanonicalTrackEntity(String displayTitle, String displayArtistName, Instant now) {
+    public CanonicalTrackEntity(
+        String displayTitle,
+        String displayArtistName,
+        String releaseYear,
+        String releaseCountry,
+        Instant now
+    ) {
         this.displayTitle = truncate(displayTitle, 500);
         this.displayArtistName = truncate(displayArtistName, 500);
+        this.releaseYear = truncate(releaseYear, 20);
+        this.releaseCountry = truncate(releaseCountry, 50);
         this.createdAt = now;
         this.updatedAt = now;
     }
@@ -44,6 +58,8 @@ public class CanonicalTrackEntity {
             id,
             displayTitle,
             displayArtistName,
+            releaseYear,
+            releaseCountry,
             createdAt,
             updatedAt
         );
@@ -51,6 +67,32 @@ public class CanonicalTrackEntity {
 
     public Long getId() {
         return id;
+    }
+
+    public String getReleaseYear() {
+        return releaseYear;
+    }
+
+    public String getReleaseCountry() {
+        return releaseCountry;
+    }
+
+    public boolean fillReleaseContextIfMissing(String releaseYear, String releaseCountry, Instant now) {
+        boolean changed = false;
+        if ((this.releaseYear == null || this.releaseYear.isBlank())
+            && releaseYear != null && !releaseYear.isBlank()) {
+            this.releaseYear = truncate(releaseYear, 20);
+            changed = true;
+        }
+        if ((this.releaseCountry == null || this.releaseCountry.isBlank())
+            && releaseCountry != null && !releaseCountry.isBlank()) {
+            this.releaseCountry = truncate(releaseCountry, 50);
+            changed = true;
+        }
+        if (changed) {
+            this.updatedAt = now;
+        }
+        return changed;
     }
 
     private static String truncate(String value, int maxLength) {

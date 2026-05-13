@@ -15,6 +15,18 @@ public interface CanonicalTrackIdentityStore {
 
     List<IdentityEntry> findIdentitiesByCanonicalTrackId(Long canonicalTrackId);
 
+    /**
+     * 기존 canonical track에 release_year/release_country가 비어 있으면 채운다.
+     * 둘 다 채워져 있으면 no-op. 새 값이 null이면 그 자리는 건드리지 않는다.
+     * @return 갱신된 (또는 그대로인) canonical track entry
+     */
+    CanonicalTrackEntry fillReleaseContextIfMissing(
+        Long canonicalTrackId,
+        String releaseYear,
+        String releaseCountry,
+        Instant now
+    );
+
     static String normalizeSource(String source) {
         return normalizeRequired(source, "source").toLowerCase(Locale.ROOT);
     }
@@ -53,6 +65,8 @@ public interface CanonicalTrackIdentityStore {
         String source,
         Double confidenceScore,
         Long createdFromCandidateId,
+        String releaseYear,
+        String releaseCountry,
         Instant now
     ) {}
 
@@ -60,6 +74,8 @@ public interface CanonicalTrackIdentityStore {
         Long canonicalTrackId,
         String displayTitle,
         String displayArtistName,
+        String releaseYear,
+        String releaseCountry,
         Instant createdAt,
         Instant updatedAt
     ) {}

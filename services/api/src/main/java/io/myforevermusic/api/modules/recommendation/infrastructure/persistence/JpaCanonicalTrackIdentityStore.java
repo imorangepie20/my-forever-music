@@ -41,6 +41,8 @@ public class JpaCanonicalTrackIdentityStore implements CanonicalTrackIdentitySto
         CanonicalTrackEntity track = trackRepository.save(new CanonicalTrackEntity(
             normalizeDisplayTitle(draft.displayTitle()),
             normalizeOptional(draft.displayArtistName()),
+            normalizeOptional(draft.releaseYear()),
+            normalizeOptional(draft.releaseCountry()),
             now
         ));
         CanonicalTrackIdentityEntity identity = identityRepository.save(new CanonicalTrackIdentityEntity(
@@ -77,6 +79,25 @@ public class JpaCanonicalTrackIdentityStore implements CanonicalTrackIdentitySto
         return identityRepository.findByCanonicalTrackIdOrderByCreatedAtAscIdAsc(canonicalTrackId).stream()
             .map(CanonicalTrackIdentityEntity::toEntry)
             .toList();
+    }
+
+    @Override
+    @Transactional
+    public CanonicalTrackEntry fillReleaseContextIfMissing(
+        Long canonicalTrackId,
+        String releaseYear,
+        String releaseCountry,
+        Instant now
+    ) {
+        CanonicalTrackEntity track = trackRepository.findById(canonicalTrackId)
+            .orElseThrow(() -> new IllegalArgumentException("canonical track was not found: " + canonicalTrackId));
+        Instant resolvedNow = now == null ? Instant.now() : now;
+        track.fillReleaseContextIfMissing(
+            normalizeOptional(releaseYear),
+            normalizeOptional(releaseCountry),
+            resolvedNow
+        );
+        return trackRepository.save(track).toEntry();
     }
 
     private String normalizeDisplayTitle(String value) {
