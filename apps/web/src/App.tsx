@@ -4,6 +4,7 @@ import EmsPage from './pages/EmsPage'
 import EmsPlaylistDetailPage from './pages/EmsPlaylistDetailPage'
 import EmsPoolAdminPage from './pages/EmsPoolAdminPage'
 import EmsSearchPlaylistDetailPage from './pages/EmsSearchPlaylistDetailPage'
+import GmsPlaylistsPage from './pages/GmsPlaylistsPage'
 import GmsPreviewPage from './pages/GmsPreviewPage'
 import HomePage from './pages/HomePage'
 import NotFoundPage from './pages/NotFoundPage'
@@ -33,6 +34,7 @@ function App() {
                     <Route path="recommendations/quality-admin" element={<PlaylistQualityAdminPage />} />
                     <Route path="recommendations/sasrec-admin" element={<SasrecModelAdminPage />} />
                     <Route path="recommendations/metadata-admin" element={<MetadataNormalizationAdminPage />} />
+                    <Route path="gms-playlists" element={<GmsPlaylistsPage />} />
                     <Route path="gms-preview" element={<GmsPreviewPage />} />
                     <Route path="playback-harness" element={<PlaybackHarnessPage />} />
                     <Route path="ems/search/playlists/:platformId/:externalPlaylistId" element={<EmsSearchPlaylistDetailPage />} />

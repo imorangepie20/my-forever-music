@@ -52,6 +52,9 @@ import type {
     EmsOverviewResponse,
     EmsWorkspaceAnalysisRequest,
     EmsWorkspaceAnalysisResponse,
+    GmsPlaylistPreviewResponse,
+    GmsPlaylistSaveRequest,
+    GmsPlaylistSaveResponse,
     GmsRecommendationPreviewRequest,
     GmsRecommendationPreviewResponse,
     GmsRecommendationFeedbackRequest,
@@ -648,3 +651,34 @@ export const recordGmsRecommendationFeedback = (payload: GmsRecommendationFeedba
         },
         body: JSON.stringify(payload),
     })
+
+export const fetchGmsPlaylistPreview = (
+    userId: string,
+    limit?: number,
+    signal?: AbortSignal,
+) => {
+    const params = new URLSearchParams({ user_id: userId })
+    if (limit != null) {
+        params.set('limit', String(limit))
+    }
+    return requestJson<GmsPlaylistPreviewResponse>(
+        `/api/v1/gms/playlists/preview?${params.toString()}`,
+        { signal },
+    )
+}
+
+export const saveGmsPlaylistToPms = (
+    playlistId: number,
+    userId: string,
+    payload?: GmsPlaylistSaveRequest,
+) =>
+    requestJson<GmsPlaylistSaveResponse>(
+        `/api/v1/gms/playlists/${playlistId}/save?user_id=${encodeURIComponent(userId)}`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload ?? {}),
+        },
+    )

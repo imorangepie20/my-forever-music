@@ -57,6 +57,12 @@ const menuItems: MenuItem[] = [
         path: '/ems',
     },
     {
+        label: 'GMS Playlists',
+        description: 'EMS 평가 플레이리스트를 PMS에 저장',
+        icon: <Sparkles size={20} />,
+        path: '/gms-playlists',
+    },
+    {
         label: 'GMS Approval',
         description: 'Review and save candidates',
         icon: <Sparkles size={20} />,

@@ -892,6 +892,49 @@ export interface GmsAxisEvidence {
     summary: string
 }
 
+export interface GmsPlaylistPreviewResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string
+    preferred_platform: string | null
+    model_stage: string
+    candidates: GmsPlaylistPreviewItem[]
+}
+
+export interface GmsPlaylistPreviewItem {
+    playlist_id: number
+    external_playlist_id: string
+    source_platform: string
+    title: string
+    curator: string | null
+    description: string | null
+    cover_image_url: string | null
+    platform_external_url: string | null
+    track_count: number
+    audio_feature_filled_count: number
+    affinity_score: number
+    confidence_score: number
+    collected_at: string
+}
+
+export interface GmsPlaylistSaveRequest {
+    title?: string | null
+}
+
+export interface GmsPlaylistSaveResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string
+    ems_playlist_id: number
+    personal_playlist_id: string
+    personal_playlist_title: string
+    personal_playlist_track_count: number
+    added_track_count: number
+    saved_at: string
+}
+
 export interface EmsCollectionSearchRequest {
     user_id: string
     platform_id?: string
