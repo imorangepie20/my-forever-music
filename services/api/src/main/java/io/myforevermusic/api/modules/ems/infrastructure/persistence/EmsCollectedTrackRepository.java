@@ -17,6 +17,49 @@ public interface EmsCollectedTrackRepository extends JpaRepository<EmsCollectedT
     @Query("select distinct track.sourcePlatform from EmsCollectedTrackEntity track order by track.sourcePlatform")
     List<String> findDistinctSourcePlatforms();
 
+    List<EmsCollectedTrackEntity> findByTitleIgnoreCaseAndArtistNameIgnoreCase(String title, String artistName);
+
+    List<EmsCollectedTrackEntity> findByTitleIgnoreCase(String title);
+
+    @Modifying
+    @Query("update EmsCollectedTrackEntity track set track.isrc = :isrc where track.id = :id and (track.isrc is null or track.isrc = '')")
+    int updateIsrcIfNull(@Param("id") Long id, @Param("isrc") String isrc);
+
+    @Modifying
+    @Query("update EmsCollectedTrackEntity track set track.isrc = null where track.id = :id and lower(track.isrc) = lower(:isrc)")
+    int clearIsrcIfMatches(@Param("id") Long id, @Param("isrc") String isrc);
+
+    @Modifying
+    @Query("""
+        update EmsCollectedTrackEntity track
+        set track.canonicalTrackId = :canonicalTrackId
+        where lower(track.isrc) = lower(:isrc)
+          and track.canonicalTrackId is null
+        """)
+    int linkCanonicalTrackByIsrc(@Param("isrc") String isrc, @Param("canonicalTrackId") Long canonicalTrackId);
+
+    @Query("""
+        select count(track)
+        from EmsCollectedTrackEntity track
+        where lower(track.isrc) = lower(:isrc)
+          and track.canonicalTrackId is not null
+          and track.canonicalTrackId <> :canonicalTrackId
+        """)
+    long countCanonicalTrackConflictsByIsrc(@Param("isrc") String isrc, @Param("canonicalTrackId") Long canonicalTrackId);
+
+    @Query("""
+        select track
+        from EmsCollectedTrackEntity track
+        where lower(track.isrc) = lower(:isrc)
+          and track.canonicalTrackId is not null
+          and track.canonicalTrackId <> :canonicalTrackId
+        order by track.canonicalTrackId asc, track.id asc
+        """)
+    List<EmsCollectedTrackEntity> findCanonicalTrackConflictsByIsrc(
+        @Param("isrc") String isrc,
+        @Param("canonicalTrackId") Long canonicalTrackId
+    );
+
     @Modifying
     @Query(value = """
         insert into ems_collected_track (

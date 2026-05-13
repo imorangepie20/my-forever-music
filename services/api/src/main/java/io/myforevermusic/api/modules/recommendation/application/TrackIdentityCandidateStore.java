@@ -9,6 +9,11 @@ public interface TrackIdentityCandidateStore {
     String STATUS_PENDING = "pending";
     String STATUS_ACCEPTED = "accepted";
     String STATUS_REJECTED = "rejected";
+    String STATUS_APPLIED = "applied";
+    String STATUS_NO_MATCH = "no_match";
+    String STATUS_CONFLICT = "conflict";
+    String STATUS_ROLLED_BACK = "rolled_back";
+    String STATUS_REVIEW_REQUIRED = "review_required";
 
     Entry save(Draft draft);
 

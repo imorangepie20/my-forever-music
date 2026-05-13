@@ -1146,6 +1146,27 @@ export interface MetadataLookupResponse {
     saved_candidates: TrackIdentityCandidateItem[]
 }
 
+export interface MetadataExternalLookupCandidate {
+    source: string
+    candidate_kind: string
+    candidate_value: string
+    label: string | null
+    description: string | null
+    candidate_score: number | null
+}
+
+export interface MetadataExternalLookupResponse {
+    service: string
+    status: string
+    generated_at: string
+    source: string
+    title: string
+    artist: string | null
+    total_count: number
+    candidates: MetadataExternalLookupCandidate[]
+    saved_candidates: TrackIdentityCandidateItem[]
+}
+
 export interface MetadataCandidateListResponse {
     service: string
     status: string
@@ -1169,6 +1190,121 @@ export interface MetadataCandidateAutoAcceptResponse {
     accepted_count: number
     skipped_count: number
     accepted: TrackIdentityCandidateItem[]
+}
+
+export interface MetadataCandidateAppliedItem {
+    candidate: TrackIdentityCandidateItem
+    updated_track_ids: number[]
+    conflict_track_ids: number[]
+}
+
+export interface MetadataCandidateApplyResponse {
+    service: string
+    status: string
+    generated_at: string
+    reviewed_count: number
+    isrc_considered_count: number
+    applied_count: number
+    no_match_count: number
+    conflict_count: number
+    applied: MetadataCandidateAppliedItem[]
+    no_match: TrackIdentityCandidateItem[]
+    conflicts: TrackIdentityCandidateItem[]
+}
+
+export interface MetadataCandidateRollbackResponse {
+    service: string
+    status: string
+    generated_at: string
+    candidate: TrackIdentityCandidateItem
+    target_track_ids: number[]
+    cleared_track_ids: number[]
+    skipped_track_ids: number[]
+}
+
+export interface CanonicalTrackItem {
+    canonical_track_id: number
+    display_title: string
+    display_artist_name: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface CanonicalTrackIdentityItem {
+    canonical_track_identity_id: number
+    canonical_track_id: number
+    identity_kind: string
+    identity_value: string
+    source: string
+    confidence_score: number | null
+    status: string
+    created_from_candidate_id: number | null
+    created_at: string
+    updated_at: string
+}
+
+export interface CanonicalRowLinkItem {
+    ems_linked_count: number
+    ems_conflict_count: number
+    pms_imported_linked_count: number
+    pms_imported_conflict_count: number
+    pms_user_linked_count: number
+    pms_user_conflict_count: number
+    total_conflict_count: number
+}
+
+export interface MetadataCandidateCanonicalPromotionResponse {
+    service: string
+    status: string
+    generated_at: string
+    candidate: TrackIdentityCandidateItem
+    canonical_track: CanonicalTrackItem
+    identity: CanonicalTrackIdentityItem
+    created_canonical_track: boolean
+    created_identity: boolean
+    links: CanonicalRowLinkItem
+}
+
+export interface CanonicalLinkConflictRowItem {
+    track_store: string
+    row_id: string
+    existing_canonical_track_id: number
+    title: string
+    artist_name: string
+    source_platform: string
+    external_track_id: string
+    isrc: string | null
+}
+
+export interface MetadataCandidateCanonicalLinkConflictResponse {
+    service: string
+    status: string
+    generated_at: string
+    candidate: TrackIdentityCandidateItem
+    target_identity: CanonicalTrackIdentityItem
+    rows: CanonicalLinkConflictRowItem[]
+}
+
+export interface MetadataCandidateAuditItem {
+    id: number
+    candidate_id: number
+    action: string
+    ems_collected_track_id: number | null
+    candidate_value: string | null
+    previous_isrc: string | null
+    new_isrc: string | null
+    status: string
+    message: string | null
+    acted_by: string | null
+    acted_at: string
+}
+
+export interface MetadataCandidateAuditResponse {
+    service: string
+    status: string
+    generated_at: string
+    candidate: TrackIdentityCandidateItem
+    entries: MetadataCandidateAuditItem[]
 }
 
 export interface SasrecUserTrainLogItem {

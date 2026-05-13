@@ -76,6 +76,13 @@ app:
     reccobeats:
       enabled: ${RECCOBEATS_ENABLED:true}
       base-url: ${RECCOBEATS_API_BASE_URL:https://api.reccobeats.com/v1}
+  recommendation:
+    metadata:
+      wikidata:
+        user-agent: ${APP_RECOMMENDATION_METADATA_WIKIDATA_USER_AGENT:MyForeverMusic/1.0 ( admin@my-forever-music.local )}
+      discogs:
+        user-agent: ${APP_RECOMMENDATION_METADATA_DISCOGS_USER_AGENT:MyForeverMusic/1.0}
+        token: ${DISCOGS_TOKEN:${APP_RECOMMENDATION_METADATA_DISCOGS_TOKEN:}}
   platform:
     lastfm:
       enabled: ${LASTFM_ENABLED:false}

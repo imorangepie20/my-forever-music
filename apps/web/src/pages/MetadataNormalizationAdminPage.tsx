@@ -1,24 +1,42 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, BadgeCheck, Check, Compass, RefreshCw, Search, ShieldCheck, X } from 'lucide-react'
+import { AlertTriangle, BadgeCheck, Check, Compass, History, Link2, RefreshCw, RotateCcw, Search, ShieldCheck, X } from 'lucide-react'
 import Button from '@/components/common/Button'
 import ConfirmDialog from '@/components/common/ConfirmDialog'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
 import {
     acceptMetadataCandidateForAdmin,
+    applyAcceptedIsrcCandidatesForAdmin,
     autoAcceptMetadataCandidatesForAdmin,
+    fetchMetadataCandidateCanonicalLinkConflictsForAdmin,
+    fetchMetadataCandidateAuditForAdmin,
     listMetadataCandidatesForAdmin,
+    lookupDiscogsMastersForAdmin,
     lookupMusicBrainzRecordingsForAdmin,
+    lookupWikidataEntitiesForAdmin,
+    promoteMetadataCandidateToCanonicalForAdmin,
     rejectMetadataCandidateForAdmin,
+    rollbackAppliedIsrcCandidateForAdmin,
 } from '@/services/api'
-import type { MetadataLookupResponse, TrackIdentityCandidateItem } from '@/types/api'
+import type {
+    MetadataCandidateAuditResponse,
+    MetadataCandidateCanonicalLinkConflictResponse,
+    MetadataExternalLookupResponse,
+    MetadataLookupResponse,
+    TrackIdentityCandidateItem,
+} from '@/types/api'
 
 const ADMIN_EMAIL = 'jowoosungtidal@gmail.com'
 
-type StatusFilter = 'pending' | 'accepted' | 'rejected' | 'all'
+type StatusFilter = 'pending' | 'accepted' | 'applied' | 'no_match' | 'conflict' | 'rolled_back' | 'review_required' | 'rejected' | 'all'
 
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
     { value: 'pending', label: 'Pending' },
     { value: 'accepted', label: 'Accepted' },
+    { value: 'applied', label: 'Applied' },
+    { value: 'no_match', label: 'No match' },
+    { value: 'conflict', label: 'Conflict' },
+    { value: 'rolled_back', label: 'Rolled back' },
+    { value: 'review_required', label: 'Review' },
     { value: 'rejected', label: 'Rejected' },
     { value: 'all', label: 'All' },
 ]
@@ -26,8 +44,33 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
 const statusTone: Record<string, string> = {
     pending: 'border-amber-300/40 bg-amber-300/10 text-amber-100',
     accepted: 'border-emerald-300/40 bg-emerald-300/10 text-emerald-100',
+    applied: 'border-sky-300/40 bg-sky-300/10 text-sky-100',
+    no_match: 'border-zinc-300/40 bg-zinc-300/10 text-zinc-100',
+    conflict: 'border-orange-300/40 bg-orange-300/10 text-orange-100',
+    rolled_back: 'border-cyan-300/40 bg-cyan-300/10 text-cyan-100',
+    review_required: 'border-violet-300/40 bg-violet-300/10 text-violet-100',
     rejected: 'border-rose-300/40 bg-rose-300/10 text-rose-100',
 }
+
+const isCanonicalPromotableCandidate = (candidate: TrackIdentityCandidateItem) => {
+    const kind = candidate.candidate_kind.toLowerCase()
+    const supported = kind === 'isrc'
+        || kind === 'mbid'
+        || kind === 'musicbrainz_recording_id'
+        || kind === 'wikidata_qid'
+        || kind === 'discogs_master_id'
+        || kind === 'discogs_release_id'
+    if (!supported) {
+        return false
+    }
+    if (kind === 'isrc') {
+        return candidate.status === 'applied'
+    }
+    return candidate.status === 'accepted' || candidate.status === 'applied'
+}
+
+const isCanonicalConflictReviewCandidate = (candidate: TrackIdentityCandidateItem) =>
+    candidate.status === 'applied' && candidate.candidate_kind.toLowerCase() === 'isrc'
 
 const formatDateTime = (value: string | null) => {
     if (!value) {
@@ -45,6 +88,9 @@ type PendingResolution =
     | { kind: 'accept'; candidate: TrackIdentityCandidateItem }
     | { kind: 'reject'; candidate: TrackIdentityCandidateItem }
     | { kind: 'autoAccept'; minScore: number; limit: number }
+    | { kind: 'applyAcceptedIsrc'; limit: number }
+    | { kind: 'rollbackAppliedIsrc'; candidate: TrackIdentityCandidateItem }
+    | { kind: 'promoteCanonical'; candidate: TrackIdentityCandidateItem }
 
 const MetadataNormalizationAdminPage = () => {
     const { session } = useAuthSession()
@@ -55,6 +101,7 @@ const MetadataNormalizationAdminPage = () => {
     const [limit, setLimit] = useState(10)
     const [persist, setPersist] = useState(true)
     const [lookupResult, setLookupResult] = useState<MetadataLookupResponse | null>(null)
+    const [externalLookupResult, setExternalLookupResult] = useState<MetadataExternalLookupResponse | null>(null)
     const [lookupLoading, setLookupLoading] = useState(false)
     const [lookupError, setLookupError] = useState<string | null>(null)
 
@@ -67,6 +114,16 @@ const MetadataNormalizationAdminPage = () => {
     const [resolveNotes, setResolveNotes] = useState('')
     const [autoAcceptMinScore, setAutoAcceptMinScore] = useState(0.95)
     const [autoAcceptSummary, setAutoAcceptSummary] = useState<string | null>(null)
+    const [applyAcceptedSummary, setApplyAcceptedSummary] = useState<string | null>(null)
+    const [rollbackSummary, setRollbackSummary] = useState<string | null>(null)
+    const [canonicalPromotionSummary, setCanonicalPromotionSummary] = useState<string | null>(null)
+    const [auditResult, setAuditResult] = useState<MetadataCandidateAuditResponse | null>(null)
+    const [auditLoadingCandidateId, setAuditLoadingCandidateId] = useState<number | null>(null)
+    const [auditError, setAuditError] = useState<string | null>(null)
+    const [canonicalConflictResult, setCanonicalConflictResult] =
+        useState<MetadataCandidateCanonicalLinkConflictResponse | null>(null)
+    const [canonicalConflictLoadingCandidateId, setCanonicalConflictLoadingCandidateId] = useState<number | null>(null)
+    const [canonicalConflictError, setCanonicalConflictError] = useState<string | null>(null)
 
     const loadCandidates = useCallback(async (signal?: AbortSignal) => {
         if (!session || !isAdmin) {
@@ -109,11 +166,46 @@ const MetadataNormalizationAdminPage = () => {
                 persist,
             )
             setLookupResult(response)
+            setExternalLookupResult(null)
             if (persist) {
                 await loadCandidates()
             }
         } catch (err) {
             setLookupError(err instanceof Error ? err.message : 'MusicBrainz lookup 이 실패했습니다.')
+        } finally {
+            setLookupLoading(false)
+        }
+    }
+
+    const handleExternalLookup = async (source: 'wikidata' | 'discogs') => {
+        if (!session || !title.trim()) {
+            return
+        }
+        setLookupLoading(true)
+        setLookupError(null)
+        try {
+            const response = source === 'wikidata'
+                ? await lookupWikidataEntitiesForAdmin(
+                    session.userId,
+                    title.trim(),
+                    artist.trim() || undefined,
+                    Math.max(1, Math.min(25, limit)),
+                    persist,
+                )
+                : await lookupDiscogsMastersForAdmin(
+                    session.userId,
+                    title.trim(),
+                    artist.trim() || undefined,
+                    Math.max(1, Math.min(25, limit)),
+                    persist,
+                )
+            setExternalLookupResult(response)
+            setLookupResult(null)
+            if (persist) {
+                await loadCandidates()
+            }
+        } catch (err) {
+            setLookupError(err instanceof Error ? err.message : `${source} lookup 이 실패했습니다.`)
         } finally {
             setLookupLoading(false)
         }
@@ -134,6 +226,28 @@ const MetadataNormalizationAdminPage = () => {
                 setAutoAcceptSummary(
                     `threshold ${result.threshold.toFixed(2)} — reviewed ${result.reviewed_count}, accepted ${result.accepted_count}, skipped ${result.skipped_count}.`,
                 )
+            } else if (pendingResolution.kind === 'applyAcceptedIsrc') {
+                const result = await applyAcceptedIsrcCandidatesForAdmin(session.userId, pendingResolution.limit)
+                setApplyAcceptedSummary(
+                    `reviewed ${result.reviewed_count}, ISRC ${result.isrc_considered_count}, applied ${result.applied_count}, no match ${result.no_match_count}, conflict ${result.conflict_count}.`,
+                )
+            } else if (pendingResolution.kind === 'rollbackAppliedIsrc') {
+                const result = await rollbackAppliedIsrcCandidateForAdmin(
+                    session.userId,
+                    pendingResolution.candidate.id,
+                    resolveNotes.trim() || null,
+                )
+                setRollbackSummary(
+                    `candidate #${result.candidate.id} -> ${result.candidate.status}; cleared ${result.cleared_track_ids.length}, skipped ${result.skipped_track_ids.length}.`,
+                )
+            } else if (pendingResolution.kind === 'promoteCanonical') {
+                const result = await promoteMetadataCandidateToCanonicalForAdmin(
+                    session.userId,
+                    pendingResolution.candidate.id,
+                )
+                setCanonicalPromotionSummary(
+                    `candidate #${result.candidate.id} -> canonical track #${result.canonical_track.canonical_track_id}, identity #${result.identity.canonical_track_identity_id}; created=${result.created_identity ? 'yes' : 'already existed'}; linked EMS ${result.links.ems_linked_count}, PMS imported ${result.links.pms_imported_linked_count}, PMS user ${result.links.pms_user_linked_count}, conflicts ${result.links.total_conflict_count}.`,
+                )
             } else {
                 const candidateId = pendingResolution.candidate.id
                 if (pendingResolution.kind === 'accept') {
@@ -152,12 +266,53 @@ const MetadataNormalizationAdminPage = () => {
         }
     }
 
+    const handleAuditLoad = async (candidate: TrackIdentityCandidateItem) => {
+        if (!session) {
+            return
+        }
+        setAuditLoadingCandidateId(candidate.id)
+        setAuditError(null)
+        try {
+            const result = await fetchMetadataCandidateAuditForAdmin(session.userId, candidate.id)
+            setAuditResult(result)
+        } catch (err) {
+            setAuditError(err instanceof Error ? err.message : 'Audit 이력을 불러오지 못했습니다.')
+        } finally {
+            setAuditLoadingCandidateId(null)
+        }
+    }
+
+    const handleCanonicalConflictLoad = async (candidate: TrackIdentityCandidateItem) => {
+        if (!session) {
+            return
+        }
+        setCanonicalConflictLoadingCandidateId(candidate.id)
+        setCanonicalConflictError(null)
+        try {
+            const result = await fetchMetadataCandidateCanonicalLinkConflictsForAdmin(session.userId, candidate.id)
+            setCanonicalConflictResult(result)
+        } catch (err) {
+            setCanonicalConflictError(err instanceof Error ? err.message : 'Canonical link conflict 를 불러오지 못했습니다.')
+        } finally {
+            setCanonicalConflictLoadingCandidateId(null)
+        }
+    }
+
     const dialogTitle = useMemo(() => {
         if (!pendingResolution) {
             return ''
         }
         if (pendingResolution.kind === 'autoAccept') {
             return `Auto-accept pending candidates (score >= ${pendingResolution.minScore.toFixed(2)})`
+        }
+        if (pendingResolution.kind === 'applyAcceptedIsrc') {
+            return 'Apply accepted ISRC candidates'
+        }
+        if (pendingResolution.kind === 'rollbackAppliedIsrc') {
+            return `Rollback ISRC candidate #${pendingResolution.candidate.id}`
+        }
+        if (pendingResolution.kind === 'promoteCanonical') {
+            return `Promote candidate #${pendingResolution.candidate.id}`
         }
         return pendingResolution.kind === 'accept'
             ? `Accept candidate #${pendingResolution.candidate.id}`
@@ -171,6 +326,15 @@ const MetadataNormalizationAdminPage = () => {
         if (pendingResolution.kind === 'autoAccept') {
             return `최근 pending candidate 최대 ${pendingResolution.limit}건 중\ncandidate_score >= ${pendingResolution.minScore.toFixed(2)} 인 후보를 한꺼번에 accept 합니다.`
         }
+        if (pendingResolution.kind === 'applyAcceptedIsrc') {
+            return `최근 accepted ISRC candidate 최대 ${pendingResolution.limit}건을 query title/artist 기준 EMS track 에 적용합니다.\n기존 ISRC 가 다르면 conflict 로 남기고 덮어쓰지 않습니다.`
+        }
+        if (pendingResolution.kind === 'rollbackAppliedIsrc') {
+            return `${pendingResolution.candidate.candidate_value} 를 적용 당시 기록된 EMS track id 에서만 제거합니다.\n현재 ISRC 가 달라졌거나 적용 track id 를 찾을 수 없으면 review_required 로 남깁니다.`
+        }
+        if (pendingResolution.kind === 'promoteCanonical') {
+            return `${pendingResolution.candidate.source}/${pendingResolution.candidate.candidate_kind} = ${pendingResolution.candidate.candidate_value}\n이 candidate 를 canonical_track_identity 에 upsert 합니다. Candidate 상태는 바꾸지 않고 audit 에 승격 이력만 남깁니다.`
+        }
         return `${pendingResolution.candidate.source}/${pendingResolution.candidate.candidate_kind} = ${pendingResolution.candidate.candidate_value}\nquery: ${pendingResolution.candidate.query_title}${pendingResolution.candidate.query_artist ? ` / ${pendingResolution.candidate.query_artist}` : ''}`
     }, [pendingResolution])
 
@@ -179,12 +343,15 @@ const MetadataNormalizationAdminPage = () => {
             return ''
         }
         if (pendingResolution.kind === 'autoAccept') return 'Auto-accept'
+        if (pendingResolution.kind === 'applyAcceptedIsrc') return 'Apply ISRCs'
+        if (pendingResolution.kind === 'rollbackAppliedIsrc') return 'Rollback'
+        if (pendingResolution.kind === 'promoteCanonical') return 'Promote'
         return pendingResolution.kind === 'accept' ? 'Accept' : 'Reject'
     }, [pendingResolution])
 
     const dialogVariant = useMemo((): 'primary' | 'danger' => {
         if (!pendingResolution) return 'primary'
-        return pendingResolution.kind === 'reject' ? 'danger' : 'primary'
+        return pendingResolution.kind === 'reject' || pendingResolution.kind === 'rollbackAppliedIsrc' ? 'danger' : 'primary'
     }, [pendingResolution])
 
     if (!session || !isAdmin) {
@@ -211,16 +378,16 @@ const MetadataNormalizationAdminPage = () => {
                     <p className="text-xs font-semibold uppercase tracking-[0.26em]">Metadata Normalization</p>
                 </div>
                 <h2 className="mt-3 text-2xl font-semibold text-hud-text-primary">
-                    MusicBrainz 후보 lookup + review
+                    Metadata 후보 lookup + review
                 </h2>
                 <p className="mt-2 text-sm text-hud-text-secondary">
-                    title + artist 로 recording 후보(MBID/ISRC)를 조회하고, persist 옵션이 켜져 있으면 각 후보를
+                    title + artist 로 MusicBrainz, Wikidata, Discogs 후보를 조회하고, persist 옵션이 켜져 있으면 각 후보를
                     `track_identity_candidate` 에 저장합니다. 운영자는 아래 candidate 목록에서 accept/reject 합니다.
                 </p>
             </section>
 
             <section className="rounded-2xl border border-hud-border-secondary bg-hud-bg-secondary/80 p-6">
-                <div className="grid gap-3 lg:grid-cols-[2fr_2fr_120px_140px_auto]">
+                <div className="grid gap-3 lg:grid-cols-[2fr_2fr_120px_140px_auto_auto_auto]">
                     <input
                         type="text"
                         value={title}
@@ -258,7 +425,25 @@ const MetadataNormalizationAdminPage = () => {
                         disabled={lookupLoading || !title.trim()}
                     >
                         <Search size={16} />
-                        Lookup
+                        MusicBrainz
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void handleExternalLookup('wikidata')}
+                        disabled={lookupLoading || !title.trim()}
+                    >
+                        <Search size={16} />
+                        Wikidata
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void handleExternalLookup('discogs')}
+                        disabled={lookupLoading || !title.trim()}
+                    >
+                        <Search size={16} />
+                        Discogs
                     </Button>
                 </div>
                 {lookupError && (
@@ -294,6 +479,45 @@ const MetadataNormalizationAdminPage = () => {
                                 {lookupResult.candidates.length === 0 && (
                                     <tr>
                                         <td colSpan={5} className="px-4 py-6 text-center text-sm text-hud-text-muted">
+                                            검색 결과가 없습니다.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+                {externalLookupResult && (
+                    <div className="mt-5 overflow-hidden rounded-xl border border-hud-border-secondary">
+                        <div className="flex items-center justify-between border-b border-hud-border-secondary bg-hud-bg-primary/80 px-4 py-3">
+                            <span className="text-sm font-semibold text-hud-text-primary">
+                                {externalLookupResult.source} candidates
+                            </span>
+                            <span className="text-xs text-hud-text-muted">
+                                saved {externalLookupResult.saved_candidates.length} / total {externalLookupResult.total_count}
+                            </span>
+                        </div>
+                        <table className="w-full min-w-[860px] text-left text-sm">
+                            <thead className="bg-hud-bg-primary/60 text-xs uppercase tracking-[0.18em] text-hud-text-muted">
+                                <tr>
+                                    <th className="px-4 py-3">Kind</th>
+                                    <th className="px-4 py-3">Value</th>
+                                    <th className="px-4 py-3">Label</th>
+                                    <th className="px-4 py-3">Description</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-hud-border-secondary">
+                                {externalLookupResult.candidates.map((candidate, idx) => (
+                                    <tr key={`${candidate.source}-${candidate.candidate_value}-${idx}`} className="bg-hud-bg-secondary/40">
+                                        <td className="px-4 py-3 text-hud-text-secondary">{candidate.candidate_kind}</td>
+                                        <td className="px-4 py-3 font-mono text-xs text-hud-text-secondary">{candidate.candidate_value}</td>
+                                        <td className="px-4 py-3 text-hud-text-primary">{candidate.label ?? '-'}</td>
+                                        <td className="px-4 py-3 text-hud-text-secondary">{candidate.description ?? '-'}</td>
+                                    </tr>
+                                ))}
+                                {externalLookupResult.candidates.length === 0 && (
+                                    <tr>
+                                        <td colSpan={4} className="px-4 py-6 text-center text-sm text-hud-text-muted">
                                             검색 결과가 없습니다.
                                         </td>
                                     </tr>
@@ -349,6 +573,15 @@ const MetadataNormalizationAdminPage = () => {
                             <BadgeCheck size={16} />
                             Auto-accept
                         </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setPendingResolution({ kind: 'applyAcceptedIsrc', limit: 100 })}
+                            disabled={resolving}
+                        >
+                            <Check size={16} />
+                            Apply ISRCs
+                        </Button>
                         <Button type="button" variant="outline" onClick={() => void loadCandidates()} disabled={candidatesLoading}>
                             <RefreshCw size={16} />
                             새로고침
@@ -359,6 +592,24 @@ const MetadataNormalizationAdminPage = () => {
                     <div className="mt-4 flex items-start gap-3 rounded-xl border border-hud-accent-primary/30 bg-hud-accent-primary/10 p-4 text-sm text-hud-text-primary">
                         <BadgeCheck size={18} className="text-hud-accent-primary" />
                         <span>{autoAcceptSummary}</span>
+                    </div>
+                )}
+                {applyAcceptedSummary && (
+                    <div className="mt-4 flex items-start gap-3 rounded-xl border border-sky-300/30 bg-sky-500/10 p-4 text-sm text-sky-100">
+                        <Check size={18} />
+                        <span>{applyAcceptedSummary}</span>
+                    </div>
+                )}
+                {rollbackSummary && (
+                    <div className="mt-4 flex items-start gap-3 rounded-xl border border-cyan-300/30 bg-cyan-500/10 p-4 text-sm text-cyan-100">
+                        <RotateCcw size={18} />
+                        <span>{rollbackSummary}</span>
+                    </div>
+                )}
+                {canonicalPromotionSummary && (
+                    <div className="mt-4 flex items-start gap-3 rounded-xl border border-hud-accent-primary/30 bg-hud-accent-primary/10 p-4 text-sm text-hud-text-primary">
+                        <Link2 size={18} className="text-hud-accent-primary" />
+                        <span>{canonicalPromotionSummary}</span>
                     </div>
                 )}
                 {candidatesError && (
@@ -405,32 +656,84 @@ const MetadataNormalizationAdminPage = () => {
                                     </td>
                                     <td className="px-4 py-3 text-xs text-hud-text-muted">{formatDateTime(candidate.created_at)}</td>
                                     <td className="px-4 py-3 text-right">
-                                        {candidate.status === 'pending' && (
-                                            <div className="flex justify-end gap-2">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() => {
-                                                        setResolveNotes('')
-                                                        setPendingResolution({ kind: 'accept', candidate })
-                                                    }}
-                                                >
-                                                    <Check size={14} />
-                                                    Accept
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() => {
-                                                        setResolveNotes('')
-                                                        setPendingResolution({ kind: 'reject', candidate })
-                                                    }}
-                                                >
-                                                    <X size={14} />
-                                                    Reject
-                                                </Button>
-                                            </div>
-                                        )}
+                                        <div className="flex flex-wrap justify-end gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                onClick={() => void handleAuditLoad(candidate)}
+                                                disabled={auditLoadingCandidateId === candidate.id}
+                                            >
+                                                <History size={14} />
+                                                Audit
+                                            </Button>
+                                            {(candidate.status === 'pending' || candidate.status === 'applied') && (
+                                                <>
+                                                    {isCanonicalPromotableCandidate(candidate) && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                setResolveNotes('')
+                                                                setPendingResolution({ kind: 'promoteCanonical', candidate })
+                                                            }}
+                                                        >
+                                                            <Link2 size={14} />
+                                                            Promote
+                                                        </Button>
+                                                    )}
+                                                    {isCanonicalConflictReviewCandidate(candidate) && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            onClick={() => void handleCanonicalConflictLoad(candidate)}
+                                                            disabled={canonicalConflictLoadingCandidateId === candidate.id}
+                                                        >
+                                                            <AlertTriangle size={14} />
+                                                            Conflicts
+                                                        </Button>
+                                                    )}
+                                                    {candidate.status === 'applied' && candidate.candidate_kind === 'isrc' && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="danger"
+                                                            onClick={() => {
+                                                                setResolveNotes('')
+                                                                setPendingResolution({ kind: 'rollbackAppliedIsrc', candidate })
+                                                            }}
+                                                        >
+                                                            <RotateCcw size={14} />
+                                                            Rollback
+                                                        </Button>
+                                                    )}
+                                                    {candidate.status === 'pending' && (
+                                                        <>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                onClick={() => {
+                                                                    setResolveNotes('')
+                                                                    setPendingResolution({ kind: 'accept', candidate })
+                                                                }}
+                                                            >
+                                                                <Check size={14} />
+                                                                Accept
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                onClick={() => {
+                                                                    setResolveNotes('')
+                                                                    setPendingResolution({ kind: 'reject', candidate })
+                                                                }}
+                                                            >
+                                                                <X size={14} />
+                                                                Reject
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -444,6 +747,130 @@ const MetadataNormalizationAdminPage = () => {
                         </tbody>
                     </table>
                 </div>
+                {auditError && (
+                    <div className="mt-4 flex items-start gap-3 rounded-xl border border-rose-300/30 bg-rose-500/10 p-4 text-sm text-rose-100">
+                        <AlertTriangle size={18} />
+                        <span>{auditError}</span>
+                    </div>
+                )}
+                {canonicalConflictError && (
+                    <div className="mt-4 flex items-start gap-3 rounded-xl border border-rose-300/30 bg-rose-500/10 p-4 text-sm text-rose-100">
+                        <AlertTriangle size={18} />
+                        <span>{canonicalConflictError}</span>
+                    </div>
+                )}
+                {canonicalConflictResult && (
+                    <div className="mt-5 overflow-hidden rounded-xl border border-hud-border-secondary">
+                        <div className="flex flex-col gap-1 border-b border-hud-border-secondary bg-hud-bg-primary/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-2 text-hud-text-primary">
+                                <AlertTriangle size={17} />
+                                <span className="text-sm font-semibold">
+                                    Candidate #{canonicalConflictResult.candidate.id} canonical conflicts
+                                </span>
+                            </div>
+                            <span className="font-mono text-xs text-hud-text-muted">
+                                target canonical #{canonicalConflictResult.target_identity.canonical_track_id}
+                            </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[980px] text-left text-sm">
+                                <thead className="bg-hud-bg-primary/60 text-xs uppercase tracking-[0.18em] text-hud-text-muted">
+                                    <tr>
+                                        <th className="px-4 py-3">Store</th>
+                                        <th className="px-4 py-3">Row</th>
+                                        <th className="px-4 py-3">Track</th>
+                                        <th className="px-4 py-3">Platform</th>
+                                        <th className="px-4 py-3">ISRC</th>
+                                        <th className="px-4 py-3">Existing canonical</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-hud-border-secondary">
+                                    {canonicalConflictResult.rows.map((row) => (
+                                        <tr key={`${row.track_store}-${row.row_id}`} className="bg-hud-bg-secondary/30 align-top">
+                                            <td className="px-4 py-3 text-hud-text-primary">{row.track_store}</td>
+                                            <td className="px-4 py-3 font-mono text-xs text-hud-text-secondary">{row.row_id}</td>
+                                            <td className="px-4 py-3">
+                                                <p className="text-hud-text-primary">{row.title}</p>
+                                                <p className="mt-1 text-xs text-hud-text-muted">{row.artist_name}</p>
+                                            </td>
+                                            <td className="px-4 py-3 text-hud-text-secondary">
+                                                {row.source_platform}
+                                                <p className="mt-1 font-mono text-xs text-hud-text-muted">{row.external_track_id}</p>
+                                            </td>
+                                            <td className="px-4 py-3 font-mono text-xs text-hud-text-secondary">{row.isrc ?? '-'}</td>
+                                            <td className="px-4 py-3 font-mono text-xs text-orange-100">
+                                                {row.existing_canonical_track_id}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {canonicalConflictResult.rows.length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="px-4 py-6 text-center text-sm text-hud-text-muted">
+                                                canonical link conflict 가 없습니다.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+                {auditResult && (
+                    <div className="mt-5 overflow-hidden rounded-xl border border-hud-border-secondary">
+                        <div className="flex flex-col gap-1 border-b border-hud-border-secondary bg-hud-bg-primary/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-2 text-hud-text-primary">
+                                <History size={17} />
+                                <span className="text-sm font-semibold">Candidate #{auditResult.candidate.id} audit</span>
+                            </div>
+                            <span className="font-mono text-xs text-hud-text-muted">
+                                {auditResult.candidate.candidate_kind}:{auditResult.candidate.candidate_value}
+                            </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[940px] text-left text-sm">
+                                <thead className="bg-hud-bg-primary/60 text-xs uppercase tracking-[0.18em] text-hud-text-muted">
+                                    <tr>
+                                        <th className="px-4 py-3">Action</th>
+                                        <th className="px-4 py-3">Track</th>
+                                        <th className="px-4 py-3">Value</th>
+                                        <th className="px-4 py-3">Status</th>
+                                        <th className="px-4 py-3">Message</th>
+                                        <th className="px-4 py-3">Acted</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-hud-border-secondary">
+                                    {auditResult.entries.map((entry) => (
+                                        <tr key={entry.id} className="bg-hud-bg-secondary/30 align-top">
+                                            <td className="px-4 py-3 text-hud-text-primary">{entry.action}</td>
+                                            <td className="px-4 py-3 text-hud-text-secondary">
+                                                {entry.ems_collected_track_id == null ? '-' : entry.ems_collected_track_id}
+                                            </td>
+                                            <td className="px-4 py-3 font-mono text-xs text-hud-text-secondary">
+                                                {entry.previous_isrc || entry.new_isrc
+                                                    ? (entry.previous_isrc ?? '-') + ' -> ' + (entry.new_isrc ?? '-')
+                                                    : entry.candidate_value ?? '-'}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className={`rounded-full border px-2.5 py-1 text-[11px] ${statusTone[entry.status] ?? statusTone.pending}`}>
+                                                    {entry.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-hud-text-secondary">{entry.message ?? '-'}</td>
+                                            <td className="px-4 py-3 text-xs text-hud-text-muted">{formatDateTime(entry.acted_at)}</td>
+                                        </tr>
+                                    ))}
+                                    {auditResult.entries.length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="px-4 py-6 text-center text-sm text-hud-text-muted">
+                                                audit 이력이 없습니다.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </section>
 
             <ConfirmDialog

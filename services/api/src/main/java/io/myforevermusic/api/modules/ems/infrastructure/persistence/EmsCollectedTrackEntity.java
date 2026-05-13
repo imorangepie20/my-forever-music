@@ -54,6 +54,9 @@ public class EmsCollectedTrackEntity {
     @Column(name = "collection_source", nullable = false, length = 50)
     private String collectionSource;
 
+    @Column(name = "canonical_track_id")
+    private Long canonicalTrackId;
+
     @Column(name = "collected_at", nullable = false)
     private Instant collectedAt;
 
@@ -98,6 +101,7 @@ public class EmsCollectedTrackEntity {
     public String getPreviewUrl() { return previewUrl; }
     public Integer getDurationMs() { return durationMs; }
     public String getCollectionSource() { return collectionSource; }
+    public Long getCanonicalTrackId() { return canonicalTrackId; }
     public Instant getCollectedAt() { return collectedAt; }
     public EmsTrackAudioFeatures getAudioFeatures() { return audioFeatures; }
 

@@ -66,6 +66,9 @@ public class PmsImportedTrackEntity {
     @Column(name = "playback_target_status", nullable = false, length = 50)
     private String playbackTargetStatus;
 
+    @Column(name = "canonical_track_id")
+    private Long canonicalTrackId;
+
     @Embedded
     private PmsTrackAudioFeatures audioFeatures;
 
@@ -170,6 +173,10 @@ public class PmsImportedTrackEntity {
 
     public String getPlaybackTargetStatus() {
         return playbackTargetStatus;
+    }
+
+    public Long getCanonicalTrackId() {
+        return canonicalTrackId;
     }
 
     public PmsTrackAudioFeatures getAudioFeatures() {

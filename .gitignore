@@ -22,3 +22,5 @@ temp/
 logs/
 *.log
 infra/local-certs/
+apps/web/public/eq.html
+services/ai/models/sasrec/

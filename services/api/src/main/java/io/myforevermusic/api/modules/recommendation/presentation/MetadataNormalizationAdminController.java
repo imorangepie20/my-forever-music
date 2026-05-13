@@ -2,8 +2,10 @@ package io.myforevermusic.api.modules.recommendation.presentation;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import io.myforevermusic.api.modules.recommendation.application.CanonicalTrackIdentityStore;
 import io.myforevermusic.api.modules.recommendation.application.MetadataNormalizationAdminService;
 import io.myforevermusic.api.modules.recommendation.application.MetadataNormalizationAdminService.LookupResult;
+import io.myforevermusic.api.modules.recommendation.application.TrackIdentityCandidateAuditStore;
 import io.myforevermusic.api.modules.recommendation.application.TrackIdentityCandidateStore;
 import io.myforevermusic.api.modules.recommendation.infrastructure.musicbrainz.MusicBrainzClient.MusicBrainzArtistCredit;
 import io.myforevermusic.api.modules.recommendation.infrastructure.musicbrainz.MusicBrainzClient.MusicBrainzRecording;
@@ -53,6 +55,34 @@ public class MetadataNormalizationAdminController {
             result.response().count() == null ? candidates.size() : result.response().count(),
             candidates,
             result.savedCandidates().stream().map(CandidateItem::from).toList()
+        );
+    }
+
+    @Operation(summary = "Look up Wikidata entity candidates by title + artist for the configured admin user")
+    @GetMapping("/wikidata/entities")
+    public ExternalMetadataLookupResponse lookupWikidataEntities(
+        @RequestParam("user_id") String userId,
+        @RequestParam("title") String title,
+        @RequestParam(value = "artist", required = false) String artist,
+        @RequestParam(value = "limit", defaultValue = "10") int limit,
+        @RequestParam(value = "persist", defaultValue = "false") boolean persist
+    ) {
+        return ExternalMetadataLookupResponse.from(
+            adminService.lookupWikidata(userId, title, artist, limit, persist)
+        );
+    }
+
+    @Operation(summary = "Look up Discogs master candidates by title + artist for the configured admin user")
+    @GetMapping("/discogs/masters")
+    public ExternalMetadataLookupResponse lookupDiscogsMasters(
+        @RequestParam("user_id") String userId,
+        @RequestParam("title") String title,
+        @RequestParam(value = "artist", required = false) String artist,
+        @RequestParam(value = "limit", defaultValue = "10") int limit,
+        @RequestParam(value = "persist", defaultValue = "false") boolean persist
+    ) {
+        return ExternalMetadataLookupResponse.from(
+            adminService.lookupDiscogsMasters(userId, title, artist, limit, persist)
         );
     }
 
@@ -172,6 +202,54 @@ public class MetadataNormalizationAdminController {
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record ExternalMetadataLookupResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        String source,
+        String title,
+        String artist,
+        int totalCount,
+        List<ExternalMetadataLookupCandidate> candidates,
+        List<CandidateItem> savedCandidates
+    ) {
+        static ExternalMetadataLookupResponse from(MetadataNormalizationAdminService.ExternalLookupResult result) {
+            return new ExternalMetadataLookupResponse(
+                "api",
+                "ok",
+                Instant.now(),
+                result.source(),
+                result.title(),
+                result.artist(),
+                result.candidates().size(),
+                result.candidates().stream().map(ExternalMetadataLookupCandidate::from).toList(),
+                result.savedCandidates().stream().map(CandidateItem::from).toList()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record ExternalMetadataLookupCandidate(
+        String source,
+        String candidateKind,
+        String candidateValue,
+        String label,
+        String description,
+        Double candidateScore
+    ) {
+        static ExternalMetadataLookupCandidate from(MetadataNormalizationAdminService.ExternalLookupCandidate candidate) {
+            return new ExternalMetadataLookupCandidate(
+                candidate.source(),
+                candidate.candidateKind(),
+                candidate.candidateValue(),
+                candidate.label(),
+                candidate.description(),
+                candidate.candidateScore()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record CandidateListResponse(
         String service,
         String status,
@@ -235,5 +313,308 @@ public class MetadataNormalizationAdminController {
         int acceptedCount,
         int skippedCount,
         List<CandidateItem> accepted
+    ) {}
+
+    @Operation(summary = "List structured audit entries for a track identity candidate")
+    @GetMapping("/candidates/{candidateId}/audit")
+    public CandidateAuditResponse listCandidateAudit(
+        @PathVariable Long candidateId,
+        @RequestParam("user_id") String userId
+    ) {
+        MetadataNormalizationAdminService.CandidateAuditResult result =
+            adminService.listCandidateAudit(userId, candidateId);
+        return new CandidateAuditResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            CandidateItem.from(result.candidate()),
+            result.entries().stream().map(CandidateAuditItem::from).toList()
+        );
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CandidateAuditResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        CandidateItem candidate,
+        List<CandidateAuditItem> entries
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CandidateAuditItem(
+        Long id,
+        Long candidateId,
+        String action,
+        Long emsCollectedTrackId,
+        String candidateValue,
+        String previousIsrc,
+        String newIsrc,
+        String status,
+        String message,
+        String actedBy,
+        Instant actedAt
+    ) {
+        static CandidateAuditItem from(TrackIdentityCandidateAuditStore.Entry entry) {
+            return new CandidateAuditItem(
+                entry.id(),
+                entry.candidateId(),
+                entry.action(),
+                entry.emsCollectedTrackId(),
+                entry.candidateValue(),
+                entry.previousIsrc(),
+                entry.newIsrc(),
+                entry.status(),
+                entry.message(),
+                entry.actedBy(),
+                entry.actedAt()
+            );
+        }
+    }
+
+    @Operation(summary = "Promote an applied candidate into canonical track identity storage")
+    @PostMapping("/candidates/{candidateId}/promote-canonical")
+    public CandidateCanonicalPromotionResponse promoteCandidateToCanonical(
+        @PathVariable Long candidateId,
+        @RequestParam("user_id") String userId
+    ) {
+        MetadataNormalizationAdminService.CanonicalPromotionResult result =
+            adminService.promoteCandidateToCanonicalIdentity(userId, candidateId);
+        return new CandidateCanonicalPromotionResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            CandidateItem.from(result.candidate()),
+            CanonicalTrackItem.from(result.canonicalTrack()),
+            CanonicalTrackIdentityItem.from(result.identity()),
+            result.createdCanonicalTrack(),
+            result.createdIdentity(),
+            CanonicalRowLinkItem.from(result.links())
+        );
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CandidateCanonicalPromotionResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        CandidateItem candidate,
+        CanonicalTrackItem canonicalTrack,
+        CanonicalTrackIdentityItem identity,
+        boolean createdCanonicalTrack,
+        boolean createdIdentity,
+        CanonicalRowLinkItem links
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CanonicalRowLinkItem(
+        int emsLinkedCount,
+        long emsConflictCount,
+        int pmsImportedLinkedCount,
+        long pmsImportedConflictCount,
+        int pmsUserLinkedCount,
+        long pmsUserConflictCount,
+        long totalConflictCount
+    ) {
+        static CanonicalRowLinkItem from(MetadataNormalizationAdminService.CanonicalRowLinkResult result) {
+            return new CanonicalRowLinkItem(
+                result.emsLinkedCount(),
+                result.emsConflictCount(),
+                result.pmsImportedLinkedCount(),
+                result.pmsImportedConflictCount(),
+                result.pmsUserLinkedCount(),
+                result.pmsUserConflictCount(),
+                result.totalConflictCount()
+            );
+        }
+    }
+
+    @Operation(summary = "List EMS/PMS rows whose ISRC points at a different canonical track")
+    @GetMapping("/candidates/{candidateId}/canonical-link-conflicts")
+    public CandidateCanonicalLinkConflictResponse listCanonicalLinkConflicts(
+        @PathVariable Long candidateId,
+        @RequestParam("user_id") String userId
+    ) {
+        MetadataNormalizationAdminService.CanonicalLinkConflictResult result =
+            adminService.listCanonicalLinkConflicts(userId, candidateId);
+        return new CandidateCanonicalLinkConflictResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            CandidateItem.from(result.candidate()),
+            CanonicalTrackIdentityItem.from(result.targetIdentity()),
+            result.rows().stream().map(CanonicalLinkConflictRowItem::from).toList()
+        );
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CandidateCanonicalLinkConflictResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        CandidateItem candidate,
+        CanonicalTrackIdentityItem targetIdentity,
+        List<CanonicalLinkConflictRowItem> rows
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CanonicalLinkConflictRowItem(
+        String trackStore,
+        String rowId,
+        Long existingCanonicalTrackId,
+        String title,
+        String artistName,
+        String sourcePlatform,
+        String externalTrackId,
+        String isrc
+    ) {
+        static CanonicalLinkConflictRowItem from(MetadataNormalizationAdminService.CanonicalLinkConflictRow row) {
+            return new CanonicalLinkConflictRowItem(
+                row.trackStore(),
+                row.rowId(),
+                row.existingCanonicalTrackId(),
+                row.title(),
+                row.artistName(),
+                row.sourcePlatform(),
+                row.externalTrackId(),
+                row.isrc()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CanonicalTrackItem(
+        Long canonicalTrackId,
+        String displayTitle,
+        String displayArtistName,
+        Instant createdAt,
+        Instant updatedAt
+    ) {
+        static CanonicalTrackItem from(CanonicalTrackIdentityStore.CanonicalTrackEntry entry) {
+            return new CanonicalTrackItem(
+                entry.canonicalTrackId(),
+                entry.displayTitle(),
+                entry.displayArtistName(),
+                entry.createdAt(),
+                entry.updatedAt()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CanonicalTrackIdentityItem(
+        Long canonicalTrackIdentityId,
+        Long canonicalTrackId,
+        String identityKind,
+        String identityValue,
+        String source,
+        Double confidenceScore,
+        String status,
+        Long createdFromCandidateId,
+        Instant createdAt,
+        Instant updatedAt
+    ) {
+        static CanonicalTrackIdentityItem from(CanonicalTrackIdentityStore.IdentityEntry entry) {
+            return new CanonicalTrackIdentityItem(
+                entry.canonicalTrackIdentityId(),
+                entry.canonicalTrackId(),
+                entry.identityKind(),
+                entry.identityValue(),
+                entry.source(),
+                entry.confidenceScore(),
+                entry.status(),
+                entry.createdFromCandidateId(),
+                entry.createdAt(),
+                entry.updatedAt()
+            );
+        }
+    }
+
+    @Operation(summary = "Apply accepted ISRC candidates to the matching ems_collected_track rows")
+    @PostMapping("/candidates/apply-accepted-isrcs")
+    public CandidateApplyResponse applyAcceptedIsrcs(
+        @RequestParam("user_id") String userId,
+        @RequestParam(value = "limit", defaultValue = "100") int limit
+    ) {
+        MetadataNormalizationAdminService.IsrcApplyResult result =
+            adminService.applyAcceptedIsrcCandidates(userId, limit);
+        return new CandidateApplyResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            result.reviewedCount(),
+            result.isrcConsideredCount(),
+            result.applied().size(),
+            result.noMatch().size(),
+            result.conflicts().size(),
+            result.applied().stream().map(AppliedCandidateItem::from).toList(),
+            result.noMatch().stream().map(CandidateItem::from).toList(),
+            result.conflicts().stream().map(CandidateItem::from).toList()
+        );
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CandidateApplyResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        int reviewedCount,
+        int isrcConsideredCount,
+        int appliedCount,
+        int noMatchCount,
+        int conflictCount,
+        List<AppliedCandidateItem> applied,
+        List<CandidateItem> noMatch,
+        List<CandidateItem> conflicts
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record AppliedCandidateItem(
+        CandidateItem candidate,
+        List<Long> updatedTrackIds,
+        List<Long> conflictTrackIds
+    ) {
+        static AppliedCandidateItem from(MetadataNormalizationAdminService.AppliedCandidate applied) {
+            return new AppliedCandidateItem(
+                CandidateItem.from(applied.candidate()),
+                applied.updatedTrackIds(),
+                applied.conflictTrackIds()
+            );
+        }
+    }
+
+    @Operation(summary = "Rollback an applied ISRC candidate from the recorded ems_collected_track rows")
+    @PostMapping("/candidates/{candidateId}/rollback-applied-isrc")
+    public CandidateRollbackResponse rollbackAppliedIsrc(
+        @PathVariable Long candidateId,
+        @RequestParam("user_id") String userId,
+        @RequestBody(required = false) CandidateResolutionRequest request
+    ) {
+        MetadataNormalizationAdminService.IsrcRollbackResult result =
+            adminService.rollbackAppliedIsrcCandidate(
+                userId,
+                candidateId,
+                request == null ? null : request.notes()
+            );
+        return new CandidateRollbackResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            CandidateItem.from(result.candidate()),
+            result.targetTrackIds(),
+            result.clearedTrackIds(),
+            result.skippedTrackIds()
+        );
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record CandidateRollbackResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        CandidateItem candidate,
+        List<Long> targetTrackIds,
+        List<Long> clearedTrackIds,
+        List<Long> skippedTrackIds
     ) {}
 }

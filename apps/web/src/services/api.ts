@@ -40,9 +40,15 @@ import type {
     EmsPoolAdminRunDeleteResponse,
     EmsPoolAdminRunDetailResponse,
     EmsPoolAdminRunsResponse,
+    MetadataCandidateAuditResponse,
+    MetadataCandidateApplyResponse,
     MetadataCandidateAutoAcceptResponse,
+    MetadataCandidateCanonicalLinkConflictResponse,
+    MetadataCandidateCanonicalPromotionResponse,
     MetadataCandidateCommandResponse,
     MetadataCandidateListResponse,
+    MetadataCandidateRollbackResponse,
+    MetadataExternalLookupResponse,
     MetadataLookupResponse,
     PlaylistQualityRecentResponse,
     SasrecAutoTrainAdminResponse,
@@ -514,6 +520,52 @@ export const lookupMusicBrainzRecordingsForAdmin = (
     )
 }
 
+export const lookupWikidataEntitiesForAdmin = (
+    userId: string,
+    title: string,
+    artist: string | undefined,
+    limit: number,
+    persist: boolean,
+    signal?: AbortSignal,
+) => {
+    const params = new URLSearchParams({
+        user_id: userId,
+        title,
+        limit: String(limit),
+        persist: persist ? 'true' : 'false',
+    })
+    if (artist && artist.trim()) {
+        params.set('artist', artist)
+    }
+    return requestJson<MetadataExternalLookupResponse>(
+        `/api/v1/recommendations/admin/metadata/wikidata/entities?${params.toString()}`,
+        { signal, cache: 'no-store' },
+    )
+}
+
+export const lookupDiscogsMastersForAdmin = (
+    userId: string,
+    title: string,
+    artist: string | undefined,
+    limit: number,
+    persist: boolean,
+    signal?: AbortSignal,
+) => {
+    const params = new URLSearchParams({
+        user_id: userId,
+        title,
+        limit: String(limit),
+        persist: persist ? 'true' : 'false',
+    })
+    if (artist && artist.trim()) {
+        params.set('artist', artist)
+    }
+    return requestJson<MetadataExternalLookupResponse>(
+        `/api/v1/recommendations/admin/metadata/discogs/masters?${params.toString()}`,
+        { signal, cache: 'no-store' },
+    )
+}
+
 export const listMetadataCandidatesForAdmin = (
     userId: string,
     status: string | undefined,
@@ -576,6 +628,60 @@ export const autoAcceptMetadataCandidatesForAdmin = (
         { method: 'POST' },
     )
 }
+
+export const applyAcceptedIsrcCandidatesForAdmin = (userId: string, limit: number) => {
+    const params = new URLSearchParams({
+        user_id: userId,
+        limit: String(limit),
+    })
+    return requestJson<MetadataCandidateApplyResponse>(
+        `/api/v1/recommendations/admin/metadata/candidates/apply-accepted-isrcs?${params.toString()}`,
+        { method: 'POST' },
+    )
+}
+
+export const fetchMetadataCandidateAuditForAdmin = (
+    userId: string,
+    candidateId: number,
+    signal?: AbortSignal,
+) =>
+    requestJson<MetadataCandidateAuditResponse>(
+        `/api/v1/recommendations/admin/metadata/candidates/${encodeURIComponent(String(candidateId))}/audit?user_id=${encodeURIComponent(userId)}`,
+        { signal, cache: 'no-store' },
+    )
+
+export const rollbackAppliedIsrcCandidateForAdmin = (
+    userId: string,
+    candidateId: number,
+    notes: string | null,
+) =>
+    requestJson<MetadataCandidateRollbackResponse>(
+        `/api/v1/recommendations/admin/metadata/candidates/${encodeURIComponent(String(candidateId))}/rollback-applied-isrc?user_id=${encodeURIComponent(userId)}`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes }),
+        },
+    )
+
+export const promoteMetadataCandidateToCanonicalForAdmin = (
+    userId: string,
+    candidateId: number,
+) =>
+    requestJson<MetadataCandidateCanonicalPromotionResponse>(
+        `/api/v1/recommendations/admin/metadata/candidates/${encodeURIComponent(String(candidateId))}/promote-canonical?user_id=${encodeURIComponent(userId)}`,
+        { method: 'POST' },
+    )
+
+export const fetchMetadataCandidateCanonicalLinkConflictsForAdmin = (
+    userId: string,
+    candidateId: number,
+    signal?: AbortSignal,
+) =>
+    requestJson<MetadataCandidateCanonicalLinkConflictResponse>(
+        `/api/v1/recommendations/admin/metadata/candidates/${encodeURIComponent(String(candidateId))}/canonical-link-conflicts?user_id=${encodeURIComponent(userId)}`,
+        { signal, cache: 'no-store' },
+    )
 
 export const fetchEmsCollectedPlaylists = (platformId: string = 'spotify', signal?: AbortSignal, limit: number = 12) =>
     requestJson<EmsCollectionPlaylistBrowseResponse>(
