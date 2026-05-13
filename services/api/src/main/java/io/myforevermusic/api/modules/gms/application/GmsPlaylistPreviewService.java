@@ -6,11 +6,18 @@ import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollected
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedPlaylistTrackEntity;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedPlaylistTrackRepository;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackEntity;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsTrackAudioFeatures;
+import io.myforevermusic.api.modules.gms.presentation.GmsRecommendationPreviewResponse;
 import io.myforevermusic.api.modules.pms.application.PmsPersonalPlaylistStore;
 import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
+import io.myforevermusic.api.modules.recommendation.application.AxisEvidence;
+import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluation;
+import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluator;
+import io.myforevermusic.api.modules.recommendation.application.RecommendationAxisEvidenceBuilder;
 import io.myforevermusic.api.modules.recommendation.application.UserMusicEventService;
 import io.myforevermusic.api.modules.recommendation.presentation.UserMusicEventRequest;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -39,6 +46,7 @@ public class GmsPlaylistPreviewService {
     private final EmsCollectedPlaylistTrackRepository playlistTrackRepository;
     private final PmsPersonalPlaylistStore personalPlaylistStore;
     private final UserMusicEventService userMusicEventService;
+    private final PlaylistQualityEvaluator playlistQualityEvaluator;
 
     public GmsPlaylistPreviewService(
         AuthAccountStore authAccountStore,
@@ -46,7 +54,8 @@ public class GmsPlaylistPreviewService {
         EmsCollectedPlaylistRepository playlistRepository,
         EmsCollectedPlaylistTrackRepository playlistTrackRepository,
         PmsPersonalPlaylistStore personalPlaylistStore,
-        UserMusicEventService userMusicEventService
+        UserMusicEventService userMusicEventService,
+        PlaylistQualityEvaluator playlistQualityEvaluator
     ) {
         this.authAccountStore = authAccountStore;
         this.pmsUserLibraryStore = pmsUserLibraryStore;
@@ -54,6 +63,7 @@ public class GmsPlaylistPreviewService {
         this.playlistTrackRepository = playlistTrackRepository;
         this.personalPlaylistStore = personalPlaylistStore;
         this.userMusicEventService = userMusicEventService;
+        this.playlistQualityEvaluator = playlistQualityEvaluator;
     }
 
     public GmsPlaylistPreviewResult preview(String userId, Integer limit) {
@@ -90,7 +100,7 @@ public class GmsPlaylistPreviewService {
         List<GmsPlaylistPreviewCandidate> candidates = source.stream()
             .map(playlist -> scoreCandidate(playlist, userArtists))
             .filter(candidate -> candidate.affinityScore() > 0.0d)
-            .sorted((left, right) -> Double.compare(right.affinityScore(), left.affinityScore()))
+            .sorted((left, right) -> Double.compare(right.compositeScore(), left.compositeScore()))
             .limit(safeLimit)
             .toList();
 
@@ -119,8 +129,13 @@ public class GmsPlaylistPreviewService {
         EmsCollectedPlaylistEntity playlist,
         Set<String> userArtists
     ) {
-        long linkedTrackCount = playlistTrackRepository.countTracksByPlaylistId(playlist.getId());
-        long filledFeatureCount = playlistTrackRepository.countAudioFeatureFilledTracksByPlaylistId(playlist.getId());
+        List<EmsCollectedPlaylistTrackEntity> trackLinks =
+            playlistTrackRepository.findByPlaylistIdOrderBySortOrderAsc(playlist.getId());
+        long linkedTrackCount = trackLinks.size();
+        long filledFeatureCount = trackLinks.stream()
+            .map(EmsCollectedPlaylistTrackEntity::getTrack)
+            .filter(track -> track != null && track.getAudioFeatures() != null)
+            .count();
 
         double baseAffinity = userArtists.contains(normalize(playlist.getCurator())) ? 0.45d : 0.15d;
         if (titleMatchesUserArtists(playlist.getTitle(), userArtists)) {
@@ -136,6 +151,18 @@ public class GmsPlaylistPreviewService {
             ? 0.0d
             : Math.min(1.0d, 0.5d + ((double) filledFeatureCount / Math.max(1, linkedTrackCount)) * 0.5d);
 
+        PlaylistQualityEvaluation evaluation = trackLinks.isEmpty()
+            ? null
+            : playlistQualityEvaluator.evaluate(toEvaluatorItems(playlist, trackLinks));
+        Double novelty = computeNoveltyAgainstUserArtists(trackLinks, userArtists);
+        List<AxisEvidence> evidence = RecommendationAxisEvidenceBuilder.build(
+            affinity,
+            novelty,
+            evaluation,
+            confidence
+        );
+        double composite = computeCompositeScore(affinity, novelty, evaluation, confidence);
+
         return new GmsPlaylistPreviewCandidate(
             playlist.getId(),
             playlist.getExternalPlaylistId(),
@@ -149,8 +176,104 @@ public class GmsPlaylistPreviewService {
             filledFeatureCount,
             round(affinity),
             round(confidence),
-            playlist.getCollectedAt()
+            round(composite),
+            playlist.getCollectedAt(),
+            evidence
         );
+    }
+
+    private List<GmsRecommendationPreviewResponse.RecommendationItem> toEvaluatorItems(
+        EmsCollectedPlaylistEntity playlist,
+        List<EmsCollectedPlaylistTrackEntity> trackLinks
+    ) {
+        List<GmsRecommendationPreviewResponse.RecommendationItem> items = new ArrayList<>(trackLinks.size());
+        int rank = 0;
+        for (EmsCollectedPlaylistTrackEntity link : trackLinks) {
+            EmsCollectedTrackEntity track = link.getTrack();
+            if (track == null) {
+                continue;
+            }
+            items.add(new GmsRecommendationPreviewResponse.RecommendationItem(
+                rank++,
+                "ems-%d".formatted(track.getId()),
+                track.getTitle(),
+                track.getArtistName(),
+                track.getSourcePlatform(),
+                playlist.getExternalPlaylistId(),
+                playlist.getTitle(),
+                track.getAlbumTitle(),
+                track.getAlbumImageUrl(),
+                track.getPlatformExternalUrl(),
+                track.getSpotifyUri(),
+                track.getPreviewUrl(),
+                "spotify".equalsIgnoreCase(track.getSourcePlatform()) ? track.getExternalTrackId() : null,
+                track.getDurationMs(),
+                null,
+                "ems",
+                energyLevelFrom(track.getAudioFeatures()),
+                null
+            ));
+        }
+        return items;
+    }
+
+    private Integer energyLevelFrom(EmsTrackAudioFeatures features) {
+        if (features == null || features.getEnergy() == null) {
+            return null;
+        }
+        double clamped = Math.max(0.0d, Math.min(1.0d, features.getEnergy()));
+        return Math.max(1, Math.min(5, (int) Math.round(clamped * 4.0d) + 1));
+    }
+
+    private Double computeNoveltyAgainstUserArtists(
+        List<EmsCollectedPlaylistTrackEntity> trackLinks,
+        Set<String> userArtists
+    ) {
+        if (trackLinks.isEmpty()) {
+            return null;
+        }
+        long counted = 0L;
+        long unfamiliar = 0L;
+        for (EmsCollectedPlaylistTrackEntity link : trackLinks) {
+            EmsCollectedTrackEntity track = link.getTrack();
+            if (track == null) {
+                continue;
+            }
+            String artist = normalize(track.getArtistName());
+            if (artist.isBlank()) {
+                continue;
+            }
+            counted++;
+            if (!userArtists.contains(artist)) {
+                unfamiliar++;
+            }
+        }
+        if (counted == 0L) {
+            return null;
+        }
+        return round((double) unfamiliar / counted);
+    }
+
+    private double computeCompositeScore(
+        double affinity,
+        Double novelty,
+        PlaylistQualityEvaluation evaluation,
+        double confidence
+    ) {
+        double noveltyValue = novelty == null ? 0.5d : novelty;
+        double coherence = evaluation == null || evaluation.coherenceScore() == null
+            ? 0.5d : evaluation.coherenceScore();
+        double diversity = evaluation == null || evaluation.diversityScore() == null
+            ? 0.5d : evaluation.diversityScore();
+        double redundancy = evaluation == null || evaluation.redundancyPenalty() == null
+            ? 0.0d : evaluation.redundancyPenalty();
+        double composite = (0.45d * affinity)
+            + (0.15d * noveltyValue)
+            + (0.15d * coherence)
+            + (0.10d * diversity)
+            + (0.10d * confidence)
+            - (0.05d * redundancy);
+        return Math.max(0.0d, Math.min(1.0d, composite));
     }
 
     private boolean titleMatchesUserArtists(String title, Set<String> userArtists) {
@@ -182,7 +305,9 @@ public class GmsPlaylistPreviewService {
         long audioFeatureFilledCount,
         double affinityScore,
         double confidenceScore,
-        Instant collectedAt
+        double compositeScore,
+        Instant collectedAt,
+        List<AxisEvidence> axisEvidence
     ) {}
 
     public record GmsPlaylistPreviewResult(

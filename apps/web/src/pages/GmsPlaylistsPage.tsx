@@ -11,6 +11,19 @@ const DEFAULT_LIMIT = 12
 
 const formatScore = (value: number) => value.toFixed(2)
 
+const axisLevelClass = (level: string) => {
+    switch (level) {
+        case 'strong':
+            return 'border-hud-accent-primary/40 bg-hud-accent-primary/10 text-hud-accent-primary'
+        case 'moderate':
+            return 'border-hud-border-primary/30 bg-hud-bg-secondary/60 text-hud-text-primary'
+        case 'low':
+            return 'border-amber-300/30 bg-amber-300/10 text-amber-100'
+        default:
+            return 'border-hud-border-secondary bg-hud-bg-secondary/60 text-hud-text-secondary'
+    }
+}
+
 const formatCollectedAt = (value: string) => {
     try {
         return new Date(value).toLocaleString()
@@ -216,15 +229,15 @@ const GmsPlaylistsPage = () => {
 
                                     <div className="grid grid-cols-2 gap-2 text-[11px]">
                                         <div className="rounded-xl border border-hud-border-secondary bg-hud-bg-secondary/60 px-2 py-2">
-                                            <p className="uppercase tracking-[0.18em] text-hud-text-muted">Affinity</p>
+                                            <p className="uppercase tracking-[0.18em] text-hud-text-muted">Composite</p>
                                             <p className="mt-1 font-semibold text-hud-accent-primary">
-                                                {formatScore(candidate.affinity_score)}
+                                                {formatScore(candidate.composite_score)}
                                             </p>
                                         </div>
                                         <div className="rounded-xl border border-hud-border-secondary bg-hud-bg-secondary/60 px-2 py-2">
-                                            <p className="uppercase tracking-[0.18em] text-hud-text-muted">Confidence</p>
+                                            <p className="uppercase tracking-[0.18em] text-hud-text-muted">Affinity</p>
                                             <p className="mt-1 font-semibold text-hud-text-primary">
-                                                {formatScore(candidate.confidence_score)}
+                                                {formatScore(candidate.affinity_score)}
                                             </p>
                                         </div>
                                         <div className="rounded-xl border border-hud-border-secondary bg-hud-bg-secondary/60 px-2 py-2">
@@ -240,6 +253,31 @@ const GmsPlaylistsPage = () => {
                                             </p>
                                         </div>
                                     </div>
+
+                                    {candidate.axis_evidence && candidate.axis_evidence.length > 0 && (
+                                        <ul className="space-y-1.5 rounded-xl border border-hud-border-secondary bg-hud-bg-primary/60 p-2">
+                                            {candidate.axis_evidence.map((evidence) => (
+                                                <li
+                                                    key={`${candidate.playlist_id}-${evidence.axis}`}
+                                                    className="flex items-start gap-2 text-[11px]"
+                                                >
+                                                    <span
+                                                        className={`mt-0.5 inline-flex h-5 min-w-[64px] items-center justify-center rounded-full border px-2 text-[10px] uppercase tracking-[0.18em] ${axisLevelClass(evidence.level)}`}
+                                                    >
+                                                        {evidence.axis}
+                                                    </span>
+                                                    <span className="flex-1 leading-5 text-hud-text-secondary">
+                                                        {evidence.summary}
+                                                        {evidence.score !== null && (
+                                                            <span className="ml-1 text-hud-text-muted">
+                                                                ({evidence.score.toFixed(2)})
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
 
                                     <p className="text-[11px] text-hud-text-muted">
                                         Collected {formatCollectedAt(candidate.collected_at)}

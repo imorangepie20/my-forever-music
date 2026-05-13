@@ -915,7 +915,9 @@ export interface GmsPlaylistPreviewItem {
     audio_feature_filled_count: number
     affinity_score: number
     confidence_score: number
+    composite_score: number
     collected_at: string
+    axis_evidence: GmsAxisEvidence[]
 }
 
 export interface GmsPlaylistSaveRequest {

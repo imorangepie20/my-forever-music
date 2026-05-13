@@ -127,7 +127,8 @@ my-forever-music/
 - `apps/web`의 `/ems/pool-admin`은 polling을 AbortController로 race-safe하게 처리하고 페이지 hidden 시 polling을 중단하며, entry 단위 재시도, run 삭제, 빈 EMS 플레이리스트 일괄 정리, last_error tooltip 표시를 제공함
 - `apps/web`의 공통 컴포넌트로 HUD 템플릿 스타일의 재사용 가능한 `ConfirmDialog`가 추가되어 pool-admin의 위험 동작을 모두 동일한 다이얼로그로 확인받음
 - `services/api`는 `GET /api/v1/gms/playlists/preview`와 `POST /api/v1/gms/playlists/{id}/save` 엔드포인트로 EMS 평가 플레이리스트를 사용자 PMS 라이브러리에 직접 저장하는 GMS playlist 흐름을 제공함 (cold-start 사용자는 409, 결정적 personal playlist id 사용으로 멱등 추가)
-- `apps/web`는 `/gms-playlists` 화면에서 사용자에게 EMS 평가 플레이리스트 후보를 affinity 점수와 함께 카드로 노출하고, ConfirmDialog로 PMS 저장을 승인받음
+- `services/api`의 GMS playlist preview는 후보마다 6축(affinity/novelty/coherence/diversity/redundancy/confidence) evidence와 composite score를 계산해 응답에 포함하고, composite score 기준으로 후보를 재정렬함
+- `apps/web`는 `/gms-playlists` 화면에서 사용자에게 EMS 평가 플레이리스트 후보를 composite/affinity 점수와 6축 evidence 패널과 함께 카드로 노출하고, ConfirmDialog로 PMS 저장을 승인받음
 - `services/ai`는 최소 FastAPI 스캐폴드와 추천 preview API 초안 생성 완료
 - `infra/nginx`는 로컬/운영용 리버스 프록시 설정 템플릿 생성 완료
 - Ubuntu 서버 기준 런북과 Docker/Nginx 템플릿 생성 완료

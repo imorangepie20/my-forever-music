@@ -6,6 +6,7 @@ import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService;
 import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.GmsPlaylistPreviewCandidate;
 import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.GmsPlaylistPreviewResult;
 import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.SaveResult;
+import io.myforevermusic.api.modules.recommendation.application.AxisEvidence;
 import io.swagger.v3.oas.annotations.Operation;
 import java.time.Instant;
 import java.util.List;
@@ -121,7 +122,9 @@ public class GmsPlaylistPreviewController {
         long audioFeatureFilledCount,
         double affinityScore,
         double confidenceScore,
-        Instant collectedAt
+        double compositeScore,
+        Instant collectedAt,
+        List<AxisEvidence> axisEvidence
     ) {
         static GmsPlaylistPreviewItem from(GmsPlaylistPreviewCandidate candidate) {
             return new GmsPlaylistPreviewItem(
@@ -137,7 +140,9 @@ public class GmsPlaylistPreviewController {
                 candidate.audioFeatureFilledCount(),
                 candidate.affinityScore(),
                 candidate.confidenceScore(),
-                candidate.collectedAt()
+                candidate.compositeScore(),
+                candidate.collectedAt(),
+                candidate.axisEvidence()
             );
         }
     }
