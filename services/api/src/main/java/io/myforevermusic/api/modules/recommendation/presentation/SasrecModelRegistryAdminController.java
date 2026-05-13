@@ -55,6 +55,16 @@ public class SasrecModelRegistryAdminController {
         return SasrecRegistryAdminResponse.from(adminService.rollback(userId));
     }
 
+    @Operation(summary = "Resolve another user's model stage for admin debugging")
+    @GetMapping("/users/{targetUserId}/status")
+    public UserModelStatusResponse getUserStatus(
+        @PathVariable String targetUserId,
+        @RequestParam("user_id") String userId
+    ) {
+        SasrecModelRegistryAdminService.UserModelStatus status = adminService.getUserModelStatus(userId, targetUserId);
+        return UserModelStatusResponse.from(status);
+    }
+
     @Operation(summary = "Run a SASRec training pass and auto-promote when qualified")
     @PostMapping("/auto-train")
     public SasrecAutoTrainAdminResponse autoTrain(
@@ -110,6 +120,60 @@ public class SasrecModelRegistryAdminController {
                 response.vocabularySize(),
                 response.trainExampleCount(),
                 response.warnings() == null ? java.util.List.of() : response.warnings()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record UserModelStatusResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        String userId,
+        String modelStage,
+        long pmsTrackCount,
+        String activeModelVersion,
+        String activeModelGeneratedAt,
+        TrainLogItem latestTrainLog,
+        long totalEventCount,
+        Long eventsSinceLastTrain
+    ) {
+        static UserModelStatusResponse from(SasrecModelRegistryAdminService.UserModelStatus status) {
+            return new UserModelStatusResponse(
+                "api",
+                "ok",
+                Instant.now(),
+                status.userId(),
+                status.modelStage(),
+                status.pmsTrackCount(),
+                status.activeModelVersion(),
+                status.activeModelGeneratedAt(),
+                status.latestTrainLog() == null ? null : TrainLogItem.from(status.latestTrainLog()),
+                status.totalEventCount(),
+                status.eventsSinceLastTrain()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record TrainLogItem(
+        Long id,
+        Instant trainedAt,
+        long eventCountAtTrain,
+        String modelVersion,
+        boolean qualified,
+        boolean promoted,
+        String summary
+    ) {
+        static TrainLogItem from(io.myforevermusic.api.modules.recommendation.application.SasrecAutoTrainLogStore.Entry entry) {
+            return new TrainLogItem(
+                entry.id(),
+                entry.trainedAt(),
+                entry.eventCountAtTrain(),
+                entry.modelVersion(),
+                entry.qualified(),
+                entry.promoted(),
+                entry.summary()
             );
         }
     }

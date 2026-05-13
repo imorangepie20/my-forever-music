@@ -657,6 +657,8 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - AI service `SasrecModelRegistryService`에 `registry.json` 기반 promote/disable/rollback/latest 정책을 추가하고, `POST /v1/recommendations/datasets/sasrec/models/{version}/promote`, `.../disable`, `POST .../models/rollback` 엔드포인트로 노출 (latest_model은 promoted 우선 + disabled 제외 시간순 정렬)
 - Spring API에 admin 전용 통과 endpoint(`GET /api/v1/recommendations/admin/sasrec/models/latest`, `POST .../promote`, `.../disable`, `POST .../rollback`)와 frontend `/recommendations/sasrec-admin` 관리자 화면을 추가해 active model 확인 + promote/disable/rollback을 ConfirmDialog로 수행
 
+- Phase 2 5차: 사용자별 모델 단계(cold-start/baseline/personalized) 정의 + admin 조회 endpoint 추가. `cold-start` = PMS user library 비어 있음, `baseline` = import 완료 후 SASRec promoted model 없음(기본 baseline 흐름), `personalized` = SASRec promoted active model 존재. `GET /api/v1/recommendations/admin/sasrec/models/users/{targetUserId}/status?user_id={adminUserId}` 가 PMS track 수, active model_version, 최근 학습 이력, 총 event 수, 마지막 학습 이후 event delta 를 반환. 관리자 전용 `/recommendations/sasrec-admin` 화면에 "Other user lookup" 섹션 추가. 일반 사용자에게는 모델 상태가 노출되지 않으며 결과(추천 곡)만 보인다.
+
 §13-5 첫 단계 운영 범위가 닫힘. 후속 강화 항목:
 
 - 사용자별 음악 학습 모델의 sequence encoder 재학습 자동화 — 1차 적용: `RecommendationModelTrainingService.autoTrainAndPromote(adminUserId)`가 train 후 qualification=true 이면 `SasrecModelRegistryAdminService.promote`를 호출해 active model 로 자동 승격. 관리자 전용 `POST /api/v1/recommendations/admin/sasrec/models/auto-train` endpoint와 `/recommendations/sasrec-admin` 화면의 Auto-Train 버튼으로 노출.

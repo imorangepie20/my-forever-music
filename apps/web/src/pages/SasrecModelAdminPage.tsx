@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, BadgeCheck, BoxSelect, RefreshCw, RotateCcw, ShieldCheck, Sparkles, Undo2 } from 'lucide-react'
+import { AlertTriangle, BadgeCheck, BoxSelect, RefreshCw, RotateCcw, Search, ShieldCheck, Sparkles, Undo2 } from 'lucide-react'
 import Button from '@/components/common/Button'
 import ConfirmDialog from '@/components/common/ConfirmDialog'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
@@ -7,10 +7,15 @@ import {
     autoTrainSasrecForAdmin,
     disableSasrecModelForAdmin,
     fetchLatestSasrecModelForAdmin,
+    fetchSasrecUserStatusForAdmin,
     promoteSasrecModelForAdmin,
     rollbackSasrecModelForAdmin,
 } from '@/services/api'
-import type { SasrecAutoTrainAdminResponse, SasrecRegistryAdminResponse } from '@/types/api'
+import type {
+    SasrecAutoTrainAdminResponse,
+    SasrecRegistryAdminResponse,
+    SasrecUserModelStatusResponse,
+} from '@/types/api'
 
 const ADMIN_EMAIL = 'jowoosungtidal@gmail.com'
 
@@ -43,6 +48,10 @@ const SasrecModelAdminPage = () => {
     const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
     const [versionInput, setVersionInput] = useState('')
     const [autoTrainResult, setAutoTrainResult] = useState<SasrecAutoTrainAdminResponse | null>(null)
+    const [userLookupInput, setUserLookupInput] = useState('')
+    const [userLookupResult, setUserLookupResult] = useState<SasrecUserModelStatusResponse | null>(null)
+    const [userLookupLoading, setUserLookupLoading] = useState(false)
+    const [userLookupError, setUserLookupError] = useState<string | null>(null)
 
     const isAdmin = session?.email.toLowerCase() === ADMIN_EMAIL
 
@@ -130,6 +139,23 @@ const SasrecModelAdminPage = () => {
 
     const requestRollback = () => {
         setPendingAction({ kind: 'rollback' })
+    }
+
+    const handleUserLookup = async () => {
+        if (!session || !userLookupInput.trim()) {
+            return
+        }
+        setUserLookupLoading(true)
+        setUserLookupError(null)
+        try {
+            const response = await fetchSasrecUserStatusForAdmin(session.userId, userLookupInput.trim())
+            setUserLookupResult(response)
+        } catch (err) {
+            setUserLookupResult(null)
+            setUserLookupError(err instanceof Error ? err.message : '사용자 모델 상태를 불러오지 못했습니다.')
+        } finally {
+            setUserLookupLoading(false)
+        }
     }
 
     if (!session || !isAdmin) {
@@ -350,6 +376,69 @@ const SasrecModelAdminPage = () => {
                     )}
                 </section>
             )}
+
+            <section className="rounded-2xl border border-hud-border-secondary bg-hud-bg-secondary/80 p-6">
+                <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">Other user lookup</p>
+                <h3 className="mt-2 text-lg font-semibold text-hud-text-primary">사용자별 모델 단계 조회</h3>
+                <p className="mt-2 text-xs leading-5 text-hud-text-muted">
+                    cold-start: PMS 라이브러리가 비어 있는 상태 / baseline: import 완료 후 SASRec 미적용 /
+                    personalized: SASRec promoted model 적용 중.
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <input
+                        type="text"
+                        value={userLookupInput}
+                        onChange={(e) => setUserLookupInput(e.target.value)}
+                        placeholder="user-..."
+                        className="flex-1 rounded-lg border border-hud-border-secondary bg-hud-bg-primary/60 px-3 py-2 text-sm text-hud-text-primary focus:border-hud-border-primary focus:outline-none"
+                    />
+                    <Button
+                        type="button"
+                        variant="primary"
+                        onClick={() => void handleUserLookup()}
+                        disabled={userLookupLoading || !userLookupInput.trim()}
+                    >
+                        <Search size={16} />
+                        Lookup
+                    </Button>
+                </div>
+                {userLookupError && (
+                    <div className="mt-4 flex items-start gap-3 rounded-xl border border-rose-300/30 bg-rose-500/10 p-4 text-sm text-rose-100">
+                        <AlertTriangle size={18} />
+                        <span>{userLookupError}</span>
+                    </div>
+                )}
+                {userLookupResult && (
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <Field label="User" value={userLookupResult.user_id} multiline />
+                        <Field
+                            label="Stage"
+                            value={userLookupResult.model_stage}
+                        />
+                        <Field label="PMS tracks" value={String(userLookupResult.pms_track_count)} />
+                        <Field label="Total events" value={String(userLookupResult.total_event_count)} />
+                        <Field
+                            label="Active model"
+                            value={userLookupResult.active_model_version ?? '-'}
+                            multiline
+                        />
+                        <Field label="Active since" value={formatDateTime(userLookupResult.active_model_generated_at)} />
+                        <Field
+                            label="Last train"
+                            value={
+                                userLookupResult.latest_train_log
+                                    ? `${formatDateTime(userLookupResult.latest_train_log.trained_at)} • qualified=${userLookupResult.latest_train_log.qualified ? 'Y' : 'N'} • promoted=${userLookupResult.latest_train_log.promoted ? 'Y' : 'N'}`
+                                    : '-'
+                            }
+                            multiline
+                        />
+                        <Field
+                            label="Events since train"
+                            value={userLookupResult.events_since_last_train == null ? '-' : String(userLookupResult.events_since_last_train)}
+                        />
+                    </div>
+                )}
+            </section>
 
             <p className="text-xs text-hud-text-muted">
                 <RotateCcw size={12} className="mr-1 inline" />

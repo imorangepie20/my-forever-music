@@ -1126,6 +1126,30 @@ export interface MetadataCandidateAutoAcceptResponse {
     accepted: TrackIdentityCandidateItem[]
 }
 
+export interface SasrecUserTrainLogItem {
+    id: number | null
+    trained_at: string | null
+    event_count_at_train: number
+    model_version: string | null
+    qualified: boolean
+    promoted: boolean
+    summary: string | null
+}
+
+export interface SasrecUserModelStatusResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string
+    model_stage: 'cold-start' | 'baseline' | 'personalized' | string
+    pms_track_count: number
+    active_model_version: string | null
+    active_model_generated_at: string | null
+    latest_train_log: SasrecUserTrainLogItem | null
+    total_event_count: number
+    events_since_last_train: number | null
+}
+
 export interface SasrecAutoTrainAdminResponse {
     service: string
     status: string

@@ -47,6 +47,7 @@ import type {
     PlaylistQualityRecentResponse,
     SasrecAutoTrainAdminResponse,
     SasrecRegistryAdminResponse,
+    SasrecUserModelStatusResponse,
     EmsOverviewRequest,
     EmsOverviewResponse,
     EmsWorkspaceAnalysisRequest,
@@ -479,6 +480,12 @@ export const autoTrainSasrecForAdmin = (userId: string) =>
     requestJson<SasrecAutoTrainAdminResponse>(
         `/api/v1/recommendations/admin/sasrec/models/auto-train?user_id=${encodeURIComponent(userId)}`,
         { method: 'POST' },
+    )
+
+export const fetchSasrecUserStatusForAdmin = (userId: string, targetUserId: string, signal?: AbortSignal) =>
+    requestJson<SasrecUserModelStatusResponse>(
+        `/api/v1/recommendations/admin/sasrec/models/users/${encodeURIComponent(targetUserId)}/status?user_id=${encodeURIComponent(userId)}`,
+        { signal, cache: 'no-store' },
     )
 
 export const lookupMusicBrainzRecordingsForAdmin = (
