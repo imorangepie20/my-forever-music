@@ -132,6 +132,7 @@ my-forever-music/
 - `services/api`는 Phase 2 metadata normalization identity pipeline을 갖춤: MusicBrainz/Wikidata/Discogs lookup → `track_identity_candidate` accept/reject/auto-accept → 적용 시 실제 EMS/PMS track 행의 ISRC/MBID 갱신 + canonical track identity 연결, audit log 영속 저장, 주기적 apply scheduler까지 관리자 화면 `/recommendations/metadata-admin`에 노출
 - `services/api`는 MusicBrainz/Wikidata/Discogs candidate에 source별로 다르게 들어오던 raw score 대신, title/artist Jaccard 토큰 유사도 + 부분 문자열 보너스 + raw score blend로 계산한 normalized 0..1 `candidate_score`를 일관되게 부여함. 동일 auto-accept threshold(`>=0.95`)가 모든 source에서 같은 의미로 동작함
 - `services/api`의 canonical track promote 흐름은 Discogs candidate일 때 metadata의 year/country를 `canonical_track.release_year` / `release_country`(V34)에 함께 적재하고, 동일 canonical track이 이미 있고 release 필드가 비어 있으면 후속 promote에서 채움
+- `services/api`의 SASRec auto-train 스케줄러는 매 tick마다 학습 모델의 Hit@K/MRR@K/nDCG@K 측정값과 recency baseline 비교값을 `sasrec_auto_train_log`(V35)에 함께 영속 기록함. `/recommendations/sasrec-admin`의 Auto-Train 결과 패널과 Other user lookup 패널이 SASRec/Baseline/Δ를 나란히 비교하는 표(개선 emerald, 회귀 rose 색)로 표시함
 - `services/api`는 RSS editorial source(Pitchfork, Stereogum, NME 등 12개 기본) → `services/ai` signal 추출 → Spotify/TIDAL seed → EMS pool 적재까지 한 번에 잇는 EMS acquisition pipeline을 제공함. 관리자 화면 `/ems/acquisition-admin`에서 run 트리거/모니터링이 가능하며 `collection_source='acquisition_pool'`로 본 테이블에 누적됨
 - `services/ai`는 최소 FastAPI 스캐폴드와 추천 preview API 초안 생성 완료
 - `infra/nginx`는 로컬/운영용 리버스 프록시 설정 템플릿 생성 완료

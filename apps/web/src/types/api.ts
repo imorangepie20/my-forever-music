@@ -1399,6 +1399,15 @@ export interface SasrecUserTrainLogItem {
     qualified: boolean
     promoted: boolean
     summary: string | null
+    hit_rate_at_k: number | null
+    mrr_at_k: number | null
+    ndcg_at_k: number | null
+    baseline_hit_rate_at_k: number | null
+    baseline_mrr_at_k: number | null
+    baseline_ndcg_at_k: number | null
+    hit_rate_delta: number | null
+    mrr_delta: number | null
+    ndcg_delta: number | null
 }
 
 export interface SasrecUserModelStatusResponse {

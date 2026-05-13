@@ -39,6 +39,33 @@ public class SasrecAutoTrainLogEntity {
     @Column(name = "summary", length = 1000)
     private String summary;
 
+    @Column(name = "hit_rate_at_k")
+    private Double hitRateAtK;
+
+    @Column(name = "mrr_at_k")
+    private Double mrrAtK;
+
+    @Column(name = "ndcg_at_k")
+    private Double ndcgAtK;
+
+    @Column(name = "baseline_hit_rate_at_k")
+    private Double baselineHitRateAtK;
+
+    @Column(name = "baseline_mrr_at_k")
+    private Double baselineMrrAtK;
+
+    @Column(name = "baseline_ndcg_at_k")
+    private Double baselineNdcgAtK;
+
+    @Column(name = "hit_rate_delta")
+    private Double hitRateDelta;
+
+    @Column(name = "mrr_delta")
+    private Double mrrDelta;
+
+    @Column(name = "ndcg_delta")
+    private Double ndcgDelta;
+
     protected SasrecAutoTrainLogEntity() {}
 
     public SasrecAutoTrainLogEntity(SasrecAutoTrainLogStore.Draft draft) {
@@ -49,6 +76,18 @@ public class SasrecAutoTrainLogEntity {
         this.qualified = draft.qualified();
         this.promoted = draft.promoted();
         this.summary = truncate(draft.summary(), 1000);
+        SasrecAutoTrainLogStore.MetricSnapshot metrics = draft.metrics();
+        if (metrics != null) {
+            this.hitRateAtK = metrics.hitRateAtK();
+            this.mrrAtK = metrics.mrrAtK();
+            this.ndcgAtK = metrics.ndcgAtK();
+            this.baselineHitRateAtK = metrics.baselineHitRateAtK();
+            this.baselineMrrAtK = metrics.baselineMrrAtK();
+            this.baselineNdcgAtK = metrics.baselineNdcgAtK();
+            this.hitRateDelta = metrics.hitRateDelta();
+            this.mrrDelta = metrics.mrrDelta();
+            this.ndcgDelta = metrics.ndcgDelta();
+        }
     }
 
     public SasrecAutoTrainLogStore.Entry toEntry() {
@@ -60,7 +99,18 @@ public class SasrecAutoTrainLogEntity {
             modelVersion,
             qualified,
             promoted,
-            summary
+            summary,
+            new SasrecAutoTrainLogStore.MetricSnapshot(
+                hitRateAtK,
+                mrrAtK,
+                ndcgAtK,
+                baselineHitRateAtK,
+                baselineMrrAtK,
+                baselineNdcgAtK,
+                hitRateDelta,
+                mrrDelta,
+                ndcgDelta
+            )
         );
     }
 

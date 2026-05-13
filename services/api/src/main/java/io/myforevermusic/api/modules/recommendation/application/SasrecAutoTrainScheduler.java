@@ -1,9 +1,11 @@
 package io.myforevermusic.api.modules.recommendation.application;
 
 import io.myforevermusic.api.modules.recommendation.infrastructure.ai.AiSasrecTrainingClient;
+import io.myforevermusic.api.modules.recommendation.presentation.RecommendationModelTrainingResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,7 +123,8 @@ public class SasrecAutoTrainScheduler {
                     modelVersion,
                     result.qualified(),
                     promoted,
-                    result.summary()
+                    result.summary(),
+                    extractMetrics(result.training())
                 ));
                 log.info(
                     "SASRec auto-train tick user={} qualified={} promoted={} model={} summary={}",
@@ -188,6 +191,34 @@ public class SasrecAutoTrainScheduler {
             log.warn("SASRec auto-train failed to count events for user={}: {}", targetUserId, ex.getMessage());
             return 0L;
         }
+    }
+
+    private SasrecAutoTrainLogStore.MetricSnapshot extractMetrics(RecommendationModelTrainingResponse training) {
+        if (training == null) {
+            return SasrecAutoTrainLogStore.MetricSnapshot.empty();
+        }
+        return new SasrecAutoTrainLogStore.MetricSnapshot(
+            asDouble(training.metrics(), "hit_rate_at_k"),
+            asDouble(training.metrics(), "mrr_at_k"),
+            asDouble(training.metrics(), "ndcg_at_k"),
+            asDouble(training.baselineMetrics(), "hit_rate_at_k"),
+            asDouble(training.baselineMetrics(), "mrr_at_k"),
+            asDouble(training.baselineMetrics(), "ndcg_at_k"),
+            asDouble(training.metricDelta(), "hit_rate_at_k"),
+            asDouble(training.metricDelta(), "mrr_at_k"),
+            asDouble(training.metricDelta(), "ndcg_at_k")
+        );
+    }
+
+    private Double asDouble(Map<String, Object> map, String key) {
+        if (map == null) {
+            return null;
+        }
+        Object value = map.get(key);
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        return null;
     }
 
     private AiSasrecTrainingClient.SasrecTrainingOptions buildTrainingOptions() {

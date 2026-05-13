@@ -19,7 +19,8 @@ public interface SasrecAutoTrainLogStore {
         String modelVersion,
         boolean qualified,
         boolean promoted,
-        String summary
+        String summary,
+        MetricSnapshot metrics
     ) {}
 
     record Entry(
@@ -30,6 +31,26 @@ public interface SasrecAutoTrainLogStore {
         String modelVersion,
         boolean qualified,
         boolean promoted,
-        String summary
+        String summary,
+        MetricSnapshot metrics
     ) {}
+
+    /**
+     * 한 학습 tick의 SASRec/baseline/delta metric 묶음. 어느 값이든 null일 수 있다.
+     */
+    record MetricSnapshot(
+        Double hitRateAtK,
+        Double mrrAtK,
+        Double ndcgAtK,
+        Double baselineHitRateAtK,
+        Double baselineMrrAtK,
+        Double baselineNdcgAtK,
+        Double hitRateDelta,
+        Double mrrDelta,
+        Double ndcgDelta
+    ) {
+        public static MetricSnapshot empty() {
+            return new MetricSnapshot(null, null, null, null, null, null, null, null, null);
+        }
+    }
 }

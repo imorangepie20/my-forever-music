@@ -343,7 +343,7 @@ const SasrecModelAdminPage = () => {
                     <p className="mt-2 break-all text-base font-semibold text-hud-text-primary">
                         {autoTrainResult.summary}
                     </p>
-                    <dl className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+                    <dl className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
                         <Field
                             label="Qualified"
                             value={autoTrainResult.qualified ? 'yes' : 'no'}
@@ -357,11 +357,12 @@ const SasrecModelAdminPage = () => {
                             value={autoTrainResult.model_version ?? '-'}
                             multiline
                         />
-                        <Field
-                            label="Hit@K Δ"
-                            value={autoTrainResult.training.metric_delta?.hit_rate_at_k?.toFixed(4) ?? '-'}
-                        />
                     </dl>
+                    <MetricComparisonTable
+                        metrics={autoTrainResult.training.metrics}
+                        baseline={autoTrainResult.training.baseline_metrics}
+                        delta={autoTrainResult.training.metric_delta}
+                    />
                     {autoTrainResult.training.qualification?.reason && (
                         <p className="mt-3 text-xs text-hud-text-secondary">
                             {autoTrainResult.training.qualification.reason}
@@ -438,6 +439,25 @@ const SasrecModelAdminPage = () => {
                         />
                     </div>
                 )}
+                {userLookupResult?.latest_train_log && (
+                    <MetricComparisonTable
+                        metrics={{
+                            hit_rate_at_k: userLookupResult.latest_train_log.hit_rate_at_k ?? undefined,
+                            mrr_at_k: userLookupResult.latest_train_log.mrr_at_k ?? undefined,
+                            ndcg_at_k: userLookupResult.latest_train_log.ndcg_at_k ?? undefined,
+                        }}
+                        baseline={{
+                            hit_rate_at_k: userLookupResult.latest_train_log.baseline_hit_rate_at_k ?? undefined,
+                            mrr_at_k: userLookupResult.latest_train_log.baseline_mrr_at_k ?? undefined,
+                            ndcg_at_k: userLookupResult.latest_train_log.baseline_ndcg_at_k ?? undefined,
+                        }}
+                        delta={{
+                            hit_rate_at_k: userLookupResult.latest_train_log.hit_rate_delta ?? undefined,
+                            mrr_at_k: userLookupResult.latest_train_log.mrr_delta ?? undefined,
+                            ndcg_at_k: userLookupResult.latest_train_log.ndcg_delta ?? undefined,
+                        }}
+                    />
+                )}
             </section>
 
             <p className="text-xs text-hud-text-muted">
@@ -454,5 +474,73 @@ const Field = ({ label, value, multiline }: { label: string; value: string; mult
         <p className={`mt-1 text-sm text-hud-text-primary ${multiline ? 'break-all' : 'truncate'}`}>{value}</p>
     </div>
 )
+
+type MetricBundle = { hit_rate_at_k?: number; mrr_at_k?: number; ndcg_at_k?: number } | undefined | null
+
+const formatMetric = (value: number | null | undefined) =>
+    value == null || Number.isNaN(value) ? '-' : value.toFixed(4)
+
+const formatDelta = (value: number | null | undefined) => {
+    if (value == null || Number.isNaN(value)) {
+        return '-'
+    }
+    const sign = value > 0 ? '+' : ''
+    return `${sign}${value.toFixed(4)}`
+}
+
+const deltaClass = (value: number | null | undefined) => {
+    if (value == null || value === 0 || Number.isNaN(value)) {
+        return 'text-hud-text-secondary'
+    }
+    return value > 0 ? 'text-emerald-200' : 'text-rose-200'
+}
+
+const MetricComparisonTable = ({
+    metrics,
+    baseline,
+    delta,
+}: {
+    metrics?: MetricBundle
+    baseline?: MetricBundle
+    delta?: MetricBundle
+}) => {
+    if (!metrics && !baseline && !delta) {
+        return null
+    }
+    const rows: Array<{ key: 'hit_rate_at_k' | 'mrr_at_k' | 'ndcg_at_k'; label: string }> = [
+        { key: 'hit_rate_at_k', label: 'Hit@K' },
+        { key: 'mrr_at_k', label: 'MRR@K' },
+        { key: 'ndcg_at_k', label: 'nDCG@K' },
+    ]
+    return (
+        <div className="mt-4 overflow-hidden rounded-xl border border-hud-border-secondary">
+            <table className="w-full text-left text-xs">
+                <thead className="bg-hud-bg-primary/80 text-[10px] uppercase tracking-[0.22em] text-hud-text-muted">
+                    <tr>
+                        <th className="px-3 py-2">Metric</th>
+                        <th className="px-3 py-2 text-right">SASRec</th>
+                        <th className="px-3 py-2 text-right">Baseline (recency)</th>
+                        <th className="px-3 py-2 text-right">Δ</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-hud-border-secondary">
+                    {rows.map((row) => {
+                        const sasrec = metrics ? metrics[row.key] : undefined
+                        const base = baseline ? baseline[row.key] : undefined
+                        const d = delta ? delta[row.key] : undefined
+                        return (
+                            <tr key={row.key} className="bg-hud-bg-secondary/40">
+                                <td className="px-3 py-2 text-hud-text-primary">{row.label}</td>
+                                <td className="px-3 py-2 text-right text-hud-text-primary">{formatMetric(sasrec)}</td>
+                                <td className="px-3 py-2 text-right text-hud-text-secondary">{formatMetric(base)}</td>
+                                <td className={`px-3 py-2 text-right ${deltaClass(d)}`}>{formatDelta(d)}</td>
+                            </tr>
+                        )
+                    })}
+                </tbody>
+            </table>
+        </div>
+    )
+}
 
 export default SasrecModelAdminPage

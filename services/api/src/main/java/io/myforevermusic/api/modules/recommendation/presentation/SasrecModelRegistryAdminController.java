@@ -163,9 +163,22 @@ public class SasrecModelRegistryAdminController {
         String modelVersion,
         boolean qualified,
         boolean promoted,
-        String summary
+        String summary,
+        Double hitRateAtK,
+        Double mrrAtK,
+        Double ndcgAtK,
+        Double baselineHitRateAtK,
+        Double baselineMrrAtK,
+        Double baselineNdcgAtK,
+        Double hitRateDelta,
+        Double mrrDelta,
+        Double ndcgDelta
     ) {
         static TrainLogItem from(io.myforevermusic.api.modules.recommendation.application.SasrecAutoTrainLogStore.Entry entry) {
+            io.myforevermusic.api.modules.recommendation.application.SasrecAutoTrainLogStore.MetricSnapshot metrics =
+                entry.metrics() == null
+                    ? io.myforevermusic.api.modules.recommendation.application.SasrecAutoTrainLogStore.MetricSnapshot.empty()
+                    : entry.metrics();
             return new TrainLogItem(
                 entry.id(),
                 entry.trainedAt(),
@@ -173,7 +186,16 @@ public class SasrecModelRegistryAdminController {
                 entry.modelVersion(),
                 entry.qualified(),
                 entry.promoted(),
-                entry.summary()
+                entry.summary(),
+                metrics.hitRateAtK(),
+                metrics.mrrAtK(),
+                metrics.ndcgAtK(),
+                metrics.baselineHitRateAtK(),
+                metrics.baselineMrrAtK(),
+                metrics.baselineNdcgAtK(),
+                metrics.hitRateDelta(),
+                metrics.mrrDelta(),
+                metrics.ndcgDelta()
             );
         }
     }

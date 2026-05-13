@@ -687,7 +687,7 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - Phase 2 15차: Discogs release context enrichment. `V34__add_canonical_track_release_context.sql`로 `canonical_track`에 `release_year`/`release_country`를 nullable로 추가하고, Discogs candidate promote 시 metadata JSON에서 year/country를 파싱해 함께 적재. 동일 canonical track이 이미 있으면 fill-if-null 정책(기존 값 보존)으로 `CanonicalTrackIdentityStore.fillReleaseContextIfMissing` 호출. promote 응답과 `/recommendations/metadata-admin` 결과 요약에 release 정보가 노출됨. Label은 Discogs search 응답에 없어 별도 master detail fetch가 필요하므로 후속 단계.
 - 남은 Phase 2 강화 항목: 없음 (다음은 별도 후속 항목).
 - ~~recommendation snapshot에 explanation/axis evidence를 더해 사용자에게 노출할 reason 텍스트 안정화~~ → Spring GMS preview response의 `RecommendationItem`에 `axis_evidence`(affinity/novelty/coherence/diversity/redundancy/confidence 각 6축의 score/level/한국어 summary)를 추가하고, 프론트 GMS Preview 카드 아래에 axis별 짧은 evidence 패널을 노출.
-- recency baseline 대비 metric 개선 검증 자동화
+- ~~recency baseline 대비 metric 개선 검증 자동화~~ → AI service `SasrecTrainingService`는 이미 매 학습마다 recency baseline metric을 계산해 SASRec과 비교한 `metric_delta`/`qualification`을 응답에 포함하고, qualified=true일 때만 promote 후보로 처리됨. Spring `SasrecAutoTrainScheduler`가 tick마다 Hit@K/MRR@K/nDCG@K 측정값과 baseline 비교값을 `sasrec_auto_train_log`(V35)에 영속 기록해 시계열을 보존함. `/recommendations/sasrec-admin`의 Auto-Train 결과와 Other user lookup `latest_train_log`에 SASRec vs Baseline vs Δ를 나란히 비교하는 표를 추가해, baseline 대비 개선(emerald) / 회귀(rose)를 관리자가 한눈에 확인 가능.
 - 최신 SASRec artifact 조회를 넘어서는 model registry 승격/비활성화/롤백 정책
 
 ## 14. 내부 참고 문서

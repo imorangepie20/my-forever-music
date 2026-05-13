@@ -27,7 +27,8 @@ public class InMemorySasrecAutoTrainLogStore implements SasrecAutoTrainLogStore 
             draft.modelVersion(),
             draft.qualified(),
             draft.promoted(),
-            draft.summary()
+            draft.summary(),
+            draft.metrics() == null ? MetricSnapshot.empty() : draft.metrics()
         );
         entries.put(id, entry);
         return entry;
