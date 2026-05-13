@@ -94,7 +94,7 @@ tail -n 120 tmp/local-stack/logs/ai.log
 
 ## 3. 실제 source로 acquisition run 실행
 
-기본 RSS source 5개를 실제 입력으로 사용합니다.
+기본 RSS source 12개를 실제 입력으로 사용합니다.
 
 브라우저로 실행하려면:
 
@@ -139,14 +139,56 @@ curl -fsS "$API/api/v1/ems/acquisition/run" \
         \"weight\": 1.1
       },
       {
+        \"name\": \"BrooklynVegan\",
+        \"type\": \"rss\",
+        \"url\": \"https://www.brooklynvegan.com/feed/\",
+        \"weight\": 1.0
+      },
+      {
+        \"name\": \"FACT Magazine\",
+        \"type\": \"rss\",
+        \"url\": \"https://www.factmag.com/feed/\",
+        \"weight\": 1.0
+      },
+      {
+        \"name\": \"The FADER\",
+        \"type\": \"rss\",
+        \"url\": \"https://www.thefader.com/feed.rss\",
+        \"weight\": 1.0
+      },
+      {
+        \"name\": \"Billboard Music News\",
+        \"type\": \"rss\",
+        \"url\": \"https://www.billboard.com/c/music/music-news/feed/\",
+        \"weight\": 1.0
+      },
+      {
+        \"name\": \"Rolling Stone Music News\",
+        \"type\": \"rss\",
+        \"url\": \"https://www.rollingstone.com/music/music-news/feed/\",
+        \"weight\": 1.0
+      },
+      {
+        \"name\": \"The Line of Best Fit\",
+        \"type\": \"rss\",
+        \"url\": \"https://www.thelineofbestfit.com/feed\",
+        \"weight\": 1.0
+      },
+      {
+        \"name\": \"SPIN\",
+        \"type\": \"rss\",
+        \"url\": \"https://www.spinmagazine.com/feed/\",
+        \"weight\": 0.9
+      },
+      {
         \"name\": \"NME\",
         \"type\": \"rss\",
         \"url\": \"https://www.nme.com/?alt=rss\",
         \"weight\": 1.0
       }
     ],
-    \"max_articles_per_source\": 10,
-    \"max_signals_per_run\": 12,
+    \"max_articles_per_source\": 15,
+    \"max_signals_per_run\": 40,
     \"per_seed_limit\": 5
   }"
 ```
@@ -376,7 +418,7 @@ services/ai/.venv/bin/python -m pytest services/ai/tests
 아래가 모두 맞으면 1차 EMS acquisition 기능은 실제 동작 기준으로 통과입니다.
 
 - AI endpoint가 실제 GPT-compatible API key로 signal을 생성
-- Pitchfork RSS source에서 signal이 저장됨
+- 기본 RSS source에서 signal이 저장됨
 - signal이 Spotify/TIDAL search seed로 변환됨
 - seed별 `ems_pool_ingest_run`이 생성됨
 - acquisition POOL run은 `collection_source='acquisition_pool'`

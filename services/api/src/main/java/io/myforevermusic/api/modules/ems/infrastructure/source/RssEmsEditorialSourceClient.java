@@ -28,7 +28,9 @@ public class RssEmsEditorialSourceClient implements EmsEditorialSourceClient {
     private final HttpClient httpClient;
 
     public RssEmsEditorialSourceClient() {
-        this(HttpClient.newHttpClient());
+        this(HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build());
     }
 
     RssEmsEditorialSourceClient(HttpClient httpClient) {

@@ -90,6 +90,34 @@ app:
           type: rss
           url: https://www.stereogum.com/feed/
           weight: 1.1
+        - name: BrooklynVegan
+          type: rss
+          url: https://www.brooklynvegan.com/feed/
+          weight: 1.0
+        - name: FACT Magazine
+          type: rss
+          url: https://www.factmag.com/feed/
+          weight: 1.0
+        - name: The FADER
+          type: rss
+          url: https://www.thefader.com/feed.rss
+          weight: 1.0
+        - name: Billboard Music News
+          type: rss
+          url: https://www.billboard.com/c/music/music-news/feed/
+          weight: 1.0
+        - name: Rolling Stone Music News
+          type: rss
+          url: https://www.rollingstone.com/music/music-news/feed/
+          weight: 1.0
+        - name: The Line of Best Fit
+          type: rss
+          url: https://www.thelineofbestfit.com/feed
+          weight: 1.0
+        - name: SPIN
+          type: rss
+          url: https://www.spinmagazine.com/feed/
+          weight: 0.9
         - name: NME
           type: rss
           url: https://www.nme.com/?alt=rss

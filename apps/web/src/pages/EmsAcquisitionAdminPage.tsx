@@ -19,6 +19,13 @@ const DEFAULT_SOURCES = [
     'Pitchfork Track Reviews|https://pitchfork.com/feed/feed-track-reviews/rss|1.1',
     'Pitchfork Best New Tracks|https://pitchfork.com/feed/reviews/best/tracks/rss|1.4',
     'Stereogum|https://www.stereogum.com/feed/|1.1',
+    'BrooklynVegan|https://www.brooklynvegan.com/feed/|1.0',
+    'FACT Magazine|https://www.factmag.com/feed/|1.0',
+    'The FADER|https://www.thefader.com/feed.rss|1.0',
+    'Billboard Music News|https://www.billboard.com/c/music/music-news/feed/|1.0',
+    'Rolling Stone Music News|https://www.rollingstone.com/music/music-news/feed/|1.0',
+    'The Line of Best Fit|https://www.thelineofbestfit.com/feed|1.0',
+    'SPIN|https://www.spinmagazine.com/feed/|0.9',
     'NME|https://www.nme.com/?alt=rss|1.0',
 ].join('\n')
 
@@ -49,8 +56,8 @@ const EmsAcquisitionAdminPage = () => {
     const [targetUserId, setTargetUserId] = useState('')
     const [platforms, setPlatforms] = useState<string[]>(['spotify', 'tidal'])
     const [sourceLines, setSourceLines] = useState(DEFAULT_SOURCES)
-    const [maxArticlesPerSource, setMaxArticlesPerSource] = useState(10)
-    const [maxSignalsPerRun, setMaxSignalsPerRun] = useState(12)
+    const [maxArticlesPerSource, setMaxArticlesPerSource] = useState(15)
+    const [maxSignalsPerRun, setMaxSignalsPerRun] = useState(40)
     const [perSeedLimit, setPerSeedLimit] = useState(5)
     const [status, setStatus] = useState<EmsAcquisitionRunResponse | null>(null)
     const [runs, setRuns] = useState<EmsAcquisitionRunItem[]>([])

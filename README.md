@@ -129,6 +129,8 @@ my-forever-music/
 - `services/api`는 `GET /api/v1/gms/playlists/preview`와 `POST /api/v1/gms/playlists/{id}/save` 엔드포인트로 EMS 평가 플레이리스트를 사용자 PMS 라이브러리에 직접 저장하는 GMS playlist 흐름을 제공함 (cold-start 사용자는 409, 결정적 personal playlist id 사용으로 멱등 추가)
 - `services/api`의 GMS playlist preview는 후보마다 6축(affinity/novelty/coherence/diversity/redundancy/confidence) evidence와 composite score를 계산해 응답에 포함하고, composite score 기준으로 후보를 재정렬함
 - `apps/web`는 `/gms-playlists` 화면에서 사용자에게 EMS 평가 플레이리스트 후보를 composite/affinity 점수와 6축 evidence 패널과 함께 카드로 노출하고, "Preview tracks" 모달에서 트랙 목록과 개별/전체 재생을 시청한 뒤 ConfirmDialog로 PMS 저장을 승인받음
+- `services/api`는 Phase 2 metadata normalization identity pipeline을 갖춤: MusicBrainz/Wikidata/Discogs lookup → `track_identity_candidate` accept/reject/auto-accept → 적용 시 실제 EMS/PMS track 행의 ISRC/MBID 갱신 + canonical track identity 연결, audit log 영속 저장, 주기적 apply scheduler까지 관리자 화면 `/recommendations/metadata-admin`에 노출
+- `services/api`는 RSS editorial source(Pitchfork, Stereogum, NME 등 12개 기본) → `services/ai` signal 추출 → Spotify/TIDAL seed → EMS pool 적재까지 한 번에 잇는 EMS acquisition pipeline을 제공함. 관리자 화면 `/ems/acquisition-admin`에서 run 트리거/모니터링이 가능하며 `collection_source='acquisition_pool'`로 본 테이블에 누적됨
 - `services/ai`는 최소 FastAPI 스캐폴드와 추천 preview API 초안 생성 완료
 - `infra/nginx`는 로컬/운영용 리버스 프록시 설정 템플릿 생성 완료
 - Ubuntu 서버 기준 런북과 Docker/Nginx 템플릿 생성 완료
