@@ -56,6 +56,7 @@ curl -s http://127.0.0.1:8000/v1/ems/acquisition/signals \
 - `status="ok"`
 - `model` 값 존재
 - `signals[0].query`가 비어 있지 않음
+- `signals[*].query_variants`가 배열이며 각 signal당 최대 3개
 - `signals[*].signal_type`은 `track | artist | playlist_query | genre | scene` 중 하나
 - `confidence_score`는 `0.0 <= score <= 1.0`
 
@@ -284,7 +285,7 @@ limit 5;
 
 ## 시나리오 7 — scale / dedupe / limit 검증
 
-목적: 많은 source와 article을 넣어도 run cap, article URL dedupe, seed dedupe가 지켜지는지 확인.
+목적: 많은 source와 article을 넣어도 run cap, query variant fan-out, article URL dedupe, seed dedupe가 지켜지는지 확인.
 
 1. source 3개 이상, `max_articles_per_source=20`, `max_signals_per_run=15`, `platforms=["spotify","tidal"]`로 실행
 2. 같은 입력으로 한 번 더 실행
@@ -313,7 +314,8 @@ having count(*) > 1;
 - 중복 seed query가 같은 platform에 두 번 생성되지 않음
 - 이미 성공적으로 queue된 같은 platform/query seed는 다음 run에서 다시 POOL에 들어가지 않음
 - 이미 처리된 article URL만 들어온 source는 AI signal extraction을 다시 호출하지 않음
-- `seed_count <= signal_count * platform_count`
+- AI는 signal당 primary query + 최대 3개 `query_variants`를 만들 수 있음
+- `seed_count <= signal_count * platform_count * 4`
 
 ---
 

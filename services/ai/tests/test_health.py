@@ -143,6 +143,7 @@ def test_ems_acquisition_accepts_schema_compliant_llm_response(monkeypatch: pyte
                     "article_title": "The best new tracks this week",
                     "signal_type": "playlist_query",
                     "query": "best new tracks",
+                    "query_variants": ["new music", "best new songs"],
                     "confidence_score": 0.84,
                     "rationale": "The article title is an editorial new-music roundup.",
                 }
@@ -155,6 +156,7 @@ def test_ems_acquisition_accepts_schema_compliant_llm_response(monkeypatch: pyte
     assert response.status == "ok"
     assert response.model == "test-acquisition-model"
     assert response.signals[0].query == "best new tracks"
+    assert response.signals[0].query_variants == ["new music", "best new songs"]
     assert response.signals[0].confidence_score == 0.84
     get_settings.cache_clear()
 

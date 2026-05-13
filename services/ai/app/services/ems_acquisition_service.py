@@ -66,6 +66,7 @@ class EmsAcquisitionService:
                                         "article_title",
                                         "signal_type",
                                         "query",
+                                        "query_variants",
                                         "confidence_score",
                                         "rationale",
                                     ],
@@ -77,6 +78,11 @@ class EmsAcquisitionService:
                                             "enum": ["track", "artist", "playlist_query", "genre", "scene"],
                                         },
                                         "query": {"type": "string", "minLength": 1, "maxLength": 200},
+                                        "query_variants": {
+                                            "type": "array",
+                                            "maxItems": 3,
+                                            "items": {"type": "string", "minLength": 1, "maxLength": 200},
+                                        },
                                         "confidence_score": {"type": "number", "minimum": 0, "maximum": 1},
                                         "rationale": {"type": "string", "maxLength": 500},
                                     },
@@ -93,7 +99,10 @@ class EmsAcquisitionService:
                         "You extract music acquisition signals from editorial feed articles for a streaming "
                         "playlist collection engine. Return only provider-searchable music seeds. "
                         "Prefer concrete artist, track, genre, scene, or playlist search queries that can be "
-                        "resolved by Spotify or TIDAL. Do not invent facts beyond the supplied article titles "
+                        "resolved by Spotify or TIDAL. For each signal, include up to three provider-searchable "
+                        "query_variants that broaden collection without changing the article evidence, such as "
+                        "artist names, track titles, scene names, or editorial playlist phrases. Use [] when "
+                        "there are no safe variants. Do not invent facts beyond the supplied article titles "
                         "and summaries. Use Korean, Japanese, or English titles as written when that improves "
                         "provider search. Return compact JSON matching the schema exactly."
                     ),

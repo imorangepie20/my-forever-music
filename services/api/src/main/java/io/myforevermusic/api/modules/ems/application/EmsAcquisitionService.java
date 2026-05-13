@@ -146,7 +146,7 @@ public class EmsAcquisitionService {
         int skippedArticleCount = 0;
         int failedSourceCount = 0;
         List<String> failureMessages = new ArrayList<>();
-        List<EmsAcquisitionSignalEntity> savedSignals = new ArrayList<>();
+        List<SavedAcquisitionSignal> savedSignals = new ArrayList<>();
 
         for (EmsEditorialSource source : sources) {
             if (savedSignals.size() >= maxSignalsPerRun) {
@@ -180,7 +180,7 @@ public class EmsAcquisitionService {
                     if (!hasText(query)) {
                         continue;
                     }
-                    savedSignals.add(signalRepository.save(new EmsAcquisitionSignalEntity(
+                    EmsAcquisitionSignalEntity savedSignal = signalRepository.save(new EmsAcquisitionSignalEntity(
                         run,
                         truncate(source.name(), 160),
                         truncate(source.url(), 500),
@@ -191,7 +191,8 @@ public class EmsAcquisitionService {
                         confidence(signal.confidenceScore(), source.weight()),
                         truncate(signal.rationale(), 500),
                         Instant.now()
-                    )));
+                    ));
+                    savedSignals.add(new SavedAcquisitionSignal(savedSignal, seedQueries(signal)));
                 }
             } catch (RuntimeException exception) {
                 failedSourceCount++;
@@ -215,50 +216,52 @@ public class EmsAcquisitionService {
         int failedSeedCount = 0;
         Set<String> seenSeeds = new LinkedHashSet<>();
 
-        for (EmsAcquisitionSignalEntity signal : savedSignals) {
+        for (SavedAcquisitionSignal savedSignal : savedSignals) {
             for (String platform : platforms) {
-                String seedKey = platform.toLowerCase(Locale.ROOT) + ":" + signal.getQuery().toLowerCase(Locale.ROOT);
-                if (!seenSeeds.add(seedKey)) {
-                    skippedSeedCount++;
-                    continue;
-                }
-                if (seedRepository.existsActiveByPlatformIdAndQuery(platform, signal.getQuery())) {
-                    skippedSeedCount++;
-                    continue;
-                }
-                EmsAcquisitionSeedEntity seed = seedRepository.save(new EmsAcquisitionSeedEntity(
-                    run,
-                    signal,
-                    truncate(platform, 50),
-                    truncate(signal.getQuery(), 200),
-                    Instant.now()
-                ));
-                seedCount++;
-                try {
-                    EmsCollectionSearchPreviewResult result = collectionService.queueAcquisitionSearchPool(
-                        userId,
-                        platform,
-                        signal.getQuery(),
-                        perSeedLimit
-                    );
-                    seed.markCompleted(
-                        result.poolRunId(),
-                        result.resultPlaylistCount(),
-                        result.resultTrackCount(),
+                for (String query : savedSignal.seedQueries()) {
+                    String seedKey = platform.toLowerCase(Locale.ROOT) + ":" + query.toLowerCase(Locale.ROOT);
+                    if (!seenSeeds.add(seedKey)) {
+                        skippedSeedCount++;
+                        continue;
+                    }
+                    if (seedRepository.existsActiveByPlatformIdAndQuery(platform, query)) {
+                        skippedSeedCount++;
+                        continue;
+                    }
+                    EmsAcquisitionSeedEntity seed = seedRepository.save(new EmsAcquisitionSeedEntity(
+                        run,
+                        savedSignal.entity(),
+                        truncate(platform, 50),
+                        truncate(query, 200),
                         Instant.now()
-                    );
-                    poolRunCount++;
-                } catch (RuntimeException exception) {
-                    failedSeedCount++;
-                    seed.markFailed(truncate(errorMessage(exception), 1000), Instant.now());
-                    log.warn(
-                        "EMS acquisition seed failed for platform={} query='{}': {}",
-                        platform,
-                        signal.getQuery(),
-                        errorMessage(exception)
-                    );
+                    ));
+                    seedCount++;
+                    try {
+                        EmsCollectionSearchPreviewResult result = collectionService.queueAcquisitionSearchPool(
+                            userId,
+                            platform,
+                            query,
+                            perSeedLimit
+                        );
+                        seed.markCompleted(
+                            result.poolRunId(),
+                            result.resultPlaylistCount(),
+                            result.resultTrackCount(),
+                            Instant.now()
+                        );
+                        poolRunCount++;
+                    } catch (RuntimeException exception) {
+                        failedSeedCount++;
+                        seed.markFailed(truncate(errorMessage(exception), 1000), Instant.now());
+                        log.warn(
+                            "EMS acquisition seed failed for platform={} query='{}': {}",
+                            platform,
+                            query,
+                            errorMessage(exception)
+                        );
+                    }
+                    seedRepository.save(seed);
                 }
-                seedRepository.save(seed);
             }
         }
 
@@ -287,6 +290,36 @@ public class EmsAcquisitionService {
         );
         runRepository.save(run);
         return toDetailSnapshot(run);
+    }
+
+    private static List<String> seedQueries(EmsAcquisitionSignal signal) {
+        List<String> queries = new ArrayList<>();
+        String primaryQuery = normalizeRequired(signal.query(), 200);
+        if (hasText(primaryQuery)) {
+            queries.add(primaryQuery);
+        }
+        if (signal.queryVariants() != null) {
+            for (String variant : signal.queryVariants()) {
+                String query = normalizeRequired(variant, 200);
+                if (hasText(query)) {
+                    queries.add(query);
+                }
+                if (queries.size() >= 4) {
+                    break;
+                }
+            }
+        }
+        return queries.stream()
+            .filter(EmsAcquisitionService::hasText)
+            .map(String::trim)
+            .distinct()
+            .toList();
+    }
+
+    private record SavedAcquisitionSignal(
+        EmsAcquisitionSignalEntity entity,
+        List<String> seedQueries
+    ) {
     }
 
     private EmsAcquisitionRunDetailSnapshot toDetailSnapshot(EmsAcquisitionRunEntity run) {

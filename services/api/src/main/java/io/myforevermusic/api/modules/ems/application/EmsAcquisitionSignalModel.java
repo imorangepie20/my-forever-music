@@ -31,6 +31,7 @@ public interface EmsAcquisitionSignalModel {
         String articleTitle,
         String signalType,
         String query,
+        List<String> queryVariants,
         double confidenceScore,
         String rationale
     ) {

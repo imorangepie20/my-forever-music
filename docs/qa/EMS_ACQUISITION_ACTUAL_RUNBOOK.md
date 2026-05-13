@@ -81,6 +81,7 @@ curl -fsS "$AI/v1/ems/acquisition/signals" \
 - 응답에 `"status":"ok"`
 - 응답에 `"signals"` 배열 존재
 - 각 signal의 `query`가 비어 있지 않음
+- 각 signal의 `query_variants`가 배열로 존재함. 안전한 변형이 없으면 빈 배열이어도 정상
 
 실패하면:
 - `AI_LLM_API_KEY`가 `services/ai/.env.local`에 있는지 확인
@@ -156,6 +157,7 @@ curl -fsS "$API/api/v1/ems/acquisition/run" \
 - `run.signal_count > 0`
 - `run.seed_count > 0`
 - `run.pool_run_count > 0`
+- `query_variants`가 있으면 `seed_count`가 `signal_count * platform_count`보다 클 수 있음
 - 반복 실행 시 `skipped_article_count` 또는 `skipped_seed_count`가 증가할 수 있음
 - `seeds[*].pool_run_id`가 존재
 

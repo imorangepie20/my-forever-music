@@ -34,6 +34,7 @@ class EmsAcquisitionSignal(BaseModel):
     article_title: str | None = None
     signal_type: SignalType
     query: str = Field(min_length=1, max_length=200)
+    query_variants: list[str] = Field(default_factory=list, max_length=3)
     confidence_score: float = Field(ge=0.0, le=1.0)
     rationale: str = Field(default="", max_length=500)
 
