@@ -93,7 +93,7 @@ tail -n 120 tmp/local-stack/logs/ai.log
 
 ## 3. 실제 source로 acquisition run 실행
 
-Pitchfork RSS source 2개를 실제 입력으로 사용합니다.
+기본 RSS source 5개를 실제 입력으로 사용합니다.
 
 브라우저로 실행하려면:
 
@@ -102,6 +102,7 @@ http://127.0.0.1:5173/ems/acquisition-admin
 ```
 
 관리자 계정으로 접속한 뒤 `User ID`에 `${EMS_USER_ID}` 값을 넣고 기본 source를 그대로 두고 `실행`을 누릅니다.
+반복 실행 시 이미 처리된 article URL과 이미 queue된 platform/query seed는 다시 넣지 않습니다.
 
 터미널로 실행하려면:
 
@@ -109,7 +110,7 @@ http://127.0.0.1:5173/ems/acquisition-admin
 curl -fsS "$API/api/v1/ems/acquisition/run" \
   -H 'Content-Type: application/json' \
   -d "{
-    \"user_id\": \"user-1c7b2adc-f828-40f0-9da3-7b35d0d24457\",
+    \"user_id\": \"${EMS_USER_ID}\",
     \"platforms\": [\"spotify\", \"tidal\"],
     \"sources\": [
       {
@@ -119,10 +120,28 @@ curl -fsS "$API/api/v1/ems/acquisition/run" \
         \"weight\": 1.0
       },
       {
+        \"name\": \"Pitchfork Track Reviews\",
+        \"type\": \"rss\",
+        \"url\": \"https://pitchfork.com/feed/feed-track-reviews/rss\",
+        \"weight\": 1.1
+      },
+      {
         \"name\": \"Pitchfork Best New Tracks\",
         \"type\": \"rss\",
         \"url\": \"https://pitchfork.com/feed/reviews/best/tracks/rss\",
-        \"weight\": 1.3
+        \"weight\": 1.4
+      },
+      {
+        \"name\": \"Stereogum\",
+        \"type\": \"rss\",
+        \"url\": \"https://www.stereogum.com/feed/\",
+        \"weight\": 1.1
+      },
+      {
+        \"name\": \"NME\",
+        \"type\": \"rss\",
+        \"url\": \"https://www.nme.com/?alt=rss\",
+        \"weight\": 1.0
       }
     ],
     \"max_articles_per_source\": 10,

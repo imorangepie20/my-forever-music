@@ -237,9 +237,9 @@ curl -s http://127.0.0.1:8080/api/v1/ems/acquisition/run \
 
 ## 시나리오 6 — scheduler 실행
 
-목적: 설정된 source로 주기 acquisition이 실행되는지 확인.
+목적: 기본 또는 설정된 source로 주기 acquisition이 실행되는지 확인.
 
-1. env 또는 `application.yml`에 아래 설정:
+1. 기본 source를 쓰거나 env 또는 `application.yml`에 아래 설정:
 
 ```yaml
 app:
@@ -283,10 +283,11 @@ limit 5;
 
 ## 시나리오 7 — scale / dedupe / limit 검증
 
-목적: 많은 source와 article을 넣어도 run cap과 seed dedupe가 지켜지는지 확인.
+목적: 많은 source와 article을 넣어도 run cap, article URL dedupe, seed dedupe가 지켜지는지 확인.
 
 1. source 3개 이상, `max_articles_per_source=20`, `max_signals_per_run=15`, `platforms=["spotify","tidal"]`로 실행
-2. DB 확인:
+2. 같은 입력으로 한 번 더 실행
+3. DB 확인:
 
 ```sql
 select signal_count, seed_count
@@ -309,6 +310,8 @@ having count(*) > 1;
 통과 기준:
 - `signal_count <= max_signals_per_run`
 - 중복 seed query가 같은 platform에 두 번 생성되지 않음
+- 이미 성공적으로 queue된 같은 platform/query seed는 다음 run에서 다시 POOL에 들어가지 않음
+- 이미 처리된 article URL만 들어온 source는 AI signal extraction을 다시 호출하지 않음
 - `seed_count <= signal_count * platform_count`
 
 ---

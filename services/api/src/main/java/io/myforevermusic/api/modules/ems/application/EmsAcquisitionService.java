@@ -154,7 +154,11 @@ public class EmsAcquisitionService {
             try {
                 List<EmsEditorialArticle> articles = sourceClient.fetch(source, maxArticlesPerSource);
                 articleCount += articles.size();
-                if (articles.isEmpty()) {
+                List<EmsEditorialArticle> freshArticles = articles.stream()
+                    .filter(article -> !hasText(article.articleUrl())
+                        || !signalRepository.existsByArticleUrl(article.articleUrl().trim()))
+                    .toList();
+                if (freshArticles.isEmpty()) {
                     continue;
                 }
                 EmsAcquisitionSignalModelResponse modelResponse = signalModel.extractSignals(
@@ -162,7 +166,7 @@ public class EmsAcquisitionService {
                         source.name(),
                         source.url(),
                         source.weight(),
-                        articles,
+                        freshArticles,
                         maxSignalsPerRun - savedSignals.size()
                     )
                 );
@@ -212,6 +216,9 @@ public class EmsAcquisitionService {
             for (String platform : platforms) {
                 String seedKey = platform.toLowerCase(Locale.ROOT) + ":" + signal.getQuery().toLowerCase(Locale.ROOT);
                 if (!seenSeeds.add(seedKey)) {
+                    continue;
+                }
+                if (seedRepository.existsActiveByPlatformIdAndQuery(platform, signal.getQuery())) {
                     continue;
                 }
                 EmsAcquisitionSeedEntity seed = seedRepository.save(new EmsAcquisitionSeedEntity(

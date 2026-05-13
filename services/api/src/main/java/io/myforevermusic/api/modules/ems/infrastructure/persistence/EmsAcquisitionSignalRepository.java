@@ -8,4 +8,6 @@ import org.springframework.data.repository.query.Param;
 public interface EmsAcquisitionSignalRepository extends JpaRepository<EmsAcquisitionSignalEntity, Long> {
     @Query("select signal from EmsAcquisitionSignalEntity signal where signal.run.id = :runId order by signal.id")
     List<EmsAcquisitionSignalEntity> findTop50ByRunIdOrderByIdAsc(@Param("runId") Long runId);
+
+    boolean existsByArticleUrl(String articleUrl);
 }

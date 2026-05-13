@@ -2,6 +2,9 @@ package io.myforevermusic.api.modules.ems.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -146,6 +149,135 @@ class EmsAcquisitionServiceTest {
             assertThat(seed.poolRunId()).isEqualTo(44L);
         });
         verify(collectionService).queueAcquisitionSearchPool("user-001", "spotify", "best new tracks", 5);
+    }
+
+    @Test
+    void shouldSkipAlreadyQueuedPlatformQuerySeeds() {
+        EmsAcquisitionProperties properties = properties();
+        EmsEditorialSource source = new EmsEditorialSource("Pitchfork", "rss", "https://pitchfork.com/feed/", 1.0d);
+        EmsEditorialArticle article = new EmsEditorialArticle(
+            "Pitchfork",
+            "https://pitchfork.com/feed/",
+            "https://example.test/a",
+            "Best New Tracks",
+            "A roundup of new tracks.",
+            Instant.parse("2026-05-14T00:00:00Z")
+        );
+        List<EmsAcquisitionSignalEntity> savedSignals = new ArrayList<>();
+        AtomicLong ids = new AtomicLong(1);
+
+        when(runRepository.save(any(EmsAcquisitionRunEntity.class))).thenAnswer(invocation -> {
+            EmsAcquisitionRunEntity entity = invocation.getArgument(0);
+            if (entity.getId() == null) {
+                ReflectionTestUtils.setField(entity, "id", ids.getAndIncrement());
+            }
+            return entity;
+        });
+        when(signalRepository.save(any(EmsAcquisitionSignalEntity.class))).thenAnswer(invocation -> {
+            EmsAcquisitionSignalEntity entity = invocation.getArgument(0);
+            ReflectionTestUtils.setField(entity, "id", ids.getAndIncrement());
+            savedSignals.add(entity);
+            return entity;
+        });
+        when(signalRepository.findTop50ByRunIdOrderByIdAsc(1L)).thenReturn(savedSignals);
+        when(seedRepository.findTop100ByRunIdOrderByIdAsc(1L)).thenReturn(List.of());
+        when(sourceClient.fetch(source, 10)).thenReturn(List.of(article));
+        when(signalModel.extractSignals(any(EmsAcquisitionSignalModelRequest.class)))
+            .thenReturn(new EmsAcquisitionSignalModelResponse(
+                "ai-001",
+                Instant.parse("2026-05-14T00:00:01Z"),
+                "test-model",
+                List.of(new EmsAcquisitionSignal(
+                    "https://example.test/a",
+                    "Best New Tracks",
+                    "playlist_query",
+                    "best new tracks",
+                    0.84d,
+                    "Editorial roundup"
+                ))
+            ));
+        when(seedRepository.existsActiveByPlatformIdAndQuery("spotify", "best new tracks")).thenReturn(true);
+
+        EmsAcquisitionService service = new EmsAcquisitionService(
+            properties,
+            sourceClient,
+            signalModel,
+            collectionService,
+            runRepository,
+            signalRepository,
+            seedRepository
+        );
+
+        EmsAcquisitionService.EmsAcquisitionRunDetailSnapshot result = service.runNow(
+            new EmsAcquisitionService.EmsAcquisitionRunCommand(
+                "user-001",
+                List.of("spotify"),
+                List.of(sourceProperty("Pitchfork", "rss", "https://pitchfork.com/feed/")),
+                10,
+                5,
+                5
+            )
+        );
+
+        assertThat(result.run().status()).isEqualTo("completed");
+        assertThat(result.run().signalCount()).isEqualTo(1);
+        assertThat(result.run().seedCount()).isZero();
+        assertThat(result.run().poolRunCount()).isZero();
+        verify(collectionService, never()).queueAcquisitionSearchPool(anyString(), anyString(), anyString(), anyInt());
+    }
+
+    @Test
+    void shouldSkipAlreadyProcessedArticleUrls() {
+        EmsAcquisitionProperties properties = properties();
+        EmsEditorialSource source = new EmsEditorialSource("Pitchfork", "rss", "https://pitchfork.com/feed/", 1.0d);
+        EmsEditorialArticle article = new EmsEditorialArticle(
+            "Pitchfork",
+            "https://pitchfork.com/feed/",
+            "https://example.test/a",
+            "Best New Tracks",
+            "A roundup of new tracks.",
+            Instant.parse("2026-05-14T00:00:00Z")
+        );
+        AtomicLong ids = new AtomicLong(1);
+
+        when(runRepository.save(any(EmsAcquisitionRunEntity.class))).thenAnswer(invocation -> {
+            EmsAcquisitionRunEntity entity = invocation.getArgument(0);
+            if (entity.getId() == null) {
+                ReflectionTestUtils.setField(entity, "id", ids.getAndIncrement());
+            }
+            return entity;
+        });
+        when(signalRepository.findTop50ByRunIdOrderByIdAsc(1L)).thenReturn(List.of());
+        when(seedRepository.findTop100ByRunIdOrderByIdAsc(1L)).thenReturn(List.of());
+        when(sourceClient.fetch(source, 10)).thenReturn(List.of(article));
+        when(signalRepository.existsByArticleUrl("https://example.test/a")).thenReturn(true);
+
+        EmsAcquisitionService service = new EmsAcquisitionService(
+            properties,
+            sourceClient,
+            signalModel,
+            collectionService,
+            runRepository,
+            signalRepository,
+            seedRepository
+        );
+
+        EmsAcquisitionService.EmsAcquisitionRunDetailSnapshot result = service.runNow(
+            new EmsAcquisitionService.EmsAcquisitionRunCommand(
+                "user-001",
+                List.of("spotify"),
+                List.of(sourceProperty("Pitchfork", "rss", "https://pitchfork.com/feed/")),
+                10,
+                5,
+                5
+            )
+        );
+
+        assertThat(result.run().status()).isEqualTo("completed");
+        assertThat(result.run().signalCount()).isZero();
+        assertThat(result.run().seedCount()).isZero();
+        verify(signalModel, never()).extractSignals(any(EmsAcquisitionSignalModelRequest.class));
+        verify(collectionService, never()).queueAcquisitionSearchPool(anyString(), anyString(), anyString(), anyInt());
     }
 
     private EmsAcquisitionProperties properties() {

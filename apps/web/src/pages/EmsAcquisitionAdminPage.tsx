@@ -16,7 +16,10 @@ const ADMIN_EMAIL = 'jowoosungtidal@gmail.com'
 
 const DEFAULT_SOURCES = [
     'Pitchfork News|https://pitchfork.com/feed/feed-news/rss|1.0',
-    'Pitchfork Best New Tracks|https://pitchfork.com/feed/reviews/best/tracks/rss|1.3',
+    'Pitchfork Track Reviews|https://pitchfork.com/feed/feed-track-reviews/rss|1.1',
+    'Pitchfork Best New Tracks|https://pitchfork.com/feed/reviews/best/tracks/rss|1.4',
+    'Stereogum|https://www.stereogum.com/feed/|1.1',
+    'NME|https://www.nme.com/?alt=rss|1.0',
 ].join('\n')
 
 const statusTone: Record<string, string> = {

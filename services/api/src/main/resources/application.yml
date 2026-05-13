@@ -73,7 +73,27 @@ app:
       max-signals-per-run: ${EMS_ACQUISITION_MAX_SIGNALS_PER_RUN:40}
       per-seed-limit: ${EMS_ACQUISITION_PER_SEED_LIMIT:5}
       platforms: ${EMS_ACQUISITION_PLATFORMS:spotify,tidal}
-      sources: []
+      sources:
+        - name: Pitchfork News
+          type: rss
+          url: https://pitchfork.com/feed/feed-news/rss
+          weight: 1.0
+        - name: Pitchfork Track Reviews
+          type: rss
+          url: https://pitchfork.com/feed/feed-track-reviews/rss
+          weight: 1.1
+        - name: Pitchfork Best New Tracks
+          type: rss
+          url: https://pitchfork.com/feed/reviews/best/tracks/rss
+          weight: 1.4
+        - name: Stereogum
+          type: rss
+          url: https://www.stereogum.com/feed/
+          weight: 1.1
+        - name: NME
+          type: rss
+          url: https://www.nme.com/?alt=rss
+          weight: 1.0
   ai:
     base-url: ${AI_SERVICE_BASE_URL:http://127.0.0.1:8000}
     recommendation-preview-path: ${AI_RECOMMENDATION_PREVIEW_PATH:/v1/recommendations/preview}
