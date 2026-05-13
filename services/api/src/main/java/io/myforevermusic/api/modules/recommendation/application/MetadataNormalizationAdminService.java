@@ -48,6 +48,7 @@ public class MetadataNormalizationAdminService {
     private final EmsCollectedTrackRepository trackRepository;
     private final PmsImportedTrackRepository pmsImportedTrackRepository;
     private final PmsUserTrackRepository pmsUserTrackRepository;
+    private final CandidateQualityScorer qualityScorer;
 
     public MetadataNormalizationAdminService(
         MusicBrainzClient musicBrainzClient,
@@ -60,7 +61,8 @@ public class MetadataNormalizationAdminService {
         ObjectMapper objectMapper,
         EmsCollectedTrackRepository trackRepository,
         PmsImportedTrackRepository pmsImportedTrackRepository,
-        PmsUserTrackRepository pmsUserTrackRepository
+        PmsUserTrackRepository pmsUserTrackRepository,
+        CandidateQualityScorer qualityScorer
     ) {
         this.musicBrainzClient = musicBrainzClient;
         this.wikidataClient = wikidataClient;
@@ -73,6 +75,7 @@ public class MetadataNormalizationAdminService {
         this.trackRepository = trackRepository;
         this.pmsImportedTrackRepository = pmsImportedTrackRepository;
         this.pmsUserTrackRepository = pmsUserTrackRepository;
+        this.qualityScorer = qualityScorer;
     }
 
     public LookupResult lookupMusicBrainz(
@@ -94,13 +97,20 @@ public class MetadataNormalizationAdminService {
                 if (recording.id() == null || recording.id().isBlank()) {
                     continue;
                 }
+                Double quality = qualityScorer.scoreFor(
+                    title,
+                    artist,
+                    recording.title(),
+                    musicBrainzArtistName(recording),
+                    normalizeScore(recording.score())
+                );
                 savedCandidates.add(candidateStore.save(new TrackIdentityCandidateStore.Draft(
                     title,
                     artist,
                     "musicbrainz",
                     "mbid",
                     recording.id(),
-                    normalizeScore(recording.score()),
+                    quality,
                     serializeMetadata(recording),
                     adminUserId,
                     now
@@ -116,7 +126,7 @@ public class MetadataNormalizationAdminService {
                             "musicbrainz",
                             "isrc",
                             isrc,
-                            normalizeScore(recording.score()),
+                            quality,
                             serializeMetadata(recording),
                             adminUserId,
                             now
@@ -126,6 +136,17 @@ public class MetadataNormalizationAdminService {
             }
         }
         return new LookupResult(response, savedCandidates);
+    }
+
+    private String musicBrainzArtistName(MusicBrainzRecording recording) {
+        if (recording.artistCredit() == null || recording.artistCredit().isEmpty()) {
+            return null;
+        }
+        return recording.artistCredit().stream()
+            .map(credit -> credit == null ? null : credit.name())
+            .filter(name -> name != null && !name.isBlank())
+            .findFirst()
+            .orElse(null);
     }
 
     public ExternalLookupResult lookupWikidata(
@@ -144,7 +165,7 @@ public class MetadataNormalizationAdminService {
             .orElse(List.of())
             .stream()
             .filter(result -> result.id() != null && !result.id().isBlank())
-            .map(this::toWikidataCandidate)
+            .map(result -> toWikidataCandidate(result, title, artist))
             .toList();
         return new ExternalLookupResult(
             "wikidata",
@@ -171,7 +192,7 @@ public class MetadataNormalizationAdminService {
             .orElse(List.of())
             .stream()
             .filter(result -> result.id() != null)
-            .map(this::toDiscogsCandidate)
+            .map(result -> toDiscogsCandidate(result, title, artist))
             .toList();
         return new ExternalLookupResult(
             "discogs",
@@ -690,27 +711,51 @@ public class MetadataNormalizationAdminService {
         return saved;
     }
 
-    private ExternalLookupCandidate toWikidataCandidate(WikidataEntitySearchResult result) {
+    private ExternalLookupCandidate toWikidataCandidate(
+        WikidataEntitySearchResult result,
+        String queryTitle,
+        String queryArtist
+    ) {
+        String candidateArtist = qualityScorer.extractWikidataArtist(result.description());
+        Double quality = qualityScorer.scoreFor(
+            queryTitle,
+            queryArtist,
+            result.label(),
+            candidateArtist,
+            null
+        );
         return new ExternalLookupCandidate(
             "wikidata",
             "wikidata_qid",
             result.id(),
             result.label(),
             result.description(),
-            null,
+            quality,
             serializeMetadata(result)
         );
     }
 
-    private ExternalLookupCandidate toDiscogsCandidate(DiscogsSearchResult result) {
+    private ExternalLookupCandidate toDiscogsCandidate(
+        DiscogsSearchResult result,
+        String queryTitle,
+        String queryArtist
+    ) {
         String description = discogsDescription(result);
+        CandidateQualityScorer.DiscogsTitleParts parts = qualityScorer.parseDiscogsTitle(result.title());
+        Double quality = qualityScorer.scoreFor(
+            queryTitle,
+            queryArtist,
+            parts.title(),
+            parts.artist(),
+            null
+        );
         return new ExternalLookupCandidate(
             "discogs",
             "discogs_master_id",
             String.valueOf(result.id()),
             result.title(),
             description,
-            null,
+            quality,
             serializeMetadata(result)
         );
     }

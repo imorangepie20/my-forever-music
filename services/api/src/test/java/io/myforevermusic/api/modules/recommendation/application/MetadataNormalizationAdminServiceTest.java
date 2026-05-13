@@ -73,7 +73,8 @@ class MetadataNormalizationAdminServiceTest {
             new ObjectMapper(),
             trackRepository,
             pmsImportedTrackRepository,
-            pmsUserTrackRepository
+            pmsUserTrackRepository,
+            new CandidateQualityScorer()
         );
     }
 
