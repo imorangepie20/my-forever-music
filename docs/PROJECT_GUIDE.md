@@ -221,7 +221,7 @@ docs/
 - `GET/POST /api/v1/pms/personal-playlists/*`는 사용자 제작 PMS playlist 생성과 GMS 추천 후보 저장을 제공함
 - `GET /api/v1/gms/playlists/preview`는 사용자 PMS 라이브러리 affinity 기준으로 EMS 평가 공개 playlist 후보를 정렬해 반환하고, cold-start 사용자에는 409로 차단함. 응답 후보마다 affinity/novelty/coherence/diversity/redundancy/confidence 6축 evidence와 composite score를 포함하고, 정렬은 composite score 기준으로 수행함
 - `POST /api/v1/gms/playlists/{id}/save`는 EMS 평가 playlist를 결정적 personal playlist id(`gms-ems-{id}`)로 PMS에 멱등 저장하고, 추가된 트랙마다 `added_to_playlist` 이벤트를 기록함
-- `apps/web`는 `/gms-playlists`에서 사용자에게 EMS 평가 playlist 후보를 composite/affinity 점수와 6축 evidence 패널과 함께 카드로 노출하고, ConfirmDialog로 PMS 저장 흐름을 승인받음
+- `apps/web`는 `/gms-playlists`에서 사용자에게 EMS 평가 playlist 후보를 composite/affinity 점수와 6축 evidence 패널과 함께 카드로 노출하고, "Preview tracks" 모달에서 트랙 목록을 보고 개별/전체 재생으로 사전 청취한 뒤 ConfirmDialog로 PMS 저장 흐름을 승인받음
 - 현재 구현은 아직 `핵심 서비스 문서`의 전체 범위가 아니라, 그중 `PMS / EMS / GMS` 추천 흐름의 최소 검증 버전임
 
 ## 9. 참고 메모

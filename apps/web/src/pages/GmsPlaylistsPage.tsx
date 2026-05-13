@@ -1,11 +1,24 @@
-import { useCallback, useEffect, useState } from 'react'
-import { ArrowDownToLine, CheckCircle2, ExternalLink, RefreshCw, Sparkles } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ArrowDownToLine, CheckCircle2, ExternalLink, ListMusic, Play, RefreshCw, Sparkles, X } from 'lucide-react'
 import Button from '@/components/common/Button'
 import ConfirmDialog from '@/components/common/ConfirmDialog'
 import HudCard from '@/components/common/HudCard'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
-import { ApiError, fetchGmsPlaylistPreview, saveGmsPlaylistToPms } from '@/services/api'
-import type { GmsPlaylistPreviewItem, GmsPlaylistPreviewResponse, GmsPlaylistSaveResponse } from '@/types/api'
+import { usePlayback } from '@/contexts/PlaybackContext'
+import { toEmsTrackPlaybackItem } from '@/lib/emsPlayback'
+import { formatDuration } from '@/lib/musicPlayback'
+import {
+    ApiError,
+    fetchEmsCollectedPlaylistDetail,
+    fetchGmsPlaylistPreview,
+    saveGmsPlaylistToPms,
+} from '@/services/api'
+import type {
+    EmsCollectionPlaylistDetailResponse,
+    GmsPlaylistPreviewItem,
+    GmsPlaylistPreviewResponse,
+    GmsPlaylistSaveResponse,
+} from '@/types/api'
 
 const DEFAULT_LIMIT = 12
 
@@ -34,6 +47,7 @@ const formatCollectedAt = (value: string) => {
 
 const GmsPlaylistsPage = () => {
     const { session } = useAuthSession()
+    const { playQueue, isLoading: playbackLoading } = usePlayback()
     const userId = session?.userId ?? ''
 
     const [preview, setPreview] = useState<GmsPlaylistPreviewResponse | null>(null)
@@ -43,6 +57,10 @@ const GmsPlaylistsPage = () => {
     const [confirmCandidate, setConfirmCandidate] = useState<GmsPlaylistPreviewItem | null>(null)
     const [lastSaveResult, setLastSaveResult] = useState<GmsPlaylistSaveResponse | null>(null)
     const [savedPlaylistIds, setSavedPlaylistIds] = useState<Set<number>>(new Set())
+    const [previewCandidate, setPreviewCandidate] = useState<GmsPlaylistPreviewItem | null>(null)
+    const [previewDetail, setPreviewDetail] = useState<EmsCollectionPlaylistDetailResponse | null>(null)
+    const [previewLoading, setPreviewLoading] = useState(false)
+    const [previewError, setPreviewError] = useState<string | null>(null)
 
     const loadPreview = useCallback(
         (signal?: AbortSignal) => {
@@ -82,6 +100,85 @@ const GmsPlaylistsPage = () => {
         loadPreview(controller.signal)
         return () => controller.abort()
     }, [loadPreview])
+
+    useEffect(() => {
+        if (!previewCandidate) {
+            setPreviewDetail(null)
+            setPreviewError(null)
+            setPreviewLoading(false)
+            return
+        }
+        const controller = new AbortController()
+        setPreviewLoading(true)
+        setPreviewError(null)
+        setPreviewDetail(null)
+
+        fetchEmsCollectedPlaylistDetail(previewCandidate.playlist_id, controller.signal)
+            .then((response) => {
+                setPreviewDetail(response)
+            })
+            .catch((requestError: unknown) => {
+                if (requestError instanceof DOMException && requestError.name === 'AbortError') {
+                    return
+                }
+                const message =
+                    requestError instanceof ApiError
+                        ? requestError.message
+                        : 'Unable to load EMS playlist tracks.'
+                setPreviewError(message)
+            })
+            .finally(() => setPreviewLoading(false))
+
+        return () => controller.abort()
+    }, [previewCandidate])
+
+    const previewPlaybackItems = useMemo(
+        () =>
+            previewDetail?.tracks.map((track) =>
+                toEmsTrackPlaybackItem(track, previewDetail.playlist.title),
+            ) ?? [],
+        [previewDetail],
+    )
+
+    const handlePreviewPlayAll = () => {
+        if (previewPlaybackItems.length > 0) {
+            void playQueue(previewPlaybackItems, 0)
+        }
+    }
+
+    const handlePreviewPlayTrack = (index: number) => {
+        if (previewPlaybackItems[index]) {
+            void playQueue(previewPlaybackItems, index)
+        }
+    }
+
+    const handlePreviewSave = async () => {
+        if (!userId || !previewCandidate) {
+            return
+        }
+        setPendingSaveId(previewCandidate.playlist_id)
+        setErrorMessage(null)
+        try {
+            const result = await saveGmsPlaylistToPms(previewCandidate.playlist_id, userId, {
+                title: null,
+            })
+            setLastSaveResult(result)
+            setSavedPlaylistIds((current) => {
+                const next = new Set(current)
+                next.add(previewCandidate.playlist_id)
+                return next
+            })
+            setPreviewCandidate(null)
+        } catch (requestError: unknown) {
+            const message =
+                requestError instanceof ApiError
+                    ? requestError.message
+                    : 'Unable to save this EMS playlist into PMS.'
+            setErrorMessage(message)
+        } finally {
+            setPendingSaveId(null)
+        }
+    }
 
     const handleSaveConfirmed = async () => {
         if (!userId || !confirmCandidate) {
@@ -283,18 +380,30 @@ const GmsPlaylistsPage = () => {
                                         Collected {formatCollectedAt(candidate.collected_at)}
                                     </p>
 
-                                    <div className="mt-auto flex gap-2">
-                                        {candidate.platform_external_url && (
-                                            <a
-                                                href={candidate.platform_external_url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-hud-border-secondary px-3 py-1.5 text-xs text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
+                                    <div className="mt-auto flex flex-col gap-2">
+                                        <div className="flex gap-2">
+                                            {candidate.platform_external_url && (
+                                                <a
+                                                    href={candidate.platform_external_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-hud-border-secondary px-3 py-1.5 text-xs text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
+                                                >
+                                                    <ExternalLink size={14} />
+                                                    Open
+                                                </a>
+                                            )}
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                fullWidth
+                                                onClick={() => setPreviewCandidate(candidate)}
                                             >
-                                                <ExternalLink size={14} />
-                                                Open
-                                            </a>
-                                        )}
+                                                <ListMusic size={14} />
+                                                Preview tracks
+                                            </Button>
+                                        </div>
                                         <Button
                                             type="button"
                                             variant={alreadySaved ? 'ghost' : 'primary'}
@@ -343,6 +452,169 @@ const GmsPlaylistsPage = () => {
                 onConfirm={handleSaveConfirmed}
                 onCancel={() => setConfirmCandidate(null)}
             />
+
+            {previewCandidate && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="gms-preview-modal-title"
+                >
+                    <div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setPreviewCandidate(null)}
+                    />
+                    <div className="relative hud-card hud-card-bottom flex max-h-[85vh] w-full max-w-3xl flex-col rounded-lg animate-fade-in">
+                        <div className="flex items-start justify-between gap-4 border-b border-hud-border-secondary p-5">
+                            <div className="flex items-start gap-3">
+                                {previewCandidate.cover_image_url ? (
+                                    <img
+                                        src={previewCandidate.cover_image_url}
+                                        alt={previewCandidate.title}
+                                        className="h-16 w-16 rounded-xl object-cover"
+                                    />
+                                ) : (
+                                    <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-hud-bg-secondary/60 text-hud-text-muted">
+                                        <Sparkles size={24} />
+                                    </div>
+                                )}
+                                <div>
+                                    <h3
+                                        id="gms-preview-modal-title"
+                                        className="text-base font-semibold text-hud-text-primary"
+                                    >
+                                        {previewCandidate.title}
+                                    </h3>
+                                    <p className="mt-1 text-xs text-hud-text-muted">
+                                        {previewCandidate.curator || 'Unknown curator'} ·{' '}
+                                        {previewCandidate.source_platform} · {previewCandidate.track_count} tracks
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setPreviewCandidate(null)}
+                                className="rounded-lg p-2 text-hud-text-muted transition-hud hover:bg-hud-bg-hover hover:text-hud-text-primary"
+                                aria-label="Close preview"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-5">
+                            {previewLoading && (
+                                <div className="flex items-center gap-3 rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm text-hud-text-secondary">
+                                    <RefreshCw size={18} className="animate-spin text-hud-accent-primary" />
+                                    Loading playlist tracks...
+                                </div>
+                            )}
+                            {previewError && (
+                                <div className="rounded-2xl border border-hud-accent-danger/40 bg-hud-accent-danger/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                                    {previewError}
+                                </div>
+                            )}
+                            {previewDetail && previewPlaybackItems.length === 0 && (
+                                <div className="rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm text-hud-text-secondary">
+                                    이 플레이리스트의 트랙 목록이 비어 있습니다.
+                                </div>
+                            )}
+                            {previewDetail && previewPlaybackItems.length > 0 && (
+                                <ul className="space-y-2">
+                                    {previewDetail.tracks.map((track, index) => (
+                                        <li
+                                            key={track.id}
+                                            className="flex items-center gap-3 rounded-xl border border-hud-border-secondary bg-hud-bg-primary/60 px-3 py-2"
+                                        >
+                                            <span className="w-6 shrink-0 text-right text-xs text-hud-text-muted">
+                                                {index + 1}
+                                            </span>
+                                            {track.album_image_url ? (
+                                                <img
+                                                    src={track.album_image_url}
+                                                    alt={track.album_title ?? track.title}
+                                                    className="h-10 w-10 shrink-0 rounded-md object-cover"
+                                                />
+                                            ) : (
+                                                <div className="h-10 w-10 shrink-0 rounded-md bg-hud-bg-secondary/60" />
+                                            )}
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm text-hud-text-primary">
+                                                    {track.title}
+                                                </p>
+                                                <p className="truncate text-xs text-hud-text-muted">
+                                                    {track.artist_name} · {track.source_platform}
+                                                </p>
+                                            </div>
+                                            <span className="shrink-0 text-xs text-hud-text-muted">
+                                                {formatDuration(track.duration_ms)}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handlePreviewPlayTrack(index)}
+                                                disabled={playbackLoading}
+                                                className="rounded-lg border border-hud-border-secondary px-2 py-1 text-xs text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                                aria-label={`Play ${track.title}`}
+                                            >
+                                                <Play size={14} />
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-3 border-t border-hud-border-secondary p-5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={previewPlaybackItems.length === 0 || playbackLoading}
+                                onClick={handlePreviewPlayAll}
+                            >
+                                <Play size={14} />
+                                Play all
+                            </Button>
+                            <div className="flex-1" />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setPreviewCandidate(null)}
+                            >
+                                닫기
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="primary"
+                                size="sm"
+                                disabled={
+                                    pendingSaveId !== null ||
+                                    savedPlaylistIds.has(previewCandidate.playlist_id) ||
+                                    previewPlaybackItems.length === 0
+                                }
+                                onClick={handlePreviewSave}
+                            >
+                                {pendingSaveId === previewCandidate.playlist_id ? (
+                                    <>
+                                        <RefreshCw size={14} className="animate-spin" />
+                                        저장 중
+                                    </>
+                                ) : savedPlaylistIds.has(previewCandidate.playlist_id) ? (
+                                    <>
+                                        <CheckCircle2 size={14} />
+                                        저장됨
+                                    </>
+                                ) : (
+                                    <>
+                                        <ArrowDownToLine size={14} />
+                                        PMS에 저장
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
