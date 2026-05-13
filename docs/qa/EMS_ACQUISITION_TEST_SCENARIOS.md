@@ -106,7 +106,8 @@ curl -s http://127.0.0.1:8080/api/v1/ems/acquisition/run \
 DB 검증:
 
 ```sql
-select ems_acquisition_run_id, status, article_count, signal_count, seed_count, pool_run_count,
+select ems_acquisition_run_id, status, article_count, skipped_article_count,
+       signal_count, seed_count, skipped_seed_count, pool_run_count,
        failed_source_count, failed_seed_count, started_at, completed_at
 from ems_acquisition_run
 order by started_at desc
@@ -290,7 +291,7 @@ limit 5;
 3. DB 확인:
 
 ```sql
-select signal_count, seed_count
+select signal_count, seed_count, skipped_article_count, skipped_seed_count
 from ems_acquisition_run
 order by started_at desc
 limit 1;

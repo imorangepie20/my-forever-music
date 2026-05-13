@@ -292,10 +292,12 @@ const EmsAcquisitionAdminPage = () => {
 
                     {latestRun && (
                         <>
-                            <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                <Stat label="Articles" value={latestRun.article_count} />
                                 <Stat label="Signals" value={latestRun.signal_count} />
                                 <Stat label="Seeds" value={latestRun.seed_count} />
                                 <Stat label="Pool Runs" value={latestRun.pool_run_count} />
+                                <Stat label="Skipped" value={latestRun.skipped_article_count + latestRun.skipped_seed_count} />
                                 <Stat label="Failures" value={latestRun.failed_source_count + latestRun.failed_seed_count} />
                             </div>
                             {(latestRun.message || latestRun.last_error) && (
@@ -338,10 +340,11 @@ const EmsAcquisitionAdminPage = () => {
                                     {run.status}
                                 </span>
                             </div>
-                            <div className="mt-3 grid grid-cols-4 gap-2 text-xs text-hud-text-secondary">
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-hud-text-secondary sm:grid-cols-5">
                                 <span>{run.signal_count} signals</span>
                                 <span>{run.seed_count} seeds</span>
                                 <span>{run.pool_run_count} pool</span>
+                                <span>{run.skipped_article_count + run.skipped_seed_count} skipped</span>
                                 <span>{run.failed_source_count + run.failed_seed_count} failed</span>
                             </div>
                         </div>

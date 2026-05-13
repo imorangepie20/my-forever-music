@@ -143,6 +143,7 @@ public class EmsAcquisitionService {
         int maxSignalsPerRun = clamp(requestedMaxSignalsPerRun, 1, 200);
         int perSeedLimit = clamp(requestedPerSeedLimit, 1, 50);
         int articleCount = 0;
+        int skippedArticleCount = 0;
         int failedSourceCount = 0;
         List<String> failureMessages = new ArrayList<>();
         List<EmsAcquisitionSignalEntity> savedSignals = new ArrayList<>();
@@ -158,6 +159,7 @@ public class EmsAcquisitionService {
                     .filter(article -> !hasText(article.articleUrl())
                         || !signalRepository.existsByArticleUrl(article.articleUrl().trim()))
                     .toList();
+                skippedArticleCount += articles.size() - freshArticles.size();
                 if (freshArticles.isEmpty()) {
                     continue;
                 }
@@ -201,13 +203,14 @@ public class EmsAcquisitionService {
 
         if (savedSignals.isEmpty() && failedSourceCount > 0) {
             String error = truncate("EMS acquisition produced no signals. " + failureMessages.get(0), 1000);
-            run.updateProgress(sources.size(), articleCount, 0, 0, 0, failedSourceCount, 0, Instant.now());
+            run.updateProgress(sources.size(), articleCount, skippedArticleCount, 0, 0, 0, 0, failedSourceCount, 0, Instant.now());
             run.markFailed(error, Instant.now());
             runRepository.save(run);
             return toDetailSnapshot(run);
         }
 
         int seedCount = 0;
+        int skippedSeedCount = 0;
         int poolRunCount = 0;
         int failedSeedCount = 0;
         Set<String> seenSeeds = new LinkedHashSet<>();
@@ -216,9 +219,11 @@ public class EmsAcquisitionService {
             for (String platform : platforms) {
                 String seedKey = platform.toLowerCase(Locale.ROOT) + ":" + signal.getQuery().toLowerCase(Locale.ROOT);
                 if (!seenSeeds.add(seedKey)) {
+                    skippedSeedCount++;
                     continue;
                 }
                 if (seedRepository.existsActiveByPlatformIdAndQuery(platform, signal.getQuery())) {
+                    skippedSeedCount++;
                     continue;
                 }
                 EmsAcquisitionSeedEntity seed = seedRepository.save(new EmsAcquisitionSeedEntity(
@@ -261,18 +266,22 @@ public class EmsAcquisitionService {
         run.updateProgress(
             sources.size(),
             articleCount,
+            skippedArticleCount,
             savedSignals.size(),
             seedCount,
+            skippedSeedCount,
             poolRunCount,
             failedSourceCount,
             failedSeedCount,
             completedAt
         );
         run.markCompleted(
-            "EMS acquisition completed: signals=%d seeds=%d pool_runs=%d.".formatted(
+            "EMS acquisition completed: signals=%d seeds=%d pool_runs=%d skipped_articles=%d skipped_seeds=%d.".formatted(
                 savedSignals.size(),
                 seedCount,
-                poolRunCount
+                poolRunCount,
+                skippedArticleCount,
+                skippedSeedCount
             ),
             completedAt
         );
@@ -345,8 +354,10 @@ public class EmsAcquisitionService {
             run.getStatus(),
             run.getSourceCount(),
             run.getArticleCount(),
+            run.getSkippedArticleCount(),
             run.getSignalCount(),
             run.getSeedCount(),
+            run.getSkippedSeedCount(),
             run.getPoolRunCount(),
             run.getFailedSourceCount(),
             run.getFailedSeedCount(),
@@ -453,8 +464,10 @@ public class EmsAcquisitionService {
         String status,
         int sourceCount,
         int articleCount,
+        int skippedArticleCount,
         int signalCount,
         int seedCount,
+        int skippedSeedCount,
         int poolRunCount,
         int failedSourceCount,
         int failedSeedCount,

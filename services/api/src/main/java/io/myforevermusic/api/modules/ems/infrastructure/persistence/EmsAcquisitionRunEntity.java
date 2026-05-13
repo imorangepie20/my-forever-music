@@ -38,11 +38,17 @@ public class EmsAcquisitionRunEntity {
     @Column(name = "article_count", nullable = false)
     private int articleCount;
 
+    @Column(name = "skipped_article_count", nullable = false)
+    private int skippedArticleCount;
+
     @Column(name = "signal_count", nullable = false)
     private int signalCount;
 
     @Column(name = "seed_count", nullable = false)
     private int seedCount;
+
+    @Column(name = "skipped_seed_count", nullable = false)
+    private int skippedSeedCount;
 
     @Column(name = "pool_run_count", nullable = false)
     private int poolRunCount;
@@ -88,8 +94,10 @@ public class EmsAcquisitionRunEntity {
     public void updateProgress(
         int sourceCount,
         int articleCount,
+        int skippedArticleCount,
         int signalCount,
         int seedCount,
+        int skippedSeedCount,
         int poolRunCount,
         int failedSourceCount,
         int failedSeedCount,
@@ -97,8 +105,10 @@ public class EmsAcquisitionRunEntity {
     ) {
         this.sourceCount = sourceCount;
         this.articleCount = articleCount;
+        this.skippedArticleCount = skippedArticleCount;
         this.signalCount = signalCount;
         this.seedCount = seedCount;
+        this.skippedSeedCount = skippedSeedCount;
         this.poolRunCount = poolRunCount;
         this.failedSourceCount = failedSourceCount;
         this.failedSeedCount = failedSeedCount;
@@ -128,8 +138,10 @@ public class EmsAcquisitionRunEntity {
     public String getStatus() { return status; }
     public int getSourceCount() { return sourceCount; }
     public int getArticleCount() { return articleCount; }
+    public int getSkippedArticleCount() { return skippedArticleCount; }
     public int getSignalCount() { return signalCount; }
     public int getSeedCount() { return seedCount; }
+    public int getSkippedSeedCount() { return skippedSeedCount; }
     public int getPoolRunCount() { return poolRunCount; }
     public int getFailedSourceCount() { return failedSourceCount; }
     public int getFailedSeedCount() { return failedSeedCount; }

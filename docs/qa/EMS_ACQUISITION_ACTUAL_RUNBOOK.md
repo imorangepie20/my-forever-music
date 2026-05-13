@@ -156,6 +156,7 @@ curl -fsS "$API/api/v1/ems/acquisition/run" \
 - `run.signal_count > 0`
 - `run.seed_count > 0`
 - `run.pool_run_count > 0`
+- 반복 실행 시 `skipped_article_count` 또는 `skipped_seed_count`가 증가할 수 있음
 - `seeds[*].pool_run_id`가 존재
 
 ## 4. 방금 실행한 run DB 확인
@@ -172,7 +173,8 @@ echo "EMS_ACQ_RUN_ID=${EMS_ACQ_RUN_ID}"
 
 pg -c "
 select ems_acquisition_run_id, trigger_type, status,
-       source_count, article_count, signal_count, seed_count, pool_run_count,
+       source_count, article_count, skipped_article_count,
+       signal_count, seed_count, skipped_seed_count, pool_run_count,
        failed_source_count, failed_seed_count, message
 from ems_acquisition_run
 where ems_acquisition_run_id = ${EMS_ACQ_RUN_ID};

@@ -221,6 +221,7 @@ class EmsAcquisitionServiceTest {
 
         assertThat(result.run().status()).isEqualTo("completed");
         assertThat(result.run().signalCount()).isEqualTo(1);
+        assertThat(result.run().skippedSeedCount()).isEqualTo(1);
         assertThat(result.run().seedCount()).isZero();
         assertThat(result.run().poolRunCount()).isZero();
         verify(collectionService, never()).queueAcquisitionSearchPool(anyString(), anyString(), anyString(), anyInt());
@@ -275,6 +276,7 @@ class EmsAcquisitionServiceTest {
 
         assertThat(result.run().status()).isEqualTo("completed");
         assertThat(result.run().signalCount()).isZero();
+        assertThat(result.run().skippedArticleCount()).isEqualTo(1);
         assertThat(result.run().seedCount()).isZero();
         verify(signalModel, never()).extractSignals(any(EmsAcquisitionSignalModelRequest.class));
         verify(collectionService, never()).queueAcquisitionSearchPool(anyString(), anyString(), anyString(), anyInt());

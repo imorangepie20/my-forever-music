@@ -1099,8 +1099,10 @@ export interface EmsAcquisitionRunItem {
     status: string
     source_count: number
     article_count: number
+    skipped_article_count: number
     signal_count: number
     seed_count: number
+    skipped_seed_count: number
     pool_run_count: number
     failed_source_count: number
     failed_seed_count: number
