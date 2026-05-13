@@ -89,6 +89,26 @@ public class EmsCollectionService {
 
     @Transactional
     public EmsCollectionSearchPreviewResult previewSearch(String userId, String platformId, String query) {
+        return queueProviderSearchPool(userId, platformId, query, SEARCH_POOL_SOURCE, null);
+    }
+
+    @Transactional
+    public EmsCollectionSearchPreviewResult queueAcquisitionSearchPool(
+        String userId,
+        String platformId,
+        String query,
+        int limit
+    ) {
+        return queueProviderSearchPool(userId, platformId, query, "acquisition_pool", limit);
+    }
+
+    private EmsCollectionSearchPreviewResult queueProviderSearchPool(
+        String userId,
+        String platformId,
+        String query,
+        String collectionSource,
+        Integer limitOverride
+    ) {
         List<EmsCollectionSearchPlaylistPreview> playlists = new ArrayList<>();
         List<EmsCollectionSearchTrackPreview> tracks = new ArrayList<>();
         int totalPlaylistCount = 0;
@@ -107,9 +127,9 @@ public class EmsCollectionService {
 
         SearchTotals totals;
         if ("spotify".equals(requestedPlatformId)) {
-            totals = appendSpotifySearchResults(credential, query, playlists, tracks);
+            totals = appendSpotifySearchResults(credential, query, playlists, tracks, limitOverride);
         } else if ("tidal".equals(requestedPlatformId)) {
-            totals = appendTidalSearchResults(credential, query, playlists, tracks);
+            totals = appendTidalSearchResults(credential, query, playlists, tracks, limitOverride);
         } else {
             throw new IllegalArgumentException("Unsupported EMS search platform: %s".formatted(requestedPlatformId));
         }
@@ -120,6 +140,7 @@ public class EmsCollectionService {
             userId,
             requestedPlatformId,
             query,
+            collectionSource,
             playlists,
             tracks,
             searchedAt
@@ -145,7 +166,14 @@ public class EmsCollectionService {
     ) {
         Instant searchedAt = Instant.now();
         EmsCollectedPlaylistEntity playlist = ensureCollectedPlaylistShell(platformId, externalPlaylistId, searchedAt);
-        return fetchAndStoreSearchPlaylistTracks(userId, playlist, platformId, externalPlaylistId, searchedAt);
+        return fetchAndStoreSearchPlaylistTracks(
+            userId,
+            playlist,
+            platformId,
+            externalPlaylistId,
+            SEARCH_POOL_SOURCE,
+            searchedAt
+        );
     }
 
     private EmsCollectionSearchPlaylistTracksPreview fetchAndStoreSearchPlaylistTracks(
@@ -153,6 +181,7 @@ public class EmsCollectionService {
         EmsCollectedPlaylistEntity playlist,
         String platformId,
         String externalPlaylistId,
+        String collectionSource,
         Instant collectedAt
     ) {
         PlatformAccountCredential credential = platformCredentialService
@@ -176,7 +205,7 @@ public class EmsCollectionService {
             throw new IllegalArgumentException("Unsupported EMS search platform: %s".formatted(platformId));
         }
 
-        storeSearchPlaylistTracks(playlist, tracks, collectedAt);
+        storeSearchPlaylistTracks(playlist, tracks, collectionSource, collectedAt);
         discardPlaylistIfEmpty(playlist);
         return new EmsCollectionSearchPlaylistTracksPreview(platformId, externalPlaylistId, tracks, tracks.size(), collectedAt);
     }
@@ -211,6 +240,7 @@ public class EmsCollectionService {
         String userId,
         String platformId,
         String query,
+        String collectionSource,
         List<EmsCollectionSearchPlaylistPreview> playlists,
         List<EmsCollectionSearchTrackPreview> tracks,
         Instant queuedAt
@@ -219,6 +249,7 @@ public class EmsCollectionService {
             truncate(userId, 100),
             truncate(platformId, 50),
             normalizeRequiredText(query, "search", 200),
+            truncate(collectionSource, 50),
             playlists.size(),
             tracks.size(),
             queuedAt
@@ -296,13 +327,14 @@ public class EmsCollectionService {
                 entry.getTrackCount()
             );
             EmsCollectedPlaylistEntity playlist = upsertPlaylistFromSearchPreview(
-                playlistPreview, entry.getRun().getSearchQuery(), collectedAt
+                playlistPreview, entry.getRun().getSearchQuery(), entry.getRun().getCollectionSource(), collectedAt
             );
             EmsCollectionSearchPlaylistTracksPreview tracks = fetchAndStoreSearchPlaylistTracks(
                 userId,
                 playlist,
                 entry.getSourcePlatform(),
                 entry.getExternalId(),
+                entry.getRun().getCollectionSource(),
                 collectedAt
             );
             return new EmsSearchPoolCollectionResult(1, tracks.trackCount());
@@ -322,7 +354,7 @@ public class EmsCollectionService {
                 entry.getPreviewUrl(),
                 entry.getDurationMs()
             );
-            upsertTrackFromSearchPreview(track, collectedAt);
+            upsertTrackFromSearchPreview(track, entry.getRun().getCollectionSource(), collectedAt);
             return new EmsSearchPoolCollectionResult(0, 1);
         }
 
@@ -332,6 +364,7 @@ public class EmsCollectionService {
     private void storeSearchPlaylistTracks(
         EmsCollectedPlaylistEntity playlist,
         List<EmsCollectionSearchTrackPreview> tracks,
+        String collectionSource,
         Instant collectedAt
     ) {
         if (playlist == null) {
@@ -340,7 +373,7 @@ public class EmsCollectionService {
             );
         }
         for (int i = 0; i < tracks.size(); i++) {
-            EmsCollectedTrackEntity track = upsertTrackFromSearchPreview(tracks.get(i), collectedAt);
+            EmsCollectedTrackEntity track = upsertTrackFromSearchPreview(tracks.get(i), collectionSource, collectedAt);
             linkPlaylistTrack(playlist, track, i);
         }
     }
@@ -383,11 +416,13 @@ public class EmsCollectionService {
         PlatformAccountCredential credential,
         String query,
         List<EmsCollectionSearchPlaylistPreview> playlists,
-        List<EmsCollectionSearchTrackPreview> tracks
+        List<EmsCollectionSearchTrackPreview> tracks,
+        Integer limitOverride
     ) {
         log.info("EMS search preview: calling Spotify search only query='{}'", query);
-        SpotifySearchResult<SpotifyPlaylistSummary> playlistResults =
-            spotifyWebApiClient.searchPlaylists(credential, query);
+        SpotifySearchResult<SpotifyPlaylistSummary> playlistResults = limitOverride == null
+            ? spotifyWebApiClient.searchPlaylists(credential, query)
+            : spotifyWebApiClient.searchPlaylists(credential, query, limitOverride);
         playlists.addAll(playlistResults.items().stream()
             .map(playlist -> new EmsCollectionSearchPlaylistPreview(
                 playlist.playlistId(),
@@ -401,8 +436,9 @@ public class EmsCollectionService {
                 playlist.trackCount()
             ))
             .toList());
-        SpotifySearchResult<SpotifyPlaylistTrack> trackResults =
-            spotifyWebApiClient.searchTracks(credential, query);
+        SpotifySearchResult<SpotifyPlaylistTrack> trackResults = limitOverride == null
+            ? spotifyWebApiClient.searchTracks(credential, query)
+            : spotifyWebApiClient.searchTracks(credential, query, limitOverride);
         tracks.addAll(trackResults.items().stream()
             .map(this::toSpotifySearchTrackPreview)
             .toList());
@@ -416,10 +452,13 @@ public class EmsCollectionService {
         PlatformAccountCredential credential,
         String query,
         List<EmsCollectionSearchPlaylistPreview> playlists,
-        List<EmsCollectionSearchTrackPreview> tracks
+        List<EmsCollectionSearchTrackPreview> tracks,
+        Integer limitOverride
     ) {
         log.info("EMS search preview: calling TIDAL search only query='{}'", query);
-        TidalSearchResult<TidalPlaylistSummary> playlistResults = tidalWebApiClient.searchPlaylistResults(credential, query);
+        TidalSearchResult<TidalPlaylistSummary> playlistResults = limitOverride == null
+            ? tidalWebApiClient.searchPlaylistResults(credential, query)
+            : limitedTidalPlaylistSearch(credential, query, limitOverride);
         playlists.addAll(playlistResults.items().stream()
             .map(playlist -> new EmsCollectionSearchPlaylistPreview(
                 playlist.playlistId(),
@@ -433,7 +472,9 @@ public class EmsCollectionService {
                 playlist.trackCount()
             ))
             .toList());
-        TidalSearchResult<TidalPlaylistTrack> trackResults = tidalWebApiClient.searchTrackResults(credential, query);
+        TidalSearchResult<TidalPlaylistTrack> trackResults = limitOverride == null
+            ? tidalWebApiClient.searchTrackResults(credential, query)
+            : limitedTidalTrackSearch(credential, query, limitOverride);
         tracks.addAll(trackResults.items().stream()
             .map(this::toTidalSearchTrackPreview)
             .toList());
@@ -441,6 +482,24 @@ public class EmsCollectionService {
             Math.max(playlistResults.total(), playlistResults.items().size()),
             Math.max(trackResults.total(), trackResults.items().size())
         );
+    }
+
+    private TidalSearchResult<TidalPlaylistSummary> limitedTidalPlaylistSearch(
+        PlatformAccountCredential credential,
+        String query,
+        int limit
+    ) {
+        List<TidalPlaylistSummary> items = tidalWebApiClient.searchPlaylists(credential, query, limit);
+        return new TidalSearchResult<>(items, items.size());
+    }
+
+    private TidalSearchResult<TidalPlaylistTrack> limitedTidalTrackSearch(
+        PlatformAccountCredential credential,
+        String query,
+        int limit
+    ) {
+        List<TidalPlaylistTrack> items = tidalWebApiClient.searchTracks(credential, query, limit);
+        return new TidalSearchResult<>(items, items.size());
     }
 
     private EmsCollectionSearchTrackPreview toSpotifySearchTrackPreview(SpotifyPlaylistTrack track) {
@@ -1135,6 +1194,7 @@ public class EmsCollectionService {
     private EmsCollectedPlaylistEntity upsertPlaylistFromSearchPreview(
         EmsCollectionSearchPlaylistPreview playlist,
         String query,
+        String collectionSource,
         Instant now
     ) {
         return playlistRepository.findBySourcePlatformAndExternalPlaylistId(
@@ -1150,7 +1210,7 @@ public class EmsCollectionService {
                     truncate(playlist.platformExternalUrl(), 500),
                     truncate(spotifyUriFor(playlist.sourcePlatform(), playlist.platformUri()), 200),
                     playlist.trackCount(),
-                    SEARCH_POOL_SOURCE,
+                    truncate(collectionSource, 50),
                     truncate(query, 200),
                     now
                 );
@@ -1166,7 +1226,7 @@ public class EmsCollectionService {
                 truncate(playlist.platformExternalUrl(), 500),
                 truncate(spotifyUriFor(playlist.sourcePlatform(), playlist.platformUri()), 200),
                 playlist.trackCount(),
-                SEARCH_POOL_SOURCE,
+                truncate(collectionSource, 50),
                 truncate(query, 200),
                 now
             )));
@@ -1195,6 +1255,7 @@ public class EmsCollectionService {
 
     private EmsCollectedTrackEntity upsertTrackFromSearchPreview(
         EmsCollectionSearchTrackPreview track,
+        String collectionSource,
         Instant now
     ) {
         return upsertCollectedTrack(
@@ -1209,7 +1270,7 @@ public class EmsCollectionService {
             track.platformUri(),
             track.previewUrl(),
             track.durationMs(),
-            SEARCH_POOL_SOURCE,
+            collectionSource,
             now,
             unavailableAudioFeatures(
                 "spotify".equals(track.sourcePlatform()) ? track.externalTrackId() : null,

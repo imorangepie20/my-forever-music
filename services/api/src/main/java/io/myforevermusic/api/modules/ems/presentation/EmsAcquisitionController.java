@@ -1,0 +1,242 @@
+package io.myforevermusic.api.modules.ems.presentation;
+
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import io.myforevermusic.api.modules.ems.application.EmsAcquisitionProperties;
+import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService;
+import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionRunCommand;
+import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionRunDetailSnapshot;
+import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionRunSnapshot;
+import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionSeedSnapshot;
+import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionSignalSnapshot;
+import io.swagger.v3.oas.annotations.Operation;
+import java.time.Instant;
+import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/v1/ems/acquisition")
+public class EmsAcquisitionController {
+
+    private final EmsAcquisitionService acquisitionService;
+
+    public EmsAcquisitionController(EmsAcquisitionService acquisitionService) {
+        this.acquisitionService = acquisitionService;
+    }
+
+    @Operation(summary = "Run EMS editorial acquisition immediately")
+    @PostMapping("/run")
+    public EmsAcquisitionRunResponse runAcquisition(@RequestBody(required = false) EmsAcquisitionRunRequest request) {
+        EmsAcquisitionRunDetailSnapshot snapshot = acquisitionService.runNow(toCommand(request));
+        return EmsAcquisitionRunResponse.from("api", snapshot);
+    }
+
+    @Operation(summary = "Get the latest EMS editorial acquisition run")
+    @GetMapping("/status")
+    public EmsAcquisitionRunResponse getStatus() {
+        EmsAcquisitionRunDetailSnapshot snapshot = acquisitionService.latestRun();
+        if (snapshot == null) {
+            return new EmsAcquisitionRunResponse(
+                "api",
+                "not_run",
+                Instant.now(),
+                null,
+                List.of(),
+                List.of()
+            );
+        }
+        return EmsAcquisitionRunResponse.from("api", snapshot);
+    }
+
+    @Operation(summary = "List recent EMS editorial acquisition runs")
+    @GetMapping("/runs")
+    public EmsAcquisitionRunsResponse listRuns() {
+        return new EmsAcquisitionRunsResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            acquisitionService.listRuns().stream().map(EmsAcquisitionRunItem::from).toList()
+        );
+    }
+
+    private static EmsAcquisitionRunCommand toCommand(EmsAcquisitionRunRequest request) {
+        if (request == null) {
+            return new EmsAcquisitionRunCommand(null, null, null, null, null, null);
+        }
+        return new EmsAcquisitionRunCommand(
+            request.userId(),
+            request.platforms(),
+            request.sources() == null ? null : request.sources().stream().map(EmsAcquisitionController::toSource).toList(),
+            request.maxArticlesPerSource(),
+            request.maxSignalsPerRun(),
+            request.perSeedLimit()
+        );
+    }
+
+    private static EmsAcquisitionProperties.Source toSource(EmsAcquisitionSourceRequest request) {
+        EmsAcquisitionProperties.Source source = new EmsAcquisitionProperties.Source();
+        source.setEnabled(true);
+        source.setName(request.name());
+        source.setType(request.type());
+        source.setUrl(request.url());
+        source.setWeight(request.weight() == null ? 1.0d : request.weight());
+        return source;
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAcquisitionRunRequest(
+        String userId,
+        List<String> platforms,
+        List<EmsAcquisitionSourceRequest> sources,
+        Integer maxArticlesPerSource,
+        Integer maxSignalsPerRun,
+        Integer perSeedLimit
+    ) {
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAcquisitionSourceRequest(
+        String name,
+        String type,
+        String url,
+        Double weight
+    ) {
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAcquisitionRunResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        EmsAcquisitionRunItem run,
+        List<EmsAcquisitionSignalItem> signals,
+        List<EmsAcquisitionSeedItem> seeds
+    ) {
+        static EmsAcquisitionRunResponse from(String service, EmsAcquisitionRunDetailSnapshot snapshot) {
+            return new EmsAcquisitionRunResponse(
+                service,
+                snapshot.run().status(),
+                Instant.now(),
+                EmsAcquisitionRunItem.from(snapshot.run()),
+                snapshot.signals().stream().map(EmsAcquisitionSignalItem::from).toList(),
+                snapshot.seeds().stream().map(EmsAcquisitionSeedItem::from).toList()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAcquisitionRunsResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        List<EmsAcquisitionRunItem> runs
+    ) {
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAcquisitionRunItem(
+        Long id,
+        String triggerType,
+        String requestedByUserId,
+        String status,
+        int sourceCount,
+        int articleCount,
+        int signalCount,
+        int seedCount,
+        int poolRunCount,
+        int failedSourceCount,
+        int failedSeedCount,
+        String message,
+        String lastError,
+        Instant startedAt,
+        Instant completedAt,
+        Instant updatedAt
+    ) {
+        static EmsAcquisitionRunItem from(EmsAcquisitionRunSnapshot snapshot) {
+            return new EmsAcquisitionRunItem(
+                snapshot.id(),
+                snapshot.triggerType(),
+                snapshot.requestedByUserId(),
+                snapshot.status(),
+                snapshot.sourceCount(),
+                snapshot.articleCount(),
+                snapshot.signalCount(),
+                snapshot.seedCount(),
+                snapshot.poolRunCount(),
+                snapshot.failedSourceCount(),
+                snapshot.failedSeedCount(),
+                snapshot.message(),
+                snapshot.lastError(),
+                snapshot.startedAt(),
+                snapshot.completedAt(),
+                snapshot.updatedAt()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAcquisitionSignalItem(
+        Long id,
+        String sourceName,
+        String sourceUrl,
+        String articleUrl,
+        String articleTitle,
+        String signalType,
+        String query,
+        double confidenceScore,
+        String rationale,
+        String status,
+        Instant createdAt
+    ) {
+        static EmsAcquisitionSignalItem from(EmsAcquisitionSignalSnapshot snapshot) {
+            return new EmsAcquisitionSignalItem(
+                snapshot.id(),
+                snapshot.sourceName(),
+                snapshot.sourceUrl(),
+                snapshot.articleUrl(),
+                snapshot.articleTitle(),
+                snapshot.signalType(),
+                snapshot.query(),
+                snapshot.confidenceScore(),
+                snapshot.rationale(),
+                snapshot.status(),
+                snapshot.createdAt()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAcquisitionSeedItem(
+        Long id,
+        Long signalId,
+        String platformId,
+        String query,
+        String status,
+        Long poolRunId,
+        int resultPlaylistCount,
+        int resultTrackCount,
+        String lastError,
+        Instant createdAt,
+        Instant updatedAt
+    ) {
+        static EmsAcquisitionSeedItem from(EmsAcquisitionSeedSnapshot snapshot) {
+            return new EmsAcquisitionSeedItem(
+                snapshot.id(),
+                snapshot.signalId(),
+                snapshot.platformId(),
+                snapshot.query(),
+                snapshot.status(),
+                snapshot.poolRunId(),
+                snapshot.resultPlaylistCount(),
+                snapshot.resultTrackCount(),
+                snapshot.lastError(),
+                snapshot.createdAt(),
+                snapshot.updatedAt()
+            );
+        }
+    }
+}

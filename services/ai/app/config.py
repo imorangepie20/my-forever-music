@@ -15,6 +15,7 @@ class Settings:
     llm_api_key: str
     llm_base_url: str
     ems_overview_model: str
+    ems_acquisition_model: str
 
 
 @lru_cache
@@ -28,4 +29,8 @@ def get_settings() -> Settings:
         llm_api_key=os.getenv("AI_LLM_API_KEY", ""),
         llm_base_url=os.getenv("AI_LLM_BASE_URL", "https://api.openai.com/v1"),
         ems_overview_model=os.getenv("AI_EMS_OVERVIEW_MODEL", ""),
+        ems_acquisition_model=os.getenv(
+            "AI_EMS_ACQUISITION_MODEL",
+            os.getenv("AI_EMS_OVERVIEW_MODEL", ""),
+        ),
     )

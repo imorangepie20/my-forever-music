@@ -54,6 +54,7 @@ services/ai/
 - `AI_ROOT_PATH`: Nginx 뒤에서 `/ai/*`로 공개할 때 사용할 prefix
 - `AI_MODEL_ARTIFACT_DIR`: SASRec MVP 같은 모델 artifact 저장 디렉터리, 기본값 `models`
 - `AI_EMS_OVERVIEW_MODEL`: EMS Overview 해석에 사용할 LLM 모델. 비어 있으면 해석을 생성하지 않고 `model_not_configured`를 반환
+- `AI_EMS_ACQUISITION_MODEL`: EMS editorial acquisition signal 추출에 사용할 LLM 모델. 비어 있으면 `AI_EMS_OVERVIEW_MODEL`을 재사용
 - `AI_LLM_API_KEY`: OpenAI-compatible chat completions provider API key
 - `AI_LLM_BASE_URL`: OpenAI-compatible chat completions base URL, 기본값 `https://api.openai.com/v1`
 

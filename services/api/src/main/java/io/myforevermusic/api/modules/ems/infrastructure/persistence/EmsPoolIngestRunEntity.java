@@ -32,6 +32,9 @@ public class EmsPoolIngestRunEntity {
     @Column(name = "search_query", nullable = false, length = 200)
     private String searchQuery;
 
+    @Column(name = "collection_source", nullable = false, length = 50)
+    private String collectionSource;
+
     @Column(name = "status", nullable = false, length = 50)
     private String status;
 
@@ -81,9 +84,30 @@ public class EmsPoolIngestRunEntity {
         int totalTrackEntries,
         Instant createdAt
     ) {
+        this(
+            requestedByUserId,
+            sourcePlatform,
+            searchQuery,
+            "search_pool",
+            totalPlaylistEntries,
+            totalTrackEntries,
+            createdAt
+        );
+    }
+
+    public EmsPoolIngestRunEntity(
+        String requestedByUserId,
+        String sourcePlatform,
+        String searchQuery,
+        String collectionSource,
+        int totalPlaylistEntries,
+        int totalTrackEntries,
+        Instant createdAt
+    ) {
         this.requestedByUserId = requestedByUserId;
         this.sourcePlatform = sourcePlatform;
         this.searchQuery = searchQuery;
+        this.collectionSource = collectionSource;
         this.status = STATUS_QUEUED;
         this.totalPlaylistEntries = totalPlaylistEntries;
         this.totalTrackEntries = totalTrackEntries;
@@ -134,6 +158,7 @@ public class EmsPoolIngestRunEntity {
     public String getRequestedByUserId() { return requestedByUserId; }
     public String getSourcePlatform() { return sourcePlatform; }
     public String getSearchQuery() { return searchQuery; }
+    public String getCollectionSource() { return collectionSource; }
     public String getStatus() { return status; }
     public int getTotalPlaylistEntries() { return totalPlaylistEntries; }
     public int getTotalTrackEntries() { return totalTrackEntries; }

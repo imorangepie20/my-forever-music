@@ -64,10 +64,21 @@ app:
       display-limit: ${EMS_DISCOVERY_DISPLAY_LIMIT:12}
       platforms: ${EMS_DISCOVERY_PLATFORMS:tidal,spotify}
       seed-queries: ${EMS_DISCOVERY_SEED_QUERIES:tidal:THE_HITS,tidal:POPULAR_MIXES,tidal:POPULAR_PLAYLISTS,tidal:FROM_OUR_EDITORS,spotify:featured-playlists,spotify:category:toplists}
+    acquisition:
+      enabled: ${EMS_ACQUISITION_ENABLED:true}
+      user-id: ${EMS_ACQUISITION_USER_ID:${EMS_DISCOVERY_USER_ID:}}
+      refresh-interval-ms: ${EMS_ACQUISITION_REFRESH_INTERVAL_MS:21600000}
+      initial-delay-ms: ${EMS_ACQUISITION_INITIAL_DELAY_MS:60000}
+      max-articles-per-source: ${EMS_ACQUISITION_MAX_ARTICLES_PER_SOURCE:20}
+      max-signals-per-run: ${EMS_ACQUISITION_MAX_SIGNALS_PER_RUN:40}
+      per-seed-limit: ${EMS_ACQUISITION_PER_SEED_LIMIT:5}
+      platforms: ${EMS_ACQUISITION_PLATFORMS:spotify,tidal}
+      sources: []
   ai:
     base-url: ${AI_SERVICE_BASE_URL:http://127.0.0.1:8000}
     recommendation-preview-path: ${AI_RECOMMENDATION_PREVIEW_PATH:/v1/recommendations/preview}
     ems-overview-path: ${AI_EMS_OVERVIEW_PATH:/v1/ems/overview}
+    ems-acquisition-signals-path: ${AI_EMS_ACQUISITION_SIGNALS_PATH:/v1/ems/acquisition/signals}
     sasrec-training-path: ${AI_SASREC_TRAINING_PATH:/v1/recommendations/datasets/sasrec/train}
     sasrec-ranking-path: ${AI_SASREC_RANKING_PATH:/v1/recommendations/datasets/sasrec/rank}
     sasrec-latest-model-path: ${AI_SASREC_LATEST_MODEL_PATH:/v1/recommendations/datasets/sasrec/models/latest}

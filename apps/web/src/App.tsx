@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import MainLayout from './layouts/MainLayout'
+import EmsAcquisitionAdminPage from './pages/EmsAcquisitionAdminPage'
 import EmsPage from './pages/EmsPage'
 import EmsPlaylistDetailPage from './pages/EmsPlaylistDetailPage'
 import EmsPoolAdminPage from './pages/EmsPoolAdminPage'
@@ -30,6 +31,7 @@ function App() {
                     <Route path="platforms/oauth/callback" element={<PlatformOAuthCallbackPage />} />
                     <Route path="pms" element={<PmsPage />} />
                     <Route path="ems" element={<EmsPage />} />
+                    <Route path="ems/acquisition-admin" element={<EmsAcquisitionAdminPage />} />
                     <Route path="ems/pool-admin" element={<EmsPoolAdminPage />} />
                     <Route path="recommendations/quality-admin" element={<PlaylistQualityAdminPage />} />
                     <Route path="recommendations/sasrec-admin" element={<SasrecModelAdminPage />} />

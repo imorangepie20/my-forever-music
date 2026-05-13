@@ -35,6 +35,9 @@ import type {
     EmsCollectionTrackBrowseResponse,
     EmsCollectionSearchPlaylistTracksResponse,
     EmsCollectedPlaylistsCleanupResponse,
+    EmsAcquisitionRunRequest,
+    EmsAcquisitionRunResponse,
+    EmsAcquisitionRunsResponse,
     EmsPoolAdminEntryRetryResponse,
     EmsPoolAdminRunCommandResponse,
     EmsPoolAdminRunDeleteResponse,
@@ -454,6 +457,27 @@ export const cleanupEmsEmptyCollectedPlaylists = (userId: string) =>
         `/api/v1/ems/collection/admin/playlists/cleanup-empty?user_id=${encodeURIComponent(userId)}`,
         { method: 'POST' },
     )
+
+export const runEmsAcquisition = (payload: EmsAcquisitionRunRequest) =>
+    requestJson<EmsAcquisitionRunResponse>('/api/v1/ems/acquisition/run', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    })
+
+export const fetchEmsAcquisitionStatus = (signal?: AbortSignal) =>
+    requestJson<EmsAcquisitionRunResponse>('/api/v1/ems/acquisition/status', {
+        signal,
+        cache: 'no-store',
+    })
+
+export const fetchEmsAcquisitionRuns = (signal?: AbortSignal) =>
+    requestJson<EmsAcquisitionRunsResponse>('/api/v1/ems/acquisition/runs', {
+        signal,
+        cache: 'no-store',
+    })
 
 export const fetchRecentPlaylistQualityForAdmin = (userId: string, limit: number, signal?: AbortSignal) =>
     requestJson<PlaylistQualityRecentResponse>(

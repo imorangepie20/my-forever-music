@@ -26,6 +26,7 @@ def read_root() -> RootResponse:
             EndpointLink(label="docs", path=_public_path(settings.root_path, "/docs")),
             EndpointLink(label="openapi", path=_public_path(settings.root_path, "/openapi.json")),
             EndpointLink(label="ems-overview", path=_public_path(settings.root_path, "/v1/ems/overview")),
+            EndpointLink(label="ems-acquisition", path=_public_path(settings.root_path, "/v1/ems/acquisition/signals")),
         ],
     )
 

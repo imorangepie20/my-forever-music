@@ -1,0 +1,491 @@
+package io.myforevermusic.api.modules.ems.application;
+
+import io.myforevermusic.api.modules.ems.application.EmsAcquisitionSignalModel.EmsAcquisitionSignal;
+import io.myforevermusic.api.modules.ems.application.EmsAcquisitionSignalModel.EmsAcquisitionSignalModelRequest;
+import io.myforevermusic.api.modules.ems.application.EmsAcquisitionSignalModel.EmsAcquisitionSignalModelResponse;
+import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPreviewResult;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsAcquisitionRunEntity;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsAcquisitionRunRepository;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsAcquisitionSeedEntity;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsAcquisitionSeedRepository;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsAcquisitionSignalEntity;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsAcquisitionSignalRepository;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+@Service
+public class EmsAcquisitionService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmsAcquisitionService.class);
+
+    private final EmsAcquisitionProperties properties;
+    private final EmsEditorialSourceClient sourceClient;
+    private final EmsAcquisitionSignalModel signalModel;
+    private final EmsCollectionService collectionService;
+    private final EmsAcquisitionRunRepository runRepository;
+    private final EmsAcquisitionSignalRepository signalRepository;
+    private final EmsAcquisitionSeedRepository seedRepository;
+
+    public EmsAcquisitionService(
+        EmsAcquisitionProperties properties,
+        EmsEditorialSourceClient sourceClient,
+        EmsAcquisitionSignalModel signalModel,
+        EmsCollectionService collectionService,
+        EmsAcquisitionRunRepository runRepository,
+        EmsAcquisitionSignalRepository signalRepository,
+        EmsAcquisitionSeedRepository seedRepository
+    ) {
+        this.properties = properties;
+        this.sourceClient = sourceClient;
+        this.signalModel = signalModel;
+        this.collectionService = collectionService;
+        this.runRepository = runRepository;
+        this.signalRepository = signalRepository;
+        this.seedRepository = seedRepository;
+    }
+
+    public EmsAcquisitionRunDetailSnapshot runScheduled() {
+        return runAcquisition(
+            "scheduled",
+            properties.getUserId(),
+            properties.getPlatforms(),
+            configuredSources(),
+            properties.getMaxArticlesPerSource(),
+            properties.getMaxSignalsPerRun(),
+            properties.getPerSeedLimit()
+        );
+    }
+
+    public EmsAcquisitionRunDetailSnapshot runNow(EmsAcquisitionRunCommand command) {
+        EmsAcquisitionRunCommand safeCommand = command == null
+            ? new EmsAcquisitionRunCommand(null, null, null, null, null, null)
+            : command;
+        return runAcquisition(
+            "manual",
+            firstNonBlank(safeCommand.userId(), properties.getUserId()),
+            safeCommand.platforms() == null || safeCommand.platforms().isEmpty()
+                ? properties.getPlatforms()
+                : safeCommand.platforms(),
+            safeCommand.sources() == null || safeCommand.sources().isEmpty()
+                ? configuredSources()
+                : safeCommand.sources().stream().map(this::toSource).toList(),
+            safeCommand.maxArticlesPerSource() == null
+                ? properties.getMaxArticlesPerSource()
+                : safeCommand.maxArticlesPerSource(),
+            safeCommand.maxSignalsPerRun() == null
+                ? properties.getMaxSignalsPerRun()
+                : safeCommand.maxSignalsPerRun(),
+            safeCommand.perSeedLimit() == null
+                ? properties.getPerSeedLimit()
+                : safeCommand.perSeedLimit()
+        );
+    }
+
+    public EmsAcquisitionRunDetailSnapshot latestRun() {
+        return runRepository.findFirstByOrderByStartedAtDesc()
+            .map(this::toDetailSnapshot)
+            .orElse(null);
+    }
+
+    public List<EmsAcquisitionRunSnapshot> listRuns() {
+        return runRepository.findTop20ByOrderByStartedAtDesc()
+            .stream()
+            .map(EmsAcquisitionService::toRunSnapshot)
+            .toList();
+    }
+
+    private EmsAcquisitionRunDetailSnapshot runAcquisition(
+        String trigger,
+        String userId,
+        List<String> requestedPlatforms,
+        List<EmsEditorialSource> requestedSources,
+        int requestedMaxArticlesPerSource,
+        int requestedMaxSignalsPerRun,
+        int requestedPerSeedLimit
+    ) {
+        Instant startedAt = Instant.now();
+        EmsAcquisitionRunEntity run = runRepository.save(new EmsAcquisitionRunEntity(
+            truncate(trigger, 50),
+            truncate(firstNonBlank(userId, ""), 100),
+            startedAt
+        ));
+
+        if (!properties.isEnabled()) {
+            run.markSkipped("EMS acquisition is disabled by app.ems.acquisition.enabled.", Instant.now());
+            runRepository.save(run);
+            return toDetailSnapshot(run);
+        }
+        if (!hasText(userId)) {
+            run.markSkipped("EMS acquisition skipped: app.ems.acquisition.user-id is not configured.", Instant.now());
+            runRepository.save(run);
+            return toDetailSnapshot(run);
+        }
+
+        List<String> platforms = cleanValues(requestedPlatforms);
+        List<EmsEditorialSource> sources = cleanSources(requestedSources);
+        if (platforms.isEmpty() || sources.isEmpty()) {
+            run.markSkipped("EMS acquisition skipped: platforms or editorial sources are empty.", Instant.now());
+            runRepository.save(run);
+            return toDetailSnapshot(run);
+        }
+
+        int maxArticlesPerSource = clamp(requestedMaxArticlesPerSource, 1, 50);
+        int maxSignalsPerRun = clamp(requestedMaxSignalsPerRun, 1, 200);
+        int perSeedLimit = clamp(requestedPerSeedLimit, 1, 50);
+        int articleCount = 0;
+        int failedSourceCount = 0;
+        List<String> failureMessages = new ArrayList<>();
+        List<EmsAcquisitionSignalEntity> savedSignals = new ArrayList<>();
+
+        for (EmsEditorialSource source : sources) {
+            if (savedSignals.size() >= maxSignalsPerRun) {
+                break;
+            }
+            try {
+                List<EmsEditorialArticle> articles = sourceClient.fetch(source, maxArticlesPerSource);
+                articleCount += articles.size();
+                if (articles.isEmpty()) {
+                    continue;
+                }
+                EmsAcquisitionSignalModelResponse modelResponse = signalModel.extractSignals(
+                    new EmsAcquisitionSignalModelRequest(
+                        source.name(),
+                        source.url(),
+                        source.weight(),
+                        articles,
+                        maxSignalsPerRun - savedSignals.size()
+                    )
+                );
+                for (EmsAcquisitionSignal signal : modelResponse.signals()) {
+                    if (savedSignals.size() >= maxSignalsPerRun) {
+                        break;
+                    }
+                    String query = normalizeRequired(signal.query(), 200);
+                    if (!hasText(query)) {
+                        continue;
+                    }
+                    savedSignals.add(signalRepository.save(new EmsAcquisitionSignalEntity(
+                        run,
+                        truncate(source.name(), 160),
+                        truncate(source.url(), 500),
+                        truncate(signal.articleUrl(), 500),
+                        truncate(signal.articleTitle(), 300),
+                        truncate(firstNonBlank(signal.signalType(), "playlist_query"), 50),
+                        query,
+                        confidence(signal.confidenceScore(), source.weight()),
+                        truncate(signal.rationale(), 500),
+                        Instant.now()
+                    )));
+                }
+            } catch (RuntimeException exception) {
+                failedSourceCount++;
+                String message = source.name() + ": " + errorMessage(exception);
+                failureMessages.add(message);
+                log.warn("EMS acquisition source failed: {}", message);
+            }
+        }
+
+        if (savedSignals.isEmpty() && failedSourceCount > 0) {
+            String error = truncate("EMS acquisition produced no signals. " + failureMessages.get(0), 1000);
+            run.updateProgress(sources.size(), articleCount, 0, 0, 0, failedSourceCount, 0, Instant.now());
+            run.markFailed(error, Instant.now());
+            runRepository.save(run);
+            return toDetailSnapshot(run);
+        }
+
+        int seedCount = 0;
+        int poolRunCount = 0;
+        int failedSeedCount = 0;
+        Set<String> seenSeeds = new LinkedHashSet<>();
+
+        for (EmsAcquisitionSignalEntity signal : savedSignals) {
+            for (String platform : platforms) {
+                String seedKey = platform.toLowerCase(Locale.ROOT) + ":" + signal.getQuery().toLowerCase(Locale.ROOT);
+                if (!seenSeeds.add(seedKey)) {
+                    continue;
+                }
+                EmsAcquisitionSeedEntity seed = seedRepository.save(new EmsAcquisitionSeedEntity(
+                    run,
+                    signal,
+                    truncate(platform, 50),
+                    truncate(signal.getQuery(), 200),
+                    Instant.now()
+                ));
+                seedCount++;
+                try {
+                    EmsCollectionSearchPreviewResult result = collectionService.queueAcquisitionSearchPool(
+                        userId,
+                        platform,
+                        signal.getQuery(),
+                        perSeedLimit
+                    );
+                    seed.markCompleted(
+                        result.poolRunId(),
+                        result.resultPlaylistCount(),
+                        result.resultTrackCount(),
+                        Instant.now()
+                    );
+                    poolRunCount++;
+                } catch (RuntimeException exception) {
+                    failedSeedCount++;
+                    seed.markFailed(truncate(errorMessage(exception), 1000), Instant.now());
+                    log.warn(
+                        "EMS acquisition seed failed for platform={} query='{}': {}",
+                        platform,
+                        signal.getQuery(),
+                        errorMessage(exception)
+                    );
+                }
+                seedRepository.save(seed);
+            }
+        }
+
+        Instant completedAt = Instant.now();
+        run.updateProgress(
+            sources.size(),
+            articleCount,
+            savedSignals.size(),
+            seedCount,
+            poolRunCount,
+            failedSourceCount,
+            failedSeedCount,
+            completedAt
+        );
+        run.markCompleted(
+            "EMS acquisition completed: signals=%d seeds=%d pool_runs=%d.".formatted(
+                savedSignals.size(),
+                seedCount,
+                poolRunCount
+            ),
+            completedAt
+        );
+        runRepository.save(run);
+        return toDetailSnapshot(run);
+    }
+
+    private EmsAcquisitionRunDetailSnapshot toDetailSnapshot(EmsAcquisitionRunEntity run) {
+        if (run.getId() == null) {
+            return new EmsAcquisitionRunDetailSnapshot(toRunSnapshot(run), List.of(), List.of());
+        }
+        return new EmsAcquisitionRunDetailSnapshot(
+            toRunSnapshot(run),
+            signalRepository.findTop50ByRunIdOrderByIdAsc(run.getId()).stream()
+                .map(EmsAcquisitionService::toSignalSnapshot)
+                .toList(),
+            seedRepository.findTop100ByRunIdOrderByIdAsc(run.getId()).stream()
+                .map(EmsAcquisitionService::toSeedSnapshot)
+                .toList()
+        );
+    }
+
+    private List<EmsEditorialSource> configuredSources() {
+        return properties.getSources().stream()
+            .filter(EmsAcquisitionProperties.Source::isEnabled)
+            .map(this::toSource)
+            .toList();
+    }
+
+    private EmsEditorialSource toSource(EmsAcquisitionProperties.Source source) {
+        return new EmsEditorialSource(
+            firstNonBlank(source.getName(), source.getUrl()),
+            firstNonBlank(source.getType(), "rss"),
+            source.getUrl(),
+            source.getWeight()
+        );
+    }
+
+    private List<EmsEditorialSource> cleanSources(List<EmsEditorialSource> sources) {
+        if (sources == null) {
+            return List.of();
+        }
+        return sources.stream()
+            .filter(source -> source != null && hasText(source.url()))
+            .map(source -> new EmsEditorialSource(
+                truncate(firstNonBlank(source.name(), source.url()), 160),
+                truncate(firstNonBlank(source.type(), "rss"), 50),
+                truncate(source.url(), 500),
+                source.weight() <= 0.0d ? 1.0d : source.weight()
+            ))
+            .toList();
+    }
+
+    private static List<String> cleanValues(List<String> values) {
+        if (values == null) {
+            return List.of();
+        }
+        return values.stream()
+            .filter(EmsAcquisitionService::hasText)
+            .map(String::trim)
+            .distinct()
+            .toList();
+    }
+
+    private static EmsAcquisitionRunSnapshot toRunSnapshot(EmsAcquisitionRunEntity run) {
+        return new EmsAcquisitionRunSnapshot(
+            run.getId(),
+            run.getTriggerType(),
+            run.getRequestedByUserId(),
+            run.getStatus(),
+            run.getSourceCount(),
+            run.getArticleCount(),
+            run.getSignalCount(),
+            run.getSeedCount(),
+            run.getPoolRunCount(),
+            run.getFailedSourceCount(),
+            run.getFailedSeedCount(),
+            run.getMessage(),
+            run.getLastError(),
+            run.getStartedAt(),
+            run.getCompletedAt(),
+            run.getUpdatedAt()
+        );
+    }
+
+    private static EmsAcquisitionSignalSnapshot toSignalSnapshot(EmsAcquisitionSignalEntity signal) {
+        return new EmsAcquisitionSignalSnapshot(
+            signal.getId(),
+            signal.getSourceName(),
+            signal.getSourceUrl(),
+            signal.getArticleUrl(),
+            signal.getArticleTitle(),
+            signal.getSignalType(),
+            signal.getQuery(),
+            signal.getConfidenceScore().doubleValue(),
+            signal.getRationale(),
+            signal.getStatus(),
+            signal.getCreatedAt()
+        );
+    }
+
+    private static EmsAcquisitionSeedSnapshot toSeedSnapshot(EmsAcquisitionSeedEntity seed) {
+        return new EmsAcquisitionSeedSnapshot(
+            seed.getId(),
+            seed.getSignal() == null ? null : seed.getSignal().getId(),
+            seed.getPlatformId(),
+            seed.getQuery(),
+            seed.getStatus(),
+            seed.getEmsPoolIngestRunId(),
+            seed.getResultPlaylistCount(),
+            seed.getResultTrackCount(),
+            seed.getLastError(),
+            seed.getCreatedAt(),
+            seed.getUpdatedAt()
+        );
+    }
+
+    private static String errorMessage(RuntimeException exception) {
+        if (exception instanceof ResponseStatusException responseStatusException
+            && hasText(responseStatusException.getReason())) {
+            return responseStatusException.getReason();
+        }
+        return hasText(exception.getMessage())
+            ? exception.getMessage()
+            : exception.getClass().getSimpleName();
+    }
+
+    private static BigDecimal confidence(double modelConfidence, double sourceWeight) {
+        double clamped = Math.min(Math.max(modelConfidence, 0.0d), 1.0d);
+        double weighted = Math.min(clamped * Math.max(sourceWeight, 0.1d), 1.0d);
+        return BigDecimal.valueOf(weighted).setScale(4, RoundingMode.HALF_UP);
+    }
+
+    private static String normalizeRequired(String value, int maxLength) {
+        return hasText(value) ? truncate(value.trim(), maxLength) : "";
+    }
+
+    private static String firstNonBlank(String first, String second) {
+        return hasText(first) ? first : hasText(second) ? second : "";
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.min(Math.max(value, min), max);
+    }
+
+    private static String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
+    }
+
+    public record EmsAcquisitionRunCommand(
+        String userId,
+        List<String> platforms,
+        List<EmsAcquisitionProperties.Source> sources,
+        Integer maxArticlesPerSource,
+        Integer maxSignalsPerRun,
+        Integer perSeedLimit
+    ) {
+    }
+
+    public record EmsAcquisitionRunDetailSnapshot(
+        EmsAcquisitionRunSnapshot run,
+        List<EmsAcquisitionSignalSnapshot> signals,
+        List<EmsAcquisitionSeedSnapshot> seeds
+    ) {
+    }
+
+    public record EmsAcquisitionRunSnapshot(
+        Long id,
+        String triggerType,
+        String requestedByUserId,
+        String status,
+        int sourceCount,
+        int articleCount,
+        int signalCount,
+        int seedCount,
+        int poolRunCount,
+        int failedSourceCount,
+        int failedSeedCount,
+        String message,
+        String lastError,
+        Instant startedAt,
+        Instant completedAt,
+        Instant updatedAt
+    ) {
+    }
+
+    public record EmsAcquisitionSignalSnapshot(
+        Long id,
+        String sourceName,
+        String sourceUrl,
+        String articleUrl,
+        String articleTitle,
+        String signalType,
+        String query,
+        double confidenceScore,
+        String rationale,
+        String status,
+        Instant createdAt
+    ) {
+    }
+
+    public record EmsAcquisitionSeedSnapshot(
+        Long id,
+        Long signalId,
+        String platformId,
+        String query,
+        String status,
+        Long poolRunId,
+        int resultPlaylistCount,
+        int resultTrackCount,
+        String lastError,
+        Instant createdAt,
+        Instant updatedAt
+    ) {
+    }
+}

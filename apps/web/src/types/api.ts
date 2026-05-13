@@ -1001,6 +1001,7 @@ export interface EmsPoolAdminRunItem {
     requested_by_user_id: string
     source_platform: string
     search_query: string
+    collection_source: string
     status: string
     total_playlist_entries: number
     total_track_entries: number
@@ -1073,6 +1074,85 @@ export interface EmsCollectedPlaylistsCleanupResponse {
     status: string
     generated_at: string
     deleted_count: number
+}
+
+export interface EmsAcquisitionSourceRequest {
+    name: string
+    type: string
+    url: string
+    weight?: number
+}
+
+export interface EmsAcquisitionRunRequest {
+    user_id: string
+    platforms?: string[]
+    sources?: EmsAcquisitionSourceRequest[]
+    max_articles_per_source?: number
+    max_signals_per_run?: number
+    per_seed_limit?: number
+}
+
+export interface EmsAcquisitionRunItem {
+    id: number | null
+    trigger_type: string
+    requested_by_user_id: string
+    status: string
+    source_count: number
+    article_count: number
+    signal_count: number
+    seed_count: number
+    pool_run_count: number
+    failed_source_count: number
+    failed_seed_count: number
+    message: string | null
+    last_error: string | null
+    started_at: string
+    completed_at: string | null
+    updated_at: string
+}
+
+export interface EmsAcquisitionSignalItem {
+    id: number
+    source_name: string
+    source_url: string
+    article_url: string | null
+    article_title: string | null
+    signal_type: string
+    query: string
+    confidence_score: number
+    rationale: string | null
+    status: string
+    created_at: string
+}
+
+export interface EmsAcquisitionSeedItem {
+    id: number
+    signal_id: number | null
+    platform_id: string
+    query: string
+    status: string
+    pool_run_id: number | null
+    result_playlist_count: number
+    result_track_count: number
+    last_error: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface EmsAcquisitionRunResponse {
+    service: string
+    status: string
+    generated_at: string
+    run: EmsAcquisitionRunItem | null
+    signals: EmsAcquisitionSignalItem[]
+    seeds: EmsAcquisitionSeedItem[]
+}
+
+export interface EmsAcquisitionRunsResponse {
+    service: string
+    status: string
+    generated_at: string
+    runs: EmsAcquisitionRunItem[]
 }
 
 export interface PlaylistQualityRecentItem {

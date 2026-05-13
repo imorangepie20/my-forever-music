@@ -3,12 +3,14 @@ import pytest
 
 from app.config import get_settings
 from app.main import app
+from app.schemas.ems_acquisition import EmsAcquisitionSignalRequest
 from app.schemas.ems_overview import (
     EmsDeterministicRecommendation,
     EmsOverviewRequest,
     EmsProviderPool,
     EmsSignal,
 )
+from app.services.ems_acquisition_service import EmsAcquisitionService
 from app.services.ems_overview_service import EmsOverviewService
 
 client = TestClient(app)
@@ -103,6 +105,60 @@ def test_ems_overview_requires_configured_llm_model() -> None:
     assert payload["taste_model_snapshot"] is None
 
 
+def test_ems_acquisition_requires_configured_model() -> None:
+    response = client.post(
+        "/v1/ems/acquisition/signals",
+        json={
+            "source_name": "Pitchfork",
+            "source_url": "https://pitchfork.com/feed/",
+            "source_weight": 1.0,
+            "max_signals": 5,
+            "articles": [
+                {
+                    "article_url": "https://example.test/a",
+                    "title": "The best new tracks this week",
+                    "summary": "A roundup of new songs and artists.",
+                    "published_at": None,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 503
+    assert "EMS acquisition model is not configured" in response.json()["detail"]
+
+
+def test_ems_acquisition_accepts_schema_compliant_llm_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_EMS_ACQUISITION_MODEL", "test-acquisition-model")
+    monkeypatch.setenv("AI_LLM_API_KEY", "test-key")
+    get_settings.cache_clear()
+
+    monkeypatch.setattr(
+        EmsAcquisitionService,
+        "_call_llm",
+        lambda self, settings, request: {
+            "signals": [
+                {
+                    "article_url": "https://example.test/a",
+                    "article_title": "The best new tracks this week",
+                    "signal_type": "playlist_query",
+                    "query": "best new tracks",
+                    "confidence_score": 0.84,
+                    "rationale": "The article title is an editorial new-music roundup.",
+                }
+            ]
+        },
+    )
+
+    response = EmsAcquisitionService().extract_signals(sample_ems_acquisition_request())
+
+    assert response.status == "ok"
+    assert response.model == "test-acquisition-model"
+    assert response.signals[0].query == "best new tracks"
+    assert response.signals[0].confidence_score == 0.84
+    get_settings.cache_clear()
+
+
 def test_ems_overview_accepts_schema_compliant_llm_response(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_EMS_OVERVIEW_MODEL", "test-model")
     monkeypatch.setenv("AI_LLM_API_KEY", "test-key")
@@ -185,4 +241,21 @@ def sample_ems_overview_request() -> EmsOverviewRequest:
             )
         ],
         warnings=[],
+    )
+
+
+def sample_ems_acquisition_request() -> EmsAcquisitionSignalRequest:
+    return EmsAcquisitionSignalRequest(
+        source_name="Pitchfork",
+        source_url="https://pitchfork.com/feed/",
+        source_weight=1.0,
+        max_signals=5,
+        articles=[
+            {
+                "article_url": "https://example.test/a",
+                "title": "The best new tracks this week",
+                "summary": "A roundup of new songs and artists.",
+                "published_at": None,
+            }
+        ],
     )

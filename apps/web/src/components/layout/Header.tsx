@@ -38,6 +38,10 @@ const pageCopy: Record<string, { title: string; subtitle: string }> = {
         title: 'EMS Pool Admin',
         subtitle: 'Monitor search-result queue ingestion into the EMS collection database.',
     },
+    '/ems/acquisition-admin': {
+        title: 'EMS Acquisition Admin',
+        subtitle: 'Run editorial source collection and inspect acquisition signals.',
+    },
     '/gms-preview': {
         title: 'GMS Approval Preview',
         subtitle: 'Review generated candidates, approve saves, and feed PMS learning events.',

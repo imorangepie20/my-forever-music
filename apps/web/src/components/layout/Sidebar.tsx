@@ -11,6 +11,7 @@ import {
     Music2,
     PlayCircle,
     Radio,
+    Rss,
     SlidersHorizontal,
     Sparkles,
 } from 'lucide-react'
@@ -83,6 +84,12 @@ const menuItems: MenuItem[] = [
 ]
 
 const adminMenuItems: MenuItem[] = [
+    {
+        label: 'EMS Acquire',
+        description: 'Editorial source collection runs',
+        icon: <Rss size={20} />,
+        path: '/ems/acquisition-admin',
+    },
     {
         label: 'EMS Pool',
         description: 'Search ingest queue monitor',

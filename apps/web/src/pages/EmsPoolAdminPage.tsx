@@ -330,7 +330,7 @@ const EmsPoolAdminPage = () => {
                                     <div>
                                         <p className="text-sm font-semibold text-hud-text-primary">{run.search_query}</p>
                                         <p className="mt-1 text-xs uppercase tracking-[0.2em] text-hud-text-muted">
-                                            {run.source_platform}
+                                            {run.source_platform} / {run.collection_source}
                                         </p>
                                     </div>
                                     <span className={`rounded-full border px-2.5 py-1 text-[11px] ${statusTone[run.status] ?? statusTone.queued}`}>
@@ -370,7 +370,7 @@ const EmsPoolAdminPage = () => {
                                         {selectedRun.search_query}
                                     </h3>
                                     <p className="mt-1 text-sm text-hud-text-secondary">
-                                        {formatDateTime(selectedRun.created_at)} / {selectedRun.source_platform}
+                                        {formatDateTime(selectedRun.created_at)} / {selectedRun.source_platform} / {selectedRun.collection_source}
                                     </p>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2">
