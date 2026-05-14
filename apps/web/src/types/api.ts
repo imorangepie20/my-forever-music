@@ -1157,6 +1157,21 @@ export interface EmsAcquisitionRunsResponse {
     runs: EmsAcquisitionRunItem[]
 }
 
+export interface EmsAcquisitionSourceQualityItem {
+    source_name: string
+    signal_count: number
+    avg_confidence: number
+    last_signal_at: string | null
+}
+
+export interface EmsAcquisitionSourceQualityResponse {
+    service: string
+    status: string
+    generated_at: string
+    lookback_days: number
+    sources: EmsAcquisitionSourceQualityItem[]
+}
+
 export interface PlaylistQualityRecentItem {
     recommendation_id: string | null
     user_id: string | null

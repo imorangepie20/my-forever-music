@@ -38,6 +38,7 @@ import type {
     EmsAcquisitionRunRequest,
     EmsAcquisitionRunResponse,
     EmsAcquisitionRunsResponse,
+    EmsAcquisitionSourceQualityResponse,
     EmsPoolAdminEntryRetryResponse,
     EmsPoolAdminRunCommandResponse,
     EmsPoolAdminRunDeleteResponse,
@@ -482,6 +483,12 @@ export const fetchEmsAcquisitionRuns = (signal?: AbortSignal) =>
         signal,
         cache: 'no-store',
     })
+
+export const fetchEmsAcquisitionSourceQuality = (days: number, signal?: AbortSignal) =>
+    requestJson<EmsAcquisitionSourceQualityResponse>(
+        `/api/v1/ems/acquisition/source-quality?days=${encodeURIComponent(String(days))}`,
+        { signal, cache: 'no-store' },
+    )
 
 export const fetchRecentPlaylistQualityForAdmin = (userId: string, limit: number, signal?: AbortSignal) =>
     requestJson<PlaylistQualityRecentResponse>(

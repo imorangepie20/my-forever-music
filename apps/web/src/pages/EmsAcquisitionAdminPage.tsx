@@ -3,12 +3,18 @@ import type { ReactNode } from 'react'
 import { AlertTriangle, Bot, DatabaseZap, Play, RefreshCw, Rss, ShieldCheck } from 'lucide-react'
 import Button from '@/components/common/Button'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
-import { fetchEmsAcquisitionRuns, fetchEmsAcquisitionStatus, runEmsAcquisition } from '@/services/api'
+import {
+    fetchEmsAcquisitionRuns,
+    fetchEmsAcquisitionSourceQuality,
+    fetchEmsAcquisitionStatus,
+    runEmsAcquisition,
+} from '@/services/api'
 import type {
     EmsAcquisitionRunItem,
     EmsAcquisitionRunResponse,
     EmsAcquisitionSeedItem,
     EmsAcquisitionSignalItem,
+    EmsAcquisitionSourceQualityItem,
     EmsAcquisitionSourceRequest,
 } from '@/types/api'
 
@@ -72,6 +78,8 @@ const EmsAcquisitionAdminPage = () => {
     const [perSeedLimit, setPerSeedLimit] = useState(5)
     const [status, setStatus] = useState<EmsAcquisitionRunResponse | null>(null)
     const [runs, setRuns] = useState<EmsAcquisitionRunItem[]>([])
+    const [sourceQuality, setSourceQuality] = useState<EmsAcquisitionSourceQualityItem[]>([])
+    const [sourceQualityDays, setSourceQualityDays] = useState(14)
     const [loading, setLoading] = useState(false)
     const [running, setRunning] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -103,6 +111,18 @@ const EmsAcquisitionAdminPage = () => {
         }
     }, [session?.userId, targetUserId])
 
+    const loadSourceQuality = useCallback(async (signal?: AbortSignal) => {
+        if (!session || !isAdmin) {
+            return
+        }
+        try {
+            const response = await fetchEmsAcquisitionSourceQuality(sourceQualityDays, signal)
+            setSourceQuality(response.sources)
+        } catch {
+            // Quality summary failures are non-fatal — leave existing entries.
+        }
+    }, [isAdmin, session, sourceQualityDays])
+
     const loadStatus = useCallback(async () => {
         if (!session || !isAdmin) {
             return
@@ -122,6 +142,7 @@ const EmsAcquisitionAdminPage = () => {
             }
             setStatus(latest)
             setRuns(recent.runs)
+            void loadSourceQuality(controller.signal)
         } catch (err) {
             if (!controller.signal.aborted) {
                 setError(err instanceof Error ? err.message : 'EMS acquisition 상태를 불러오지 못했습니다.')
@@ -132,7 +153,7 @@ const EmsAcquisitionAdminPage = () => {
                 setLoading(false)
             }
         }
-    }, [isAdmin, session])
+    }, [isAdmin, session, loadSourceQuality])
 
     useEffect(() => {
         void loadStatus()
@@ -382,6 +403,65 @@ const EmsAcquisitionAdminPage = () => {
                     <p className="mt-3 rounded-lg border border-hud-border-secondary bg-hud-bg-primary/60 p-3 text-xs text-hud-text-muted">
                         최근 기록에 scheduled trigger run이 없습니다. `app.ems.acquisition.user-id` 설정 또는 scheduler 가 disabled 인지 확인하세요.
                     </p>
+                )}
+            </section>
+
+            <section className="rounded-2xl border border-hud-border-secondary bg-hud-bg-secondary/80 p-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-hud-text-primary">
+                        <Rss size={18} />
+                        Source quality
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label className="text-[10px] uppercase tracking-[0.18em] text-hud-text-muted" htmlFor="source-quality-days">
+                            Lookback (days)
+                        </label>
+                        <input
+                            id="source-quality-days"
+                            type="number"
+                            min={1}
+                            max={90}
+                            value={sourceQualityDays}
+                            onChange={(e) => setSourceQualityDays(Math.max(1, Math.min(90, Number(e.target.value) || 1)))}
+                            className="w-20 rounded-lg border border-hud-border-secondary bg-hud-bg-primary px-2 py-1 text-sm text-hud-text-primary focus:border-hud-border-primary focus:outline-none"
+                        />
+                        <Button type="button" variant="outline" onClick={() => void loadSourceQuality()}>
+                            <RefreshCw size={14} />
+                            Reload
+                        </Button>
+                    </div>
+                </div>
+                {sourceQuality.length === 0 ? (
+                    <p className="rounded-lg border border-hud-border-secondary bg-hud-bg-primary/60 p-3 text-xs text-hud-text-muted">
+                        최근 {sourceQualityDays}일 동안 source 별 signal 기록이 없습니다.
+                    </p>
+                ) : (
+                    <div className="overflow-hidden rounded-xl border border-hud-border-secondary">
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-hud-bg-primary/80 text-[10px] uppercase tracking-[0.22em] text-hud-text-muted">
+                                <tr>
+                                    <th className="px-3 py-2">Source</th>
+                                    <th className="px-3 py-2 text-right">Signals</th>
+                                    <th className="px-3 py-2 text-right">Avg confidence</th>
+                                    <th className="px-3 py-2 text-right">Last signal</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-hud-border-secondary">
+                                {sourceQuality.map((source) => (
+                                    <tr key={source.source_name} className="bg-hud-bg-secondary/40">
+                                        <td className="px-3 py-2 text-hud-text-primary">{source.source_name}</td>
+                                        <td className="px-3 py-2 text-right text-hud-text-primary">{source.signal_count}</td>
+                                        <td className="px-3 py-2 text-right text-hud-text-secondary">
+                                            {source.avg_confidence.toFixed(3)}
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-hud-text-muted">
+                                            {formatDateTime(source.last_signal_at)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </section>
 

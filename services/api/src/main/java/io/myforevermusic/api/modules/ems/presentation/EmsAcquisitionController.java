@@ -9,6 +9,7 @@ import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAc
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionRunSnapshot;
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionSeedSnapshot;
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionSignalSnapshot;
+import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionSourceQualitySnapshot;
 import io.swagger.v3.oas.annotations.Operation;
 import java.time.Instant;
 import java.util.List;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -60,6 +62,22 @@ public class EmsAcquisitionController {
             "ok",
             Instant.now(),
             acquisitionService.listRuns().stream().map(EmsAcquisitionRunItem::from).toList()
+        );
+    }
+
+    @Operation(summary = "Summarize per-source signal count + average confidence over the recent window")
+    @GetMapping("/source-quality")
+    public EmsAcquisitionSourceQualityResponse sourceQuality(
+        @RequestParam(value = "days", defaultValue = "14") int days
+    ) {
+        return new EmsAcquisitionSourceQualityResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            Math.max(1, Math.min(90, days)),
+            acquisitionService.summarizeSourceQuality(days).stream()
+                .map(EmsAcquisitionSourceQualityItem::from)
+                .toList()
         );
     }
 
@@ -135,6 +153,33 @@ public class EmsAcquisitionController {
         Instant generatedAt,
         List<EmsAcquisitionRunItem> runs
     ) {
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAcquisitionSourceQualityResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        int lookbackDays,
+        List<EmsAcquisitionSourceQualityItem> sources
+    ) {
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAcquisitionSourceQualityItem(
+        String sourceName,
+        long signalCount,
+        double avgConfidence,
+        Instant lastSignalAt
+    ) {
+        static EmsAcquisitionSourceQualityItem from(EmsAcquisitionSourceQualitySnapshot snapshot) {
+            return new EmsAcquisitionSourceQualityItem(
+                snapshot.sourceName(),
+                snapshot.signalCount(),
+                snapshot.avgConfidence(),
+                snapshot.lastSignalAt()
+            );
+        }
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)

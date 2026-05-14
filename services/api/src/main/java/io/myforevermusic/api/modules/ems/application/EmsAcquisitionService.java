@@ -104,6 +104,25 @@ public class EmsAcquisitionService {
             .toList();
     }
 
+    /**
+     * 최근 lookbackDays 동안 source별로 적재된 signal 수, 평균 confidence, 마지막 signal 시각을 요약한다.
+     * 운영자가 어떤 RSS source가 health한지 한눈에 보고, 산출량이 0인 source를 빠르게 식별할 수 있게 한다.
+     */
+    public List<EmsAcquisitionSourceQualitySnapshot> summarizeSourceQuality(int lookbackDays) {
+        int safeDays = Math.max(1, Math.min(90, lookbackDays));
+        Instant since = Instant.now().minus(java.time.Duration.ofDays(safeDays));
+        return signalRepository.summarizeSourceQualitySince(since).stream()
+            .map(row -> new EmsAcquisitionSourceQualitySnapshot(
+                row.getSourceName(),
+                row.getSignalCount(),
+                row.getAvgConfidence() == null
+                    ? 0.0d
+                    : Math.round(row.getAvgConfidence() * 10000.0d) / 10000.0d,
+                row.getLastSignalAt()
+            ))
+            .toList();
+    }
+
     private EmsAcquisitionRunDetailSnapshot runAcquisition(
         String trigger,
         String userId,
@@ -539,6 +558,14 @@ public class EmsAcquisitionService {
         String lastError,
         Instant createdAt,
         Instant updatedAt
+    ) {
+    }
+
+    public record EmsAcquisitionSourceQualitySnapshot(
+        String sourceName,
+        long signalCount,
+        double avgConfidence,
+        Instant lastSignalAt
     ) {
     }
 }
