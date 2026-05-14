@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -207,7 +209,12 @@ def test_sasrec_training_service_saves_model_artifact(tmp_path) -> None:
     assert result.model_artifact.metadata_path is not None
     assert result.metric_delta.hit_rate_at_k >= -1.0
     assert (tmp_path / "sasrec" / result.model_version / "model.pt").exists()
-    assert (tmp_path / "sasrec" / result.model_version / "metadata.json").exists()
+    metadata_path = tmp_path / "sasrec" / result.model_version / "metadata.json"
+    assert metadata_path.exists()
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert metadata["dataset_version"] == "recommendation-sequence-v1"
+    assert metadata["dataset_fingerprint"] == "sha256:test-training"
+    assert metadata["source_dataset"]["dataset_fingerprint"] == "sha256:test-training"
 
 
 def test_sasrec_ranking_service_loads_artifact_and_ranks_candidates(tmp_path) -> None:
@@ -249,6 +256,7 @@ def test_sasrec_model_registry_resolves_latest_persisted_artifact(tmp_path) -> N
     assert latest_model.model_version == training_result.model_version
     assert latest_model.vocabulary_size == 3
     assert latest_model.train_example_count == 3
+    assert latest_model.dataset_fingerprint == "sha256:test-training"
 
 
 def test_sasrec_ranking_service_reports_missing_artifact(tmp_path) -> None:
@@ -285,6 +293,8 @@ def sample_dataset_payload() -> dict:
             "event_count": 1,
             "recommendation_snapshot_count": 1,
             "sequence_item_count": 2,
+            "dataset_version": "recommendation-sequence-v1",
+            "dataset_fingerprint": "sha256:test-sample",
         },
         "events": [
             {
@@ -358,6 +368,8 @@ def sasrec_training_payload() -> dict:
         "event_count": 1,
         "recommendation_snapshot_count": 1,
         "sequence_item_count": 4,
+        "dataset_version": "recommendation-sequence-v1",
+        "dataset_fingerprint": "sha256:test-training",
     }
     payload["sequence"] = [
         {

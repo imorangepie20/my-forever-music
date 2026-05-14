@@ -271,6 +271,8 @@ const SasrecModelAdminPage = () => {
                         <Field label="Generated" value={formatDateTime(registry?.generated_at_ai ?? null)} />
                         <Field label="Vocabulary" value={registry?.vocabulary_size?.toString() ?? '-'} />
                         <Field label="Train Examples" value={registry?.train_example_count?.toString() ?? '-'} />
+                        <Field label="Dataset Version" value={registry?.dataset_version ?? '-'} multiline />
+                        <Field label="Dataset Fingerprint" value={registry?.dataset_fingerprint ?? '-'} multiline />
                         <Field label="Artifact Dir" value={registry?.artifact_dir ?? '-'} multiline />
                     </dl>
                     {registry?.warnings && registry.warnings.length > 0 && (
@@ -369,6 +371,22 @@ const SasrecModelAdminPage = () => {
                             value={autoTrainResult.model_version ?? '-'}
                             multiline
                         />
+                        <Field
+                            label="Dataset Version"
+                            value={autoTrainResult.training.dataset_summary?.dataset_version ?? '-'}
+                            multiline
+                        />
+                        <Field
+                            label="Dataset Fingerprint"
+                            value={autoTrainResult.training.dataset_summary?.dataset_fingerprint ?? '-'}
+                            multiline
+                        />
+                        <Field
+                            label="Sequence Items"
+                            value={autoTrainResult.training.dataset_summary?.sequence_item_count == null
+                                ? '-'
+                                : String(autoTrainResult.training.dataset_summary.sequence_item_count)}
+                        />
                     </dl>
                     <MetricComparisonTable
                         metrics={autoTrainResult.training.metrics}
@@ -457,6 +475,28 @@ const SasrecModelAdminPage = () => {
                         <Field
                             label="Events since train"
                             value={userLookupResult.events_since_last_train == null ? '-' : String(userLookupResult.events_since_last_train)}
+                        />
+                        <Field
+                            label="Dataset Version"
+                            value={userLookupResult.latest_train_log?.dataset_version ?? '-'}
+                            multiline
+                        />
+                        <Field
+                            label="Dataset Fingerprint"
+                            value={userLookupResult.latest_train_log?.dataset_fingerprint ?? '-'}
+                            multiline
+                        />
+                        <Field
+                            label="Sequence Items"
+                            value={userLookupResult.latest_train_log
+                                ? String(userLookupResult.latest_train_log.sequence_item_count_at_train)
+                                : '-'}
+                        />
+                        <Field
+                            label="Snapshots"
+                            value={userLookupResult.latest_train_log
+                                ? String(userLookupResult.latest_train_log.recommendation_snapshot_count_at_train)
+                                : '-'}
                         />
                     </div>
                 )}

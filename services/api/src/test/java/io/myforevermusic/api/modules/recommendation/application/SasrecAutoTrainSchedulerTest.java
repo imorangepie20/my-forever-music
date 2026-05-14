@@ -53,6 +53,10 @@ class SasrecAutoTrainSchedulerTest {
         verify(trainLogStore).save(argThat(draft ->
             draft.userId().equals("regular-user")
                 && draft.eventCountAtTrain() == 42L
+                && draft.datasetVersion().equals("recommendation-sequence-v1")
+                && draft.datasetFingerprint().equals("sha256:regular")
+                && draft.sequenceItemCountAtTrain() == 45L
+                && draft.recommendationSnapshotCountAtTrain() == 3L
                 && draft.modelVersion().equals("sasrec-mvp-regular")
                 && draft.qualified()
                 && !draft.promoted()
@@ -65,7 +69,15 @@ class SasrecAutoTrainSchedulerTest {
             "sasrec-mvp-training",
             "ok",
             "regular-user",
-            new RecommendationModelTrainingResponse.DatasetSummary(null, null, 42, 3, 45),
+            new RecommendationModelTrainingResponse.DatasetSummary(
+                null,
+                null,
+                42,
+                3,
+                45,
+                "recommendation-sequence-v1",
+                "sha256:regular"
+            ),
             "sasrec-mvp-regular",
             Map.of("train_example_count", 12),
             Map.of("hit_rate_at_k", 0.5d, "mrr_at_k", 0.25d, "ndcg_at_k", 0.4d),

@@ -23,7 +23,9 @@ public record RecommendationDatasetExportResponse(
     public record Summary(
         Integer eventCount,
         Integer recommendationSnapshotCount,
-        Integer sequenceItemCount
+        Integer sequenceItemCount,
+        String datasetVersion,
+        String datasetFingerprint
     ) {
     }
 

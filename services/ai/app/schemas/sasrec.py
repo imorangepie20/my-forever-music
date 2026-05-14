@@ -166,4 +166,6 @@ class SasrecModelRegistryResponse(BaseModel):
     generated_at: str | None = None
     vocabulary_size: int | None = None
     train_example_count: int | None = None
+    dataset_version: str | None = None
+    dataset_fingerprint: str | None = None
     warnings: list[str]

@@ -259,6 +259,9 @@ class SasrecTrainingService:
             "model_version": model_version,
             "user_id": request.user_id,
             "generated_at": request.generated_at.isoformat(),
+            "dataset_version": request.summary.dataset_version,
+            "dataset_fingerprint": request.summary.dataset_fingerprint,
+            "source_dataset": request.summary.model_dump(),
             "vocabulary": [item.model_dump() for item in dataset.vocabulary],
             "summary": dataset.summary.model_dump(),
             "training": {

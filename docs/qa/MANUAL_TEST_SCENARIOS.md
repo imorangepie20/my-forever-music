@@ -85,6 +85,7 @@
 2. 30초~몇 분 대기 (로컬 학습)
 3. 검증:
    - 결과 카드에 qualified / promoted / Hit@K Δ + model_version 노출
+   - Dataset Version / Dataset Fingerprint / Sequence Items 노출
    - qualified=true 면 Active Model 카드가 새 model 로 자동 promote
    - qualified=false 면 reason 표시, promote 안 됨
 4. 다른 사용자를 검증하려면 Other user lookup 에 target `user_id` 입력 → **Train Target** → ConfirmDialog
@@ -112,7 +113,7 @@ app:
 1. 설정 후 API 재시작
 2. 약 30초 후 첫 tick — API 로그에 `SASRec auto-train tick user=... qualified=... summary=...`
    - `user-id` 를 비우면 최근 활성 일반 사용자도 target 으로 학습 가능해야 함
-3. DB 활성 프로필이면 `sasrec_auto_train_log` 에 row 1개 이상 (`trained_at`, `event_count_at_train`, `qualified`, `promoted`)
+3. DB 활성 프로필이면 `sasrec_auto_train_log` 에 row 1개 이상 (`trained_at`, `event_count_at_train`, `dataset_fingerprint`, `sequence_item_count_at_train`, `qualified`, `promoted`)
 4. 5분 후 다음 tick — 새 event 가 50개 미만이면 `skip user=... (delta=... < threshold=50)` 로그
 5. **재시작 후 드리프트 유지**: API 재시작 → 또 30초 후 tick → 새 row 가 안 생기거나 skip 출력 (DB store 기반 직전 학습 시점 인식)
 
@@ -157,5 +158,5 @@ app:
 | Web 로그 | `tail -F tmp/local-stack/logs/web.log` |
 | DB 접속 | `docker exec -it my-forever-music-local-postgres psql -U postgres -d my_forever_music` |
 | event 조회 예시 | `select event_type, count(*) from user_music_event where user_id=:u group by event_type;` |
-| auto-train log 조회 | `select user_id, trained_at, qualified, promoted, summary from sasrec_auto_train_log order by trained_at desc limit 20;` |
+| auto-train log 조회 | `select user_id, trained_at, dataset_fingerprint, sequence_item_count_at_train, qualified, promoted, summary from sasrec_auto_train_log order by trained_at desc limit 20;` |
 | candidate 조회 | `select id, query_title, candidate_kind, candidate_value, candidate_score, status from track_identity_candidate order by created_at desc limit 30;` |

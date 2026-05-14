@@ -20,6 +20,8 @@ class RecommendationDatasetSummary(BaseModel):
     event_count: int = Field(ge=0)
     recommendation_snapshot_count: int = Field(ge=0)
     sequence_item_count: int = Field(ge=0)
+    dataset_version: str | None = None
+    dataset_fingerprint: str | None = None
 
 
 class RecommendationDatasetEvent(BaseModel):

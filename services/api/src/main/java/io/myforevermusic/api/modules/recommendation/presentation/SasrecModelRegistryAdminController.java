@@ -108,6 +108,8 @@ public class SasrecModelRegistryAdminController {
         String generatedAtAi,
         Integer vocabularySize,
         Integer trainExampleCount,
+        String datasetVersion,
+        String datasetFingerprint,
         java.util.List<String> warnings
     ) {
         static SasrecRegistryAdminResponse from(SasrecRegistryResponse response) {
@@ -121,6 +123,8 @@ public class SasrecModelRegistryAdminController {
                 response.generatedAt(),
                 response.vocabularySize(),
                 response.trainExampleCount(),
+                response.datasetVersion(),
+                response.datasetFingerprint(),
                 response.warnings() == null ? java.util.List.of() : response.warnings()
             );
         }
@@ -162,6 +166,10 @@ public class SasrecModelRegistryAdminController {
         Long id,
         Instant trainedAt,
         long eventCountAtTrain,
+        String datasetVersion,
+        String datasetFingerprint,
+        long sequenceItemCountAtTrain,
+        long recommendationSnapshotCountAtTrain,
         String modelVersion,
         boolean qualified,
         boolean promoted,
@@ -185,6 +193,10 @@ public class SasrecModelRegistryAdminController {
                 entry.id(),
                 entry.trainedAt(),
                 entry.eventCountAtTrain(),
+                entry.datasetVersion(),
+                entry.datasetFingerprint(),
+                entry.sequenceItemCountAtTrain(),
+                entry.recommendationSnapshotCountAtTrain(),
                 entry.modelVersion(),
                 entry.qualified(),
                 entry.promoted(),

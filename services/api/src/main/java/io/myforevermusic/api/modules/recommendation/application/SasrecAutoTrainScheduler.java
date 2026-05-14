@@ -116,10 +116,16 @@ public class SasrecAutoTrainScheduler {
                 long eventCountAtTrain = countEventsForUser(targetUserId);
                 boolean promoted = result.promoteResult() != null;
                 String modelVersion = result.training() == null ? null : result.training().modelVersion();
+                RecommendationModelTrainingResponse.DatasetSummary datasetSummary =
+                    result.training() == null ? null : result.training().datasetSummary();
                 trainLogStore.save(new SasrecAutoTrainLogStore.Draft(
                     targetUserId,
                     now,
                     eventCountAtTrain,
+                    datasetSummary == null ? null : datasetSummary.datasetVersion(),
+                    datasetSummary == null ? null : datasetSummary.datasetFingerprint(),
+                    asLong(datasetSummary == null ? null : datasetSummary.sequenceItemCount()),
+                    asLong(datasetSummary == null ? null : datasetSummary.recommendationSnapshotCount()),
                     modelVersion,
                     result.qualified(),
                     promoted,
@@ -208,6 +214,10 @@ public class SasrecAutoTrainScheduler {
             asDouble(training.metricDelta(), "mrr_at_k"),
             asDouble(training.metricDelta(), "ndcg_at_k")
         );
+    }
+
+    private long asLong(Integer value) {
+        return value == null ? 0L : value.longValue();
     }
 
     private Double asDouble(Map<String, Object> map, String key) {

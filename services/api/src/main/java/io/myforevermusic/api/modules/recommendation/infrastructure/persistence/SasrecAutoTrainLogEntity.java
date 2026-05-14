@@ -27,6 +27,18 @@ public class SasrecAutoTrainLogEntity {
     @Column(name = "event_count_at_train", nullable = false)
     private long eventCountAtTrain;
 
+    @Column(name = "dataset_version", length = 100)
+    private String datasetVersion;
+
+    @Column(name = "dataset_fingerprint", length = 100)
+    private String datasetFingerprint;
+
+    @Column(name = "sequence_item_count_at_train", nullable = false)
+    private long sequenceItemCountAtTrain;
+
+    @Column(name = "recommendation_snapshot_count_at_train", nullable = false)
+    private long recommendationSnapshotCountAtTrain;
+
     @Column(name = "model_version", length = 200)
     private String modelVersion;
 
@@ -72,6 +84,10 @@ public class SasrecAutoTrainLogEntity {
         this.userId = draft.userId();
         this.trainedAt = draft.trainedAt();
         this.eventCountAtTrain = draft.eventCountAtTrain();
+        this.datasetVersion = truncate(draft.datasetVersion(), 100);
+        this.datasetFingerprint = truncate(draft.datasetFingerprint(), 100);
+        this.sequenceItemCountAtTrain = draft.sequenceItemCountAtTrain();
+        this.recommendationSnapshotCountAtTrain = draft.recommendationSnapshotCountAtTrain();
         this.modelVersion = truncate(draft.modelVersion(), 200);
         this.qualified = draft.qualified();
         this.promoted = draft.promoted();
@@ -96,6 +112,10 @@ public class SasrecAutoTrainLogEntity {
             userId,
             trainedAt,
             eventCountAtTrain,
+            datasetVersion,
+            datasetFingerprint,
+            sequenceItemCountAtTrain,
+            recommendationSnapshotCountAtTrain,
             modelVersion,
             qualified,
             promoted,

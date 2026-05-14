@@ -211,6 +211,8 @@ AI_SASREC_MODEL_VERSION=sasrec-your-model-version \
 curl -X POST "http://localhost:8081/api/v1/recommendations/datasets/users/{userId}/sasrec/train?event_limit=300&snapshot_limit=200&epochs=30&persist_artifact=true"
 ```
 
+export payload의 `summary.dataset_version`과 `summary.dataset_fingerprint`는 동일 학습 입력을 추적하기 위한 snapshot id 역할을 한다. SASRec artifact metadata, model registry 응답, auto-train log에도 같은 fingerprint가 남는다.
+
 관리자 계정으로 다른 사용자 모델을 학습/promote 하려면 admin endpoint에 `target_user_id`를 함께 넘긴다.
 
 ```bash

@@ -64,7 +64,15 @@ class SasrecModelRegistryAdminControllerWebMvcTest {
             "sasrec-mvp-training",
             "ok",
             "target-user",
-            new RecommendationModelTrainingResponse.DatasetSummary(20, 10, 3, 2, 5),
+            new RecommendationModelTrainingResponse.DatasetSummary(
+                20,
+                10,
+                3,
+                2,
+                5,
+                "recommendation-sequence-v1",
+                "sha256:target"
+            ),
             "sasrec-mvp-target",
             Map.of("train_example_count", 4),
             Map.of("hit_rate_at_k", 0.5d),
@@ -83,6 +91,8 @@ class SasrecModelRegistryAdminControllerWebMvcTest {
             "2026-05-14T00:00:00Z",
             5,
             4,
+            "recommendation-sequence-v1",
+            "sha256:target",
             List.of()
         );
         return new RecommendationModelTrainingService.AutoTrainResult(

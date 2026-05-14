@@ -41,7 +41,13 @@ class RecommendationDatasetExportControllerWebMvcTest {
                 Instant.parse("2026-05-11T03:00:00Z"),
                 20,
                 10,
-                new RecommendationDatasetExportResponse.Summary(1, 1, 2),
+                new RecommendationDatasetExportResponse.Summary(
+                    1,
+                    1,
+                    2,
+                    "recommendation-sequence-v1",
+                    "sha256:test"
+                ),
                 List.of(),
                 List.of(),
                 List.of(new RecommendationDatasetExportResponse.SequenceItem(
@@ -77,7 +83,15 @@ class RecommendationDatasetExportControllerWebMvcTest {
             "sasrec-mvp-training",
             "ok",
             "user-001",
-            new RecommendationModelTrainingResponse.DatasetSummary(20, 10, 3, 2, 5),
+            new RecommendationModelTrainingResponse.DatasetSummary(
+                20,
+                10,
+                3,
+                2,
+                5,
+                "recommendation-sequence-v1",
+                "sha256:test"
+            ),
             "sasrec-mvp-test",
             Map.of("train_example_count", 4),
             Map.of("hit_rate_at_k", 0.5d),
@@ -100,6 +114,7 @@ class RecommendationDatasetExportControllerWebMvcTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.model_version").value("sasrec-mvp-test"))
             .andExpect(jsonPath("$.dataset_summary.sequence_item_count").value(5))
+            .andExpect(jsonPath("$.dataset_summary.dataset_fingerprint").value("sha256:test"))
             .andExpect(jsonPath("$.model_artifact.saved").value(true));
     }
 }

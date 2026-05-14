@@ -1188,6 +1188,8 @@ export interface SasrecRegistryAdminResponse {
     generated_at_ai: string | null
     vocabulary_size: number | null
     train_example_count: number | null
+    dataset_version: string | null
+    dataset_fingerprint: string | null
     warnings: string[]
 }
 
@@ -1395,6 +1397,10 @@ export interface SasrecUserTrainLogItem {
     id: number | null
     trained_at: string | null
     event_count_at_train: number
+    dataset_version: string | null
+    dataset_fingerprint: string | null
+    sequence_item_count_at_train: number
+    recommendation_snapshot_count_at_train: number
     model_version: string | null
     qualified: boolean
     promoted: boolean
@@ -1435,6 +1441,13 @@ export interface SasrecAutoTrainAdminResponse {
     summary: string
     training: {
         model_version: string | null
+        dataset_summary?: {
+            event_count?: number
+            recommendation_snapshot_count?: number
+            sequence_item_count?: number
+            dataset_version?: string
+            dataset_fingerprint?: string
+        }
         metrics?: { hit_rate_at_k?: number; mrr_at_k?: number; ndcg_at_k?: number }
         baseline_metrics?: { hit_rate_at_k?: number; mrr_at_k?: number; ndcg_at_k?: number }
         metric_delta?: { hit_rate_at_k?: number; mrr_at_k?: number; ndcg_at_k?: number }

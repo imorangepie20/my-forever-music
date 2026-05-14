@@ -35,7 +35,9 @@ public record RecommendationModelTrainingResponse(
                 dataset.snapshotLimit(),
                 dataset.summary().eventCount(),
                 dataset.summary().recommendationSnapshotCount(),
-                dataset.summary().sequenceItemCount()
+                dataset.summary().sequenceItemCount(),
+                dataset.summary().datasetVersion(),
+                dataset.summary().datasetFingerprint()
             ),
             trainingResponse.modelVersion(),
             trainingResponse.summary(),
@@ -54,7 +56,9 @@ public record RecommendationModelTrainingResponse(
         Integer snapshotLimit,
         Integer eventCount,
         Integer recommendationSnapshotCount,
-        Integer sequenceItemCount
+        Integer sequenceItemCount,
+        String datasetVersion,
+        String datasetFingerprint
     ) {
     }
 }

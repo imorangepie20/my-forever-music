@@ -113,6 +113,8 @@ public class AiSasrecRegistryClient {
         String generatedAt,
         Integer vocabularySize,
         Integer trainExampleCount,
+        String datasetVersion,
+        String datasetFingerprint,
         List<String> warnings
     ) {
     }

@@ -189,5 +189,7 @@ class SasrecModelRegistryService:
             generated_at=metadata.get("generated_at"),
             vocabulary_size=summary.get("unique_track_count"),
             train_example_count=summary.get("training_example_count") or training.get("train_example_count"),
+            dataset_version=metadata.get("dataset_version") or summary.get("dataset_version"),
+            dataset_fingerprint=metadata.get("dataset_fingerprint") or summary.get("dataset_fingerprint"),
             warnings=list(warnings),
         )

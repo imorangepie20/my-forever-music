@@ -75,6 +75,8 @@ class RecommendationDatasetExportServiceTest {
         assertThat(response.summary().eventCount()).isEqualTo(1);
         assertThat(response.summary().recommendationSnapshotCount()).isEqualTo(1);
         assertThat(response.sequence()).hasSize(2);
+        assertThat(response.summary().datasetVersion()).isEqualTo("recommendation-sequence-v1");
+        assertThat(response.summary().datasetFingerprint()).startsWith("sha256:");
         assertThat(response.sequence().get(0).token()).isEqualTo("event:play_started:track-001");
         assertThat(response.sequence().get(1).token()).isEqualTo("recommendation:gms-baseline-v1:track-002");
     }
