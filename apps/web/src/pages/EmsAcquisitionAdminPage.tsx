@@ -38,6 +38,17 @@ const statusTone: Record<string, string> = {
     failed: 'border-rose-300/40 bg-rose-500/10 text-rose-100',
 }
 
+const triggerTone = (trigger: string | null | undefined) => {
+    switch (trigger) {
+        case 'scheduled':
+            return 'border-cyan-300/40 bg-cyan-300/10 text-cyan-100'
+        case 'manual':
+            return 'border-hud-accent-primary/40 bg-hud-accent-primary/10 text-hud-accent-primary'
+        default:
+            return 'border-hud-border-secondary bg-hud-bg-primary text-hud-text-muted'
+    }
+}
+
 const formatDateTime = (value: string | null | undefined) => {
     if (!value) {
         return '-'
@@ -72,6 +83,19 @@ const EmsAcquisitionAdminPage = () => {
     const seeds = status?.seeds ?? []
 
     const parsedSources = useMemo(() => parseSources(sourceLines), [sourceLines])
+
+    const schedulerHealth = useMemo(() => {
+        const scheduledRuns = runs.filter((run) => run.trigger_type === 'scheduled')
+        const manualRuns = runs.filter((run) => run.trigger_type === 'manual')
+        const latestScheduled = scheduledRuns[0] ?? null
+        const skippedScheduled = scheduledRuns.filter((run) => run.status === 'skipped').length
+        return {
+            scheduledCount: scheduledRuns.length,
+            manualCount: manualRuns.length,
+            skippedScheduledCount: skippedScheduled,
+            latestScheduled,
+        }
+    }, [runs])
 
     useEffect(() => {
         if (session?.userId && !targetUserId) {
@@ -333,6 +357,37 @@ const EmsAcquisitionAdminPage = () => {
             <section className="rounded-2xl border border-hud-border-secondary bg-hud-bg-secondary/80 p-5">
                 <div className="mb-4 flex items-center gap-2 text-sm font-medium text-hud-text-primary">
                     <RefreshCw size={18} />
+                    Scheduler
+                </div>
+                <div className="grid gap-3 sm:grid-cols-4">
+                    <Stat label="Scheduled runs" value={schedulerHealth.scheduledCount} />
+                    <Stat label="Manual runs" value={schedulerHealth.manualCount} />
+                    <Stat label="Skipped (scheduled)" value={schedulerHealth.skippedScheduledCount} />
+                    <div className="rounded-xl border border-hud-border-secondary bg-hud-bg-primary/60 p-3">
+                        <p className="text-[10px] uppercase tracking-[0.22em] text-hud-text-muted">Last scheduled</p>
+                        <p className="mt-1 truncate text-sm text-hud-text-primary">
+                            {schedulerHealth.latestScheduled
+                                ? formatDateTime(schedulerHealth.latestScheduled.started_at)
+                                : '-'}
+                        </p>
+                    </div>
+                </div>
+                {schedulerHealth.latestScheduled && (schedulerHealth.latestScheduled.last_error || schedulerHealth.latestScheduled.message) && (
+                    <p className="mt-3 rounded-lg border border-hud-border-secondary bg-hud-bg-primary/60 p-3 text-xs text-hud-text-secondary">
+                        Latest scheduled run #{schedulerHealth.latestScheduled.id} ({schedulerHealth.latestScheduled.status}):
+                        {' '}{schedulerHealth.latestScheduled.last_error ?? schedulerHealth.latestScheduled.message}
+                    </p>
+                )}
+                {schedulerHealth.scheduledCount === 0 && (
+                    <p className="mt-3 rounded-lg border border-hud-border-secondary bg-hud-bg-primary/60 p-3 text-xs text-hud-text-muted">
+                        최근 기록에 scheduled trigger run이 없습니다. `app.ems.acquisition.user-id` 설정 또는 scheduler 가 disabled 인지 확인하세요.
+                    </p>
+                )}
+            </section>
+
+            <section className="rounded-2xl border border-hud-border-secondary bg-hud-bg-secondary/80 p-5">
+                <div className="mb-4 flex items-center gap-2 text-sm font-medium text-hud-text-primary">
+                    <RefreshCw size={18} />
                     최근 실행
                 </div>
                 <div className="grid gap-3 lg:grid-cols-2">
@@ -343,9 +398,14 @@ const EmsAcquisitionAdminPage = () => {
                                     <p className="text-sm font-semibold text-hud-text-primary">Run #{run.id}</p>
                                     <p className="mt-1 text-xs text-hud-text-muted">{formatDateTime(run.started_at)}</p>
                                 </div>
-                                <span className={`rounded-full border px-2.5 py-1 text-[11px] ${statusTone[run.status] ?? statusTone.not_run}`}>
-                                    {run.status}
-                                </span>
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                    <span className={`rounded-full border px-2.5 py-1 text-[11px] ${triggerTone(run.trigger_type)}`}>
+                                        {run.trigger_type}
+                                    </span>
+                                    <span className={`rounded-full border px-2.5 py-1 text-[11px] ${statusTone[run.status] ?? statusTone.not_run}`}>
+                                        {run.status}
+                                    </span>
+                                </div>
                             </div>
                             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-hud-text-secondary sm:grid-cols-5">
                                 <span>{run.signal_count} signals</span>
@@ -354,6 +414,11 @@ const EmsAcquisitionAdminPage = () => {
                                 <span>{run.skipped_article_count + run.skipped_seed_count} skipped</span>
                                 <span>{run.failed_source_count + run.failed_seed_count} failed</span>
                             </div>
+                            {(run.last_error || run.message) && (
+                                <p className="mt-3 rounded-lg border border-hud-border-secondary bg-hud-bg-primary/40 p-2 text-xs text-hud-text-muted">
+                                    {run.last_error ?? run.message}
+                                </p>
+                            )}
                         </div>
                     ))}
                     {!runs.length && (
