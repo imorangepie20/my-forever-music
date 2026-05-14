@@ -1178,6 +1178,50 @@ export interface PlaylistQualityRecentResponse {
     playlists: PlaylistQualityRecentItem[]
 }
 
+export interface FeatureCoverageSummary {
+    track_count: number
+    audio_feature_filled_count: number
+    audio_feature_coverage_ratio: number
+    isrc_count: number
+    isrc_coverage_ratio: number
+}
+
+export interface FeatureCoveragePmsLibrary extends FeatureCoverageSummary {
+    playlist_count: number
+    playback_target_available_count: number
+    playback_target_coverage_ratio: number
+}
+
+export interface FeatureCoverageEmsSource extends FeatureCoverageSummary {
+    source_platform: string
+    canonical_track_count: number
+    canonical_track_coverage_ratio: number
+}
+
+export interface FeatureCoverageEmsPool extends FeatureCoverageSummary {
+    canonical_track_count: number
+    canonical_track_coverage_ratio: number
+    sources: FeatureCoverageEmsSource[]
+    warnings: string[]
+}
+
+export interface FeatureCoverageLearningData {
+    event_count: number
+    recent_recommendation_snapshot_count: number
+    recent_recommendation_snapshot_limit: number
+}
+
+export interface FeatureCoverageAdminResponse {
+    service: string
+    status: string
+    generated_at: string
+    target_user_id: string
+    pms_library: FeatureCoveragePmsLibrary
+    ems_pool: FeatureCoverageEmsPool
+    learning_data: FeatureCoverageLearningData
+    warnings: string[]
+}
+
 export interface SasrecRegistryAdminResponse {
     service: string
     status: string

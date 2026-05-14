@@ -1,0 +1,87 @@
+package io.myforevermusic.api.modules.recommendation.presentation;
+
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import io.myforevermusic.api.modules.recommendation.application.FeatureCoverageAdminService;
+import java.time.Instant;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+@WebMvcTest(FeatureCoverageAdminController.class)
+@AutoConfigureMockMvc(addFilters = false)
+class FeatureCoverageAdminControllerWebMvcTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private FeatureCoverageAdminService adminService;
+
+    @Test
+    void shouldReturnFeatureCoverageWithSnakeCaseFields() throws Exception {
+        when(adminService.summarize(eq("admin-user"), eq("target-user"))).thenReturn(sampleReport());
+
+        mockMvc.perform(get("/api/v1/recommendations/admin/feature-coverage")
+                .param("user_id", "admin-user")
+                .param("target_user_id", "target-user"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.service").value("api"))
+            .andExpect(jsonPath("$.status").value("ok"))
+            .andExpect(jsonPath("$.target_user_id").value("target-user"))
+            .andExpect(jsonPath("$.pms_library.playlist_count").value(2))
+            .andExpect(jsonPath("$.pms_library.audio_feature_coverage_ratio").value(0.75))
+            .andExpect(jsonPath("$.ems_pool.sources[0].source_platform").value("spotify"))
+            .andExpect(jsonPath("$.ems_pool.sources[0].canonical_track_coverage_ratio").value(0.6))
+            .andExpect(jsonPath("$.learning_data.event_count").value(21))
+            .andExpect(jsonPath("$.learning_data.recent_recommendation_snapshot_limit").value(1000));
+    }
+
+    private FeatureCoverageAdminService.FeatureCoverageReport sampleReport() {
+        return new FeatureCoverageAdminService.FeatureCoverageReport(
+            "target-user",
+            Instant.parse("2026-05-14T00:00:00Z"),
+            "ok",
+            new FeatureCoverageAdminService.PmsLibraryCoverage(
+                2,
+                12L,
+                9L,
+                0.75d,
+                10L,
+                0.8333d,
+                11L,
+                0.9167d
+            ),
+            new FeatureCoverageAdminService.EmsPoolCoverage(
+                20L,
+                16L,
+                0.8d,
+                18L,
+                0.9d,
+                12L,
+                0.6d,
+                List.of(new FeatureCoverageAdminService.EmsSourceCoverage(
+                    "spotify",
+                    20L,
+                    16L,
+                    0.8d,
+                    18L,
+                    0.9d,
+                    12L,
+                    0.6d
+                )),
+                List.of()
+            ),
+            new FeatureCoverageAdminService.LearningDataCoverage(21L, 5L, 1000),
+            List.of()
+        );
+    }
+}

@@ -5,6 +5,7 @@ import EmsPage from './pages/EmsPage'
 import EmsPlaylistDetailPage from './pages/EmsPlaylistDetailPage'
 import EmsPoolAdminPage from './pages/EmsPoolAdminPage'
 import EmsSearchPlaylistDetailPage from './pages/EmsSearchPlaylistDetailPage'
+import FeatureCoverageAdminPage from './pages/FeatureCoverageAdminPage'
 import GmsPlaylistsPage from './pages/GmsPlaylistsPage'
 import GmsPreviewPage from './pages/GmsPreviewPage'
 import HomePage from './pages/HomePage'
@@ -34,6 +35,7 @@ function App() {
                     <Route path="ems/acquisition-admin" element={<EmsAcquisitionAdminPage />} />
                     <Route path="ems/pool-admin" element={<EmsPoolAdminPage />} />
                     <Route path="recommendations/quality-admin" element={<PlaylistQualityAdminPage />} />
+                    <Route path="recommendations/feature-coverage" element={<FeatureCoverageAdminPage />} />
                     <Route path="recommendations/sasrec-admin" element={<SasrecModelAdminPage />} />
                     <Route path="recommendations/metadata-admin" element={<MetadataNormalizationAdminPage />} />
                     <Route path="gms-playlists" element={<GmsPlaylistsPage />} />

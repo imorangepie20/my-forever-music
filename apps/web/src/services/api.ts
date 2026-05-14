@@ -52,6 +52,7 @@ import type {
     MetadataCandidateListResponse,
     MetadataCandidateRollbackResponse,
     MetadataExternalLookupResponse,
+    FeatureCoverageAdminResponse,
     MetadataLookupResponse,
     PlaylistQualityRecentResponse,
     SasrecAutoTrainAdminResponse,
@@ -484,6 +485,17 @@ export const fetchRecentPlaylistQualityForAdmin = (userId: string, limit: number
         `/api/v1/recommendations/admin/playlist-quality/recent?user_id=${encodeURIComponent(userId)}&limit=${encodeURIComponent(String(limit))}`,
         { signal, cache: 'no-store' },
     )
+
+export const fetchFeatureCoverageForAdmin = (userId: string, targetUserId?: string, signal?: AbortSignal) => {
+    const params = new URLSearchParams({ user_id: userId })
+    if (targetUserId?.trim()) {
+        params.set('target_user_id', targetUserId.trim())
+    }
+    return requestJson<FeatureCoverageAdminResponse>(
+        `/api/v1/recommendations/admin/feature-coverage?${params.toString()}`,
+        { signal, cache: 'no-store' },
+    )
+}
 
 export const fetchLatestSasrecModelForAdmin = (userId: string, signal?: AbortSignal) =>
     requestJson<SasrecRegistryAdminResponse>(

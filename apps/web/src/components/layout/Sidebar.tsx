@@ -6,6 +6,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Compass,
+    Gauge,
     Globe,
     Home,
     Music2,
@@ -101,6 +102,12 @@ const adminMenuItems: MenuItem[] = [
         description: 'Recent GMS 6-axis summary',
         icon: <BarChart3 size={20} />,
         path: '/recommendations/quality-admin',
+    },
+    {
+        label: 'Feature Coverage',
+        description: 'PMS, EMS, learning signal readiness',
+        icon: <Gauge size={20} />,
+        path: '/recommendations/feature-coverage',
     },
     {
         label: 'SASRec Model',
