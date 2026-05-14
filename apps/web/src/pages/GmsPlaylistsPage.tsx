@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     ArrowDownToLine,
     CheckCircle2,
@@ -73,7 +73,6 @@ const GmsPlaylistsPage = () => {
         skipPrevious,
         seek,
         setVolume,
-        clearItem,
         currentItem,
         currentIndex,
         queue,
@@ -87,6 +86,7 @@ const GmsPlaylistsPage = () => {
         audioQualityLabel,
     } = usePlayback()
     const userId = session?.userId ?? ''
+    const playQueueRef = useRef(playQueue)
 
     const [preview, setPreview] = useState<GmsPlaylistPreviewResponse | null>(null)
     const [isLoading, setIsLoading] = useState(false)
@@ -103,6 +103,10 @@ const GmsPlaylistsPage = () => {
     const [previewLoading, setPreviewLoading] = useState(false)
     const [previewError, setPreviewError] = useState<string | null>(null)
     const [removedPreviewTrackIds, setRemovedPreviewTrackIds] = useState<Set<number>>(new Set())
+
+    useEffect(() => {
+        playQueueRef.current = playQueue
+    }, [playQueue])
 
     const loadPreview = useCallback(
         (signal?: AbortSignal) => {
@@ -160,6 +164,12 @@ const GmsPlaylistsPage = () => {
         fetchEmsCollectedPlaylistDetail(previewCandidate.playlist_id, controller.signal)
             .then((response) => {
                 setPreviewDetail(response)
+                const playbackItems = response.tracks.map((track) =>
+                    toEmsTrackPlaybackItem(track, response.playlist.title),
+                )
+                if (playbackItems.length > 0) {
+                    void playQueueRef.current(playbackItems, 0)
+                }
             })
             .catch((requestError: unknown) => {
                 if (requestError instanceof DOMException && requestError.name === 'AbortError') {
@@ -201,31 +211,18 @@ const GmsPlaylistsPage = () => {
     }
 
     const handlePreviewPlayTrack = (index: number) => {
-        if (previewPlaybackItems[index]) {
+        const selectedItem = previewPlaybackItems[index]
+        if (selectedItem) {
             void playQueue(previewPlaybackItems, index)
         }
     }
 
     const handlePreviewRemoveTrack = (trackId: number) => {
-        const removedItemId = `ems-track:${trackId}`
-        const nextTracks = visiblePreviewTracks.filter((track) => track.id !== trackId)
-        const nextItems = nextTracks.map((track) =>
-            toEmsTrackPlaybackItem(track, previewDetail?.playlist.title),
-        )
         setRemovedPreviewTrackIds((current) => {
             const next = new Set(current)
             next.add(trackId)
             return next
         })
-
-        if (currentItem?.id !== removedItemId) {
-            return
-        }
-        if (nextItems.length === 0) {
-            clearItem()
-            return
-        }
-        void playQueue(nextItems, Math.min(currentIndex, nextItems.length - 1))
     }
 
     const handleRestoreRemovedTracks = () => {
@@ -720,7 +717,13 @@ const GmsPlaylistsPage = () => {
                                                     }}
                                                     disabled={playbackLoading || previewPlaybackItems.length === 0}
                                                     className="rounded-lg border border-hud-accent-primary/50 bg-hud-accent-primary/10 p-2 text-hud-accent-primary transition-hud hover:bg-hud-accent-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-                                                    aria-label={previewQueueActive && isPlaying ? 'Pause preview playback' : 'Play preview playback'}
+                                                    aria-label={
+                                                        previewQueueActive && isPlaying
+                                                            ? 'Pause preview playback'
+                                                            : previewQueueActive
+                                                                ? 'Resume preview playback'
+                                                                : 'Play preview playback'
+                                                    }
                                                 >
                                                     {previewQueueActive && isPlaying ? <Pause size={17} /> : <Play size={17} />}
                                                 </button>

@@ -16,6 +16,10 @@ const files = {
     tidalSdk: read('src/lib/tidalPlaybackSdk.ts'),
     tidalStream: read('src/lib/tidalStreamPlayback.ts'),
     tidalPlaylistTestPage: read('src/pages/TidalPlaylistPlaybackTestPage.tsx'),
+    gmsPlaylistsPage: read('src/pages/GmsPlaylistsPage.tsx'),
+    pmsPlaylistDetailPage: read('src/pages/PmsPlaylistDetailPage.tsx'),
+    emsPlaylistDetailPage: read('src/pages/EmsPlaylistDetailPage.tsx'),
+    emsSearchPlaylistDetailPage: read('src/pages/EmsSearchPlaylistDetailPage.tsx'),
     musicPlayback: read('src/lib/musicPlayback.ts'),
     pmsPlayback: read('src/lib/pmsPlayback.ts'),
     app: read('src/App.tsx'),
@@ -239,6 +243,32 @@ check(
         /extractTidalTrackIdFromUrl/.test(files.musicPlayback) &&
         /resolveTidalTrackId/.test(files.musicPlayback),
     'Imported TIDAL PMS tracks must be recognized from tidal:track URIs, TIDAL URLs, or external ids.',
+)
+
+check(
+    'PlaybackContext appends queue items without replacing active playback',
+    /appendToQueue:\s*\(items: PlaybackMediaItem\[\]\) => Promise<void>/.test(files.playbackContext) &&
+        /addSpotifyUriToQueue/.test(files.playbackContext) &&
+        /const nextQueue = \[\.\.\.queueRef\.current, \.\.\.appendedItems\]/.test(files.playbackContext) &&
+        !/appendToQueue[\s\S]{0,1200}setCurrentItem\(null\)/.test(files.playbackContext),
+    'Queue append must preserve the current player item and extend the existing queue tail.',
+)
+
+check(
+    'GMS playlist preview starts a fresh focused playback queue',
+    /playQueueRef\.current\(playbackItems, 0\)/.test(files.gmsPlaylistsPage) &&
+        /playQueue\(previewPlaybackItems, 0\)/.test(files.gmsPlaylistsPage) &&
+        /playQueue\(previewPlaybackItems, index\)/.test(files.gmsPlaylistsPage) &&
+        !/appendToQueue/.test(files.gmsPlaylistsPage),
+    'GMS Preview tracks should clear the previous queue and start the selected candidate playlist for focused review.',
+)
+
+check(
+    'Playlist detail Queue All actions append behind active playback',
+    /handleQueueAll[\s\S]*appendToQueue\(playbackItems\)/.test(files.pmsPlaylistDetailPage) &&
+        /handleQueueAll[\s\S]*appendToQueue\(playbackItems\)/.test(files.emsPlaylistDetailPage) &&
+        /handleQueueAll[\s\S]*appendToQueue\(playbackItems\)/.test(files.emsSearchPlaylistDetailPage),
+    'PMS and EMS detail pages should reserve Play All for replacement playback and Queue All for appending behind the active queue.',
 )
 
 check(

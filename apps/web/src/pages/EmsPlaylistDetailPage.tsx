@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ExternalLink, Heart, Play, RefreshCw } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Heart, ListPlus, Play, RefreshCw } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
@@ -26,7 +26,7 @@ const openExternal = (url?: string | null) => {
 const EmsPlaylistDetailPage = () => {
     const navigate = useNavigate()
     const { playlistId } = useParams<{ playlistId: string }>()
-    const { playQueue, isLoading: playbackLoading } = usePlayback()
+    const { appendToQueue, playQueue, isLoading: playbackLoading } = usePlayback()
     const { session } = useAuthSession()
     const [detail, setDetail] = useState<EmsCollectionPlaylistDetailResponse | null>(null)
     const [isLoading, setIsLoading] = useState(true)
@@ -82,6 +82,12 @@ const EmsPlaylistDetailPage = () => {
     const handlePlayAll = () => {
         if (playbackItems.length > 0) {
             void playQueue(playbackItems, 0)
+        }
+    }
+
+    const handleQueueAll = () => {
+        if (playbackItems.length > 0) {
+            void appendToQueue(playbackItems)
         }
     }
 
@@ -240,10 +246,10 @@ const EmsPlaylistDetailPage = () => {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={handlePlayAll}
+                        onClick={handleQueueAll}
                         disabled={playbackItems.length === 0 || playbackLoading}
                     >
-                        <Play size={16} />
+                        <ListPlus size={16} />
                         Queue All
                     </Button>
                 }

@@ -375,6 +375,19 @@ export const playSpotifyContext = async (userId: string, contextUri: string) => 
     }
 }
 
+export const addSpotifyUriToQueue = async (userId: string, uri: string) => {
+    if (!/^spotify:track:[A-Za-z0-9]{22}$/.test(uri)) {
+        throw new Error('Spotify queue item must be a valid track URI.')
+    }
+
+    const session = await ensureSpotifyWebPlayer(userId, activeCallbacks)
+    await spotifyApiRequest(
+        userId,
+        `/me/player/queue?uri=${encodeURIComponent(uri)}&device_id=${encodeURIComponent(session.deviceId)}`,
+        { method: 'POST' },
+    )
+}
+
 export const spotifyPause = async (userId: string) => {
     const session = await ensureSpotifyWebPlayer(userId, activeCallbacks)
     await session.player.pause()

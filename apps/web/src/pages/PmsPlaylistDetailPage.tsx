@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ExternalLink, Heart, ListMusic, Play, RefreshCw } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Heart, ListMusic, ListPlus, Play, RefreshCw } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
@@ -47,7 +47,7 @@ const PmsPlaylistDetailPage = () => {
     const navigate = useNavigate()
     const { playlistId } = useParams<{ playlistId: string }>()
     const { session } = useAuthSession()
-    const { playItem, playQueue, isLoading: playbackLoading } = usePlayback()
+    const { appendToQueue, playItem, playQueue, isLoading: playbackLoading } = usePlayback()
     const [detail, setDetail] = useState<PmsPlaylistDetailResponse | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -125,6 +125,12 @@ const PmsPlaylistDetailPage = () => {
 
         if (playlistPlaybackItem && spotifyContextUri) {
             void playItem(playlistPlaybackItem)
+        }
+    }
+
+    const handleQueueAll = () => {
+        if (playbackItems.length > 0) {
+            void appendToQueue(playbackItems)
         }
     }
 
@@ -289,10 +295,10 @@ const PmsPlaylistDetailPage = () => {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={handlePlayAll}
-                        disabled={(playbackItems.length === 0 && !spotifyContextUri) || playbackLoading}
+                        onClick={handleQueueAll}
+                        disabled={playbackItems.length === 0 || playbackLoading}
                     >
-                        <Play size={16} />
+                        <ListPlus size={16} />
                         Queue All
                     </Button>
                 }

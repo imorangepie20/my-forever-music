@@ -101,7 +101,9 @@
 2. 프리뷰 모달에서 첫 트랙 재생 → 모달 상단 Preview player에 현재 트랙, seek, volume, prev/next, pause/play 표시
 3. 특정 트랙의 휴지통 버튼 클릭
 4. 검증:
-   - 해당 트랙이 preview 목록과 Play all queue에서 제외됨
+   - `Preview tracks` 클릭 시 이전 player queue가 초기화되고 해당 GMS playlist가 새 queue로 재생 시작됨
+   - PMS/EMS detail의 `Queue All`은 현재 재생을 끊지 않고 player queue 뒤에 붙음
+   - 해당 트랙이 preview 목록과 이후 재생/저장 대상에서 제외됨
    - `removed before PMS save` 카운트가 증가하고 Restore로 복구 가능
    - 제거된 상태에서 `PMS에 저장`을 누르면 요청 payload에 `excluded_track_ids`가 포함되고 PMS 저장 결과의 added track count가 제거 전보다 작음
 

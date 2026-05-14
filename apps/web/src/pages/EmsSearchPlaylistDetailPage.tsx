@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useState } from 'react'
-import { ArrowLeft, ExternalLink, Heart, Play, RefreshCw } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Heart, ListPlus, Play, RefreshCw } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
@@ -46,7 +46,7 @@ const EmsSearchPlaylistDetailPage = () => {
     const { platformId, externalPlaylistId } = useParams<{ platformId: string; externalPlaylistId: string }>()
     const { session } = useAuthSession()
     const { workspace } = useRecommendationWorkspace()
-    const { playQueue, isLoading: playbackLoading } = usePlayback()
+    const { appendToQueue, playQueue, isLoading: playbackLoading } = usePlayback()
     const activeUserId = session?.userId || workspace.userId
     const [playlist] = useState(() => readCachedPlaylist(platformId, externalPlaylistId))
     const [tracks, setTracks] = useState<EmsCollectionSearchTrackItem[]>([])
@@ -106,6 +106,13 @@ const EmsSearchPlaylistDetailPage = () => {
         const playbackItems = tracks.map((track) => toEmsSearchTrackPlaybackItem(track, playlistTitle))
         if (playbackItems.length > 0) {
             void playQueue(playbackItems, 0)
+        }
+    }
+
+    const handleQueueAll = () => {
+        const playbackItems = tracks.map((track) => toEmsSearchTrackPlaybackItem(track, playlistTitle))
+        if (playbackItems.length > 0) {
+            void appendToQueue(playbackItems)
         }
     }
 
@@ -256,10 +263,10 @@ const EmsSearchPlaylistDetailPage = () => {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={handlePlayAll}
+                        onClick={handleQueueAll}
                         disabled={tracks.length === 0 || playbackLoading}
                     >
-                        <Play size={16} />
+                        <ListPlus size={16} />
                         Queue All
                     </Button>
                 }

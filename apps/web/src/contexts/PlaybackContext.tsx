@@ -21,6 +21,7 @@ import {
     spotifySetRepeat,
     spotifySetShuffle,
     spotifySetVolume,
+    addSpotifyUriToQueue,
     type SpotifyPlaybackState,
 } from '@/lib/spotifyPlaybackSdk'
 import { resolveSpotifyPlayableItem } from '@/lib/spotifyResolvedPlayback'
@@ -59,6 +60,7 @@ interface PlaybackContextValue {
     audioQualityLabel: string | null
     playItem: (item: PlaybackMediaItem) => Promise<void>
     playQueue: (items: PlaybackMediaItem[], startIndex?: number) => Promise<void>
+    appendToQueue: (items: PlaybackMediaItem[]) => Promise<void>
     pause: () => Promise<void>
     resume: () => Promise<void>
     skipNext: () => Promise<void>
@@ -555,6 +557,66 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
 
     const playItem = useCallback((item: PlaybackMediaItem) => playQueue([item], 0), [playQueue])
 
+    const appendToQueue = useCallback(
+        async (items: PlaybackMediaItem[]) => {
+            if (items.length === 0) {
+                setError('No tracks were provided for playback.')
+                return
+            }
+            if (!currentItem || queueRef.current.length === 0) {
+                await playQueue(items, 0)
+                return
+            }
+
+            const userId = requireUserId()
+            const currentPlaybackPlatformId = resolvePlaybackPlatformId(currentItem, session?.preferredPlatformId)
+
+            setIsLoading(true)
+            clearPlaybackError()
+            setNotice(`Adding ${items.length} track(s) to queue...`)
+
+            try {
+                let appendedItems = items
+                if (currentPlaybackPlatformId === 'spotify') {
+                    await ensureSpotifyWebPlayer(userId, spotifyCallbacks)
+                    const resolvedItems = await Promise.all(
+                        items.map((item) => resolveSpotifyPlayableItem(userId, item))
+                    )
+                    const spotifyEntries = resolvedItems.map((item) => ({
+                        item,
+                        uri: toSpotifyUri(item),
+                    }))
+                    const playableSpotifyEntries = spotifyEntries.filter(
+                        (entry): entry is { item: PlaybackMediaItem; uri: string } => Boolean(entry.uri),
+                    )
+                    if (playableSpotifyEntries.length !== resolvedItems.length) {
+                        const missingSpotifyUri = spotifyEntries.find((entry) => !entry.uri)
+                        throw new Error(`Track cannot be queued on Spotify: ${missingSpotifyUri?.item.title ?? 'unknown track'}`)
+                    }
+
+                    for (const entry of playableSpotifyEntries) {
+                        await addSpotifyUriToQueue(userId, entry.uri)
+                    }
+                    appendedItems = playableSpotifyEntries.map((entry) => entry.item)
+                } else if (currentPlaybackPlatformId !== 'tidal') {
+                    throw new Error(`Playback queue append is not implemented for ${currentPlaybackPlatformId ?? 'unknown'} tracks yet.`)
+                }
+
+                const nextQueue = [...queueRef.current, ...appendedItems]
+                queueRef.current = nextQueue
+                setQueue(nextQueue)
+                setNotice(`Added ${appendedItems.length} track(s) to queue.`)
+            } catch (playbackError: unknown) {
+                const message = playbackError instanceof Error ? playbackError.message : 'Unable to add tracks to queue.'
+                setError(message)
+                setNotice(null)
+            } finally {
+                setIsLoading(false)
+            }
+        },
+        [clearPlaybackError, currentItem, playQueue, requireUserId, session?.preferredPlatformId, spotifyCallbacks],
+    )
+
     const pause = useCallback(async () => {
         if (!currentItem) {
             return
@@ -790,6 +852,7 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
             audioQualityLabel,
             playItem,
             playQueue,
+            appendToQueue,
             pause,
             resume,
             skipNext,
@@ -817,6 +880,7 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
             audioQualityLabel,
             playItem,
             playQueue,
+            appendToQueue,
             pause,
             resume,
             skipNext,
