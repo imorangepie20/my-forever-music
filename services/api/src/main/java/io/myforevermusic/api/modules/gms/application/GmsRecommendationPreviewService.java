@@ -13,8 +13,10 @@ import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudi
 import io.myforevermusic.api.modules.recommendation.application.AxisEvidence;
 import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluation;
 import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluator;
+import io.myforevermusic.api.modules.recommendation.application.RecommendationAuditLogStore;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationAxisEvidenceBuilder;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationSnapshotService;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -37,6 +39,7 @@ public class GmsRecommendationPreviewService {
     private final PmsUserLibraryStore pmsUserLibraryStore;
     private final Optional<LastFmWebApiClient> lastFmWebApiClient;
     private final RecommendationSnapshotService recommendationSnapshotService;
+    private final RecommendationAuditLogStore recommendationAuditLogStore;
     private final PlaylistQualityEvaluator playlistQualityEvaluator;
 
     public GmsRecommendationPreviewService(
@@ -47,6 +50,7 @@ public class GmsRecommendationPreviewService {
         PmsUserLibraryStore pmsUserLibraryStore,
         Optional<LastFmWebApiClient> lastFmWebApiClient,
         RecommendationSnapshotService recommendationSnapshotService,
+        RecommendationAuditLogStore recommendationAuditLogStore,
         PlaylistQualityEvaluator playlistQualityEvaluator
     ) {
         this.aiRecommendationPreviewClient = aiRecommendationPreviewClient;
@@ -56,6 +60,7 @@ public class GmsRecommendationPreviewService {
         this.pmsUserLibraryStore = pmsUserLibraryStore;
         this.lastFmWebApiClient = lastFmWebApiClient;
         this.recommendationSnapshotService = recommendationSnapshotService;
+        this.recommendationAuditLogStore = recommendationAuditLogStore;
         this.playlistQualityEvaluator = playlistQualityEvaluator;
     }
 
@@ -96,6 +101,7 @@ public class GmsRecommendationPreviewService {
             );
             finalResponse = withAxisEvidence(finalResponse, enrichedRequest);
             recommendationSnapshotService.recordGmsPreview(enrichedRequest, finalResponse);
+            recordPreviewAudit(enrichedRequest, finalResponse);
             return finalResponse;
         }
 
@@ -114,7 +120,49 @@ public class GmsRecommendationPreviewService {
         );
         finalResponse = withAxisEvidence(finalResponse, enrichedRequest);
         recommendationSnapshotService.recordGmsPreview(enrichedRequest, finalResponse);
+        recordPreviewAudit(enrichedRequest, finalResponse);
         return finalResponse;
+    }
+
+    private void recordPreviewAudit(
+        GmsRecommendationPreviewRequest request,
+        GmsRecommendationPreviewResponse response
+    ) {
+        if (request.userId() == null || request.userId().isBlank()) {
+            return;
+        }
+        int itemCount = response.items() == null ? 0 : response.items().size();
+        boolean sasrecApplied = hasSasrecModel(response);
+        recommendationAuditLogStore.save(new RecommendationAuditLogStore.AuditDraft(
+            request.userId(),
+            response.requestId(),
+            request.requestId(),
+            RecommendationAuditLogStore.EVENT_PREVIEW_GENERATED,
+            "gms",
+            resolveAuditModelVersion(response),
+            null,
+            null,
+            itemCount,
+            sasrecApplied,
+            sasrecApplied ? null : "sasrec_not_applied",
+            null,
+            null,
+            request.playlistId(),
+            response.generatedAt() == null ? Instant.now() : response.generatedAt()
+        ));
+    }
+
+    private String resolveAuditModelVersion(GmsRecommendationPreviewResponse response) {
+        if (hasSasrecModel(response)) {
+            return response.context().engine();
+        }
+        return "gms-baseline-v1";
+    }
+
+    private boolean hasSasrecModel(GmsRecommendationPreviewResponse response) {
+        return response.context() != null
+            && response.context().engine() != null
+            && response.context().engine().contains("sasrec:");
     }
 
     private GmsRecommendationPreviewResponse withAxisEvidence(

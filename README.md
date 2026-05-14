@@ -134,6 +134,8 @@ my-forever-music/
 - `services/api`의 canonical track promote 흐름은 Discogs candidate일 때 metadata의 year/country를 `canonical_track.release_year` / `release_country`(V34)에 함께 적재하고, 동일 canonical track이 이미 있고 release 필드가 비어 있으면 후속 promote에서 채움
 - `services/api`의 SASRec auto-train 스케줄러는 매 tick마다 학습 모델의 Hit@K/MRR@K/nDCG@K 측정값과 recency baseline 비교값을 `sasrec_auto_train_log`(V35)에 함께 영속 기록함. `/recommendations/sasrec-admin`의 Auto-Train 결과 패널과 Other user lookup 패널이 SASRec/Baseline/Δ를 나란히 비교하는 표(개선 emerald, 회귀 rose 색)로 표시함
 - `services/api`는 RSS editorial source(Pitchfork, Stereogum, NME 등 12개 기본) → `services/ai` signal 추출 → Spotify/TIDAL seed → EMS pool 적재까지 한 번에 잇는 EMS acquisition pipeline을 제공함. 관리자 화면 `/ems/acquisition-admin`에서 run 트리거/모니터링이 가능하며 `collection_source='acquisition_pool'`로 본 테이블에 누적됨
+- `services/api`는 관리자 전용 `/recommendations/feature-coverage`로 PMS user library (audio feature/ISRC/playback target 보유율), EMS collected pool (source platform별 audio/ISRC/canonical link), learning signal (user event/recommendation snapshot 수) 커버리지를 한 화면에서 확인하게 함. EMS repository 없는 프로필에서는 degraded warning을 노출해 저장소 부재를 숨기지 않음
+- `services/api`는 GMS preview 생성과 feedback 저장 시 `recommendation_audit_log`(V37)에 user/recommendation/request id, model version, dataset fingerprint, SASRec 적용 여부, fallback reason, feedback type/target을 감사 row로 남김. 관리자 전용 `GET /api/v1/recommendations/admin/audit-log/recent` endpoint로 최근 로그를 조회 가능
 - `services/ai`는 최소 FastAPI 스캐폴드와 추천 preview API 초안 생성 완료
 - `infra/nginx`는 로컬/운영용 리버스 프록시 설정 템플릿 생성 완료
 - Ubuntu 서버 기준 런북과 Docker/Nginx 템플릿 생성 완료

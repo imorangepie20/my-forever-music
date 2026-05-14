@@ -9,6 +9,7 @@ import io.myforevermusic.api.modules.gms.presentation.GmsRecommendationFeedbackR
 import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
+import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryRecommendationAuditLogStore;
 import io.myforevermusic.api.modules.recommendation.application.UserMusicEventService;
 import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryUserMusicEventStore;
 import java.time.Instant;
@@ -21,11 +22,13 @@ class GmsRecommendationFeedbackServiceTest {
     void shouldRecordFeedbackForSyncedPmsLibraryTrack() {
         InMemoryPmsUserLibraryStore userLibraryStore = new InMemoryPmsUserLibraryStore();
         InMemoryUserMusicEventStore eventStore = new InMemoryUserMusicEventStore();
+        InMemoryRecommendationAuditLogStore auditLogStore = new InMemoryRecommendationAuditLogStore();
         userLibraryStore.savePlaylists("user-001", List.of(samplePlaylist()));
         GmsRecommendationFeedbackService service = new GmsRecommendationFeedbackService(
             new InMemoryGmsRecommendationFeedbackStore(),
             userLibraryStore,
-            new UserMusicEventService(eventStore)
+            new UserMusicEventService(eventStore),
+            auditLogStore
         );
 
         GmsRecommendationFeedbackResponse response = service.recordFeedback(
@@ -49,6 +52,10 @@ class GmsRecommendationFeedbackServiceTest {
             .isEqualTo("recommendation_liked");
         assertThat(eventStore.findRecentByUserId("user-001", 1).getFirst().recommendationId())
             .isEqualTo("preview-001");
+        assertThat(auditLogStore.findRecentByUserId("user-001", 1).getFirst().eventType())
+            .isEqualTo("feedback_recorded");
+        assertThat(auditLogStore.findRecentByUserId("user-001", 1).getFirst().feedbackType())
+            .isEqualTo("like");
     }
 
     @Test
@@ -56,7 +63,8 @@ class GmsRecommendationFeedbackServiceTest {
         GmsRecommendationFeedbackService service = new GmsRecommendationFeedbackService(
             new InMemoryGmsRecommendationFeedbackStore(),
             new InMemoryPmsUserLibraryStore(),
-            new UserMusicEventService(new InMemoryUserMusicEventStore())
+            new UserMusicEventService(new InMemoryUserMusicEventStore()),
+            new InMemoryRecommendationAuditLogStore()
         );
 
         assertThatThrownBy(() -> service.recordFeedback(

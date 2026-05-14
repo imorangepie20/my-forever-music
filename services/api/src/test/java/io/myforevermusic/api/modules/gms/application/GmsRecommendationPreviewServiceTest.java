@@ -19,6 +19,7 @@ import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsUserLib
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
 import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluator;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationSnapshotService;
+import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryRecommendationAuditLogStore;
 import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryRecommendationSnapshotStore;
 import java.time.Instant;
 import java.util.List;
@@ -55,6 +56,7 @@ class GmsRecommendationPreviewServiceTest {
             new InMemoryPmsUserLibraryStore(),
             Optional.of(new FakeLastFmWebApiClient()),
             new RecommendationSnapshotService(new InMemoryRecommendationSnapshotStore()),
+            new InMemoryRecommendationAuditLogStore(),
             new PlaylistQualityEvaluator()
         );
 
@@ -150,6 +152,7 @@ class GmsRecommendationPreviewServiceTest {
             new InMemoryPmsUserLibraryStore(),
             Optional.of(new FakeLastFmWebApiClient()),
             new RecommendationSnapshotService(new InMemoryRecommendationSnapshotStore()),
+            new InMemoryRecommendationAuditLogStore(),
             new PlaylistQualityEvaluator()
         );
 
@@ -180,6 +183,7 @@ class GmsRecommendationPreviewServiceTest {
         InMemoryAuthAccountStore authAccountStore = new InMemoryAuthAccountStore();
         InMemoryPmsUserLibraryStore pmsUserLibraryStore = new InMemoryPmsUserLibraryStore();
         InMemoryRecommendationSnapshotStore snapshotStore = new InMemoryRecommendationSnapshotStore();
+        InMemoryRecommendationAuditLogStore auditLogStore = new InMemoryRecommendationAuditLogStore();
         pmsUserLibraryStore.savePlaylists("user-001", List.of(sampleLibraryPlaylist()));
         GmsRecommendationPreviewService service = new GmsRecommendationPreviewService(
             new SingleItemAiRecommendationPreviewClient(),
@@ -189,6 +193,7 @@ class GmsRecommendationPreviewServiceTest {
             pmsUserLibraryStore,
             Optional.empty(),
             new RecommendationSnapshotService(snapshotStore),
+            auditLogStore,
             new PlaylistQualityEvaluator()
         );
 
@@ -215,6 +220,10 @@ class GmsRecommendationPreviewServiceTest {
             .isEqualTo("track-001");
         assertThat(snapshotStore.findRecentByUserId("user-001", 1).getFirst().modelVersion())
             .isEqualTo("gms-baseline-v1");
+        assertThat(auditLogStore.findRecentByUserId("user-001", 1).getFirst().eventType())
+            .isEqualTo("preview_generated");
+        assertThat(auditLogStore.findRecentByUserId("user-001", 1).getFirst().itemCount())
+            .isEqualTo(1);
     }
 
     @Test
@@ -231,6 +240,7 @@ class GmsRecommendationPreviewServiceTest {
             pmsUserLibraryStore,
             Optional.empty(),
             new RecommendationSnapshotService(new InMemoryRecommendationSnapshotStore()),
+            new InMemoryRecommendationAuditLogStore(),
             new PlaylistQualityEvaluator()
         );
 

@@ -57,7 +57,7 @@
 
 ## 시나리오 5 — Sidebar 스크롤 (admin)
 
-1. admin 로그인 후 sidebar 메뉴 총 11개 (workspace 7 + admin 4)
+1. admin 로그인 후 sidebar 메뉴 총 14개 (workspace 8 + admin 6)
 2. 노트북 작은 viewport (약 800px 높이) 에서 nav 가 viewport 끝에 닿으면 **휠 스크롤 가능**
 3. footer 의 Flow 카드 + Collapse 버튼은 항상 viewport 안에 보임
 
@@ -138,6 +138,40 @@ app:
    - `min=0.5` 로 낮춰서 다시 → accepted 증가
    - source 또는 candidate_kind 필터를 endpoint 호출 시 직접 query parameter 로 시험 (현재 UI 는 미노출)
 
+## 시나리오 12 — Feature Coverage admin
+
+1. 일반 사용자로 `/recommendations/feature-coverage` 진입 → **차단 화면**
+2. admin 으로 같은 경로 → PMS Library / EMS Pool / Learning Data 패널 확인
+3. 검증:
+   - PMS audio / EMS audio / EMS ISRC / Playback coverage 카드가 표시됨
+   - EMS source table 에 platform별 track/audio/ISRC/canonical coverage가 표시됨
+   - Target user input 에 다른 `user_id` 입력 후 조회하면 `target_user_id`와 PMS/Learning Data 집계가 바뀜
+   - EMS repository가 없는 local profile에서는 degraded warning이 노출되고, 오류를 숨기지 않음
+
+## 시나리오 13 — Recommendation audit log
+
+1. admin 으로 `/gms-preview` 에서 추천 한 번 실행
+2. 같은 추천 카드에서 Like 또는 Save feedback 한 번 실행
+3. API 확인:
+
+```bash
+curl "http://localhost:8081/api/v1/recommendations/admin/audit-log/recent?user_id=${ADMIN_USER_ID}&target_user_id=${TARGET_USER_ID}&limit=20"
+```
+
+4. 검증:
+   - `preview_generated` entry 가 있고 `item_count`, `model_version`, `sasrec_applied` 또는 `fallback_reason` 이 채워짐
+   - feedback 이후 `feedback_recorded` entry 가 있고 `feedback_type`, `target_track_id`, `target_playlist_id` 가 채워짐
+   - 일반 사용자 `user_id`로 호출하면 403
+5. DB 활성 프로필이면 직접 확인:
+
+```sql
+select event_type, model_version, sasrec_applied, fallback_reason, feedback_type, target_track_id, created_at
+from recommendation_audit_log
+where user_id = :target_user_id
+order by created_at desc
+limit 20;
+```
+
 ---
 
 ## 회귀 검증 포인트 (이전 commit 영향 확인)
@@ -160,3 +194,4 @@ app:
 | event 조회 예시 | `select event_type, count(*) from user_music_event where user_id=:u group by event_type;` |
 | auto-train log 조회 | `select user_id, trained_at, dataset_fingerprint, sequence_item_count_at_train, qualified, promoted, summary from sasrec_auto_train_log order by trained_at desc limit 20;` |
 | candidate 조회 | `select id, query_title, candidate_kind, candidate_value, candidate_score, status from track_identity_candidate order by created_at desc limit 30;` |
+| recommendation audit 조회 | `select event_type, model_version, sasrec_applied, fallback_reason, feedback_type, created_at from recommendation_audit_log order by created_at desc limit 20;` |

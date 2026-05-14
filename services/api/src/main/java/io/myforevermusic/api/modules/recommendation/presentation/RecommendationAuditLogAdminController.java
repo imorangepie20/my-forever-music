@@ -1,0 +1,93 @@
+package io.myforevermusic.api.modules.recommendation.presentation;
+
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import io.myforevermusic.api.modules.recommendation.application.RecommendationAuditLogAdminService;
+import io.myforevermusic.api.modules.recommendation.application.RecommendationAuditLogStore;
+import io.swagger.v3.oas.annotations.Operation;
+import java.time.Instant;
+import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/v1/recommendations/admin/audit-log")
+public class RecommendationAuditLogAdminController {
+
+    private final RecommendationAuditLogAdminService adminService;
+
+    public RecommendationAuditLogAdminController(RecommendationAuditLogAdminService adminService) {
+        this.adminService = adminService;
+    }
+
+    @Operation(summary = "List recent recommendation audit log entries for admin debugging")
+    @GetMapping("/recent")
+    public RecommendationAuditLogRecentResponse listRecent(
+        @RequestParam("user_id") String userId,
+        @RequestParam(value = "target_user_id", required = false) String targetUserId,
+        @RequestParam(value = "limit", defaultValue = "50") int limit
+    ) {
+        List<RecommendationAuditLogStore.StoredAuditLog> entries = adminService.listRecent(
+            userId,
+            targetUserId,
+            limit
+        );
+        return new RecommendationAuditLogRecentResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            entries.stream().map(RecommendationAuditLogItem::from).toList()
+        );
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record RecommendationAuditLogRecentResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        List<RecommendationAuditLogItem> entries
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record RecommendationAuditLogItem(
+        Long auditLogId,
+        String userId,
+        String recommendationId,
+        String requestId,
+        String eventType,
+        String sourceSpace,
+        String modelVersion,
+        String datasetVersion,
+        String datasetFingerprint,
+        Integer itemCount,
+        Boolean sasrecApplied,
+        String fallbackReason,
+        String feedbackType,
+        String targetTrackId,
+        String targetPlaylistId,
+        Instant createdAt
+    ) {
+        static RecommendationAuditLogItem from(RecommendationAuditLogStore.StoredAuditLog entry) {
+            return new RecommendationAuditLogItem(
+                entry.auditLogId(),
+                entry.userId(),
+                entry.recommendationId(),
+                entry.requestId(),
+                entry.eventType(),
+                entry.sourceSpace(),
+                entry.modelVersion(),
+                entry.datasetVersion(),
+                entry.datasetFingerprint(),
+                entry.itemCount(),
+                entry.sasrecApplied(),
+                entry.fallbackReason(),
+                entry.feedbackType(),
+                entry.targetTrackId(),
+                entry.targetPlaylistId(),
+                entry.createdAt()
+            );
+        }
+    }
+}

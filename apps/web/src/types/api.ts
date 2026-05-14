@@ -1222,6 +1222,32 @@ export interface FeatureCoverageAdminResponse {
     warnings: string[]
 }
 
+export interface RecommendationAuditLogItem {
+    audit_log_id: number
+    user_id: string
+    recommendation_id: string | null
+    request_id: string | null
+    event_type: string
+    source_space: string | null
+    model_version: string | null
+    dataset_version: string | null
+    dataset_fingerprint: string | null
+    item_count: number | null
+    sasrec_applied: boolean | null
+    fallback_reason: string | null
+    feedback_type: string | null
+    target_track_id: string | null
+    target_playlist_id: string | null
+    created_at: string
+}
+
+export interface RecommendationAuditLogRecentResponse {
+    service: string
+    status: string
+    generated_at: string
+    entries: RecommendationAuditLogItem[]
+}
+
 export interface SasrecRegistryAdminResponse {
     service: string
     status: string

@@ -3,6 +3,7 @@ package io.myforevermusic.api.modules.gms.application;
 import io.myforevermusic.api.modules.gms.presentation.GmsRecommendationFeedbackRequest;
 import io.myforevermusic.api.modules.gms.presentation.GmsRecommendationFeedbackResponse;
 import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
+import io.myforevermusic.api.modules.recommendation.application.RecommendationAuditLogStore;
 import io.myforevermusic.api.modules.recommendation.application.UserMusicEventService;
 import io.myforevermusic.api.modules.recommendation.presentation.UserMusicEventRequest;
 import java.time.Instant;
@@ -19,15 +20,18 @@ public class GmsRecommendationFeedbackService {
     private final GmsRecommendationFeedbackStore feedbackStore;
     private final PmsUserLibraryStore pmsUserLibraryStore;
     private final UserMusicEventService userMusicEventService;
+    private final RecommendationAuditLogStore recommendationAuditLogStore;
 
     public GmsRecommendationFeedbackService(
         GmsRecommendationFeedbackStore feedbackStore,
         PmsUserLibraryStore pmsUserLibraryStore,
-        UserMusicEventService userMusicEventService
+        UserMusicEventService userMusicEventService,
+        RecommendationAuditLogStore recommendationAuditLogStore
     ) {
         this.feedbackStore = feedbackStore;
         this.pmsUserLibraryStore = pmsUserLibraryStore;
         this.userMusicEventService = userMusicEventService;
+        this.recommendationAuditLogStore = recommendationAuditLogStore;
     }
 
     public GmsRecommendationFeedbackResponse recordFeedback(GmsRecommendationFeedbackRequest request) {
@@ -47,8 +51,33 @@ public class GmsRecommendationFeedbackService {
             )
         );
         recordFeedbackLearningEvent(request, feedbackType, libraryTrack);
+        recordFeedbackAudit(request, feedbackType, storedFeedback);
 
         return GmsRecommendationFeedbackResponse.from(storedFeedback);
+    }
+
+    private void recordFeedbackAudit(
+        GmsRecommendationFeedbackRequest request,
+        String feedbackType,
+        GmsRecommendationFeedbackStore.StoredFeedback storedFeedback
+    ) {
+        recommendationAuditLogStore.save(new RecommendationAuditLogStore.AuditDraft(
+            request.userId(),
+            request.requestId(),
+            request.requestId(),
+            RecommendationAuditLogStore.EVENT_FEEDBACK_RECORDED,
+            sourceSpace(request.sourceSpace()),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            feedbackType,
+            request.trackId(),
+            request.playlistId(),
+            storedFeedback.createdAt() == null ? Instant.now() : storedFeedback.createdAt()
+        ));
     }
 
     private String normalizeFeedbackType(String feedbackType) {

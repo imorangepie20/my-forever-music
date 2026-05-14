@@ -55,6 +55,7 @@ import type {
     FeatureCoverageAdminResponse,
     MetadataLookupResponse,
     PlaylistQualityRecentResponse,
+    RecommendationAuditLogRecentResponse,
     SasrecAutoTrainAdminResponse,
     SasrecRegistryAdminResponse,
     SasrecUserModelStatusResponse,
@@ -493,6 +494,22 @@ export const fetchFeatureCoverageForAdmin = (userId: string, targetUserId?: stri
     }
     return requestJson<FeatureCoverageAdminResponse>(
         `/api/v1/recommendations/admin/feature-coverage?${params.toString()}`,
+        { signal, cache: 'no-store' },
+    )
+}
+
+export const fetchRecentRecommendationAuditLogForAdmin = (
+    userId: string,
+    targetUserId?: string,
+    limit = 50,
+    signal?: AbortSignal,
+) => {
+    const params = new URLSearchParams({ user_id: userId, limit: String(limit) })
+    if (targetUserId?.trim()) {
+        params.set('target_user_id', targetUserId.trim())
+    }
+    return requestJson<RecommendationAuditLogRecentResponse>(
+        `/api/v1/recommendations/admin/audit-log/recent?${params.toString()}`,
         { signal, cache: 'no-store' },
     )
 }

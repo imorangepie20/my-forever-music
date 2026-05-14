@@ -663,6 +663,8 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - GMS playlist 흐름 3차 (Frontend): `/gms-playlists` 페이지 추가. `fetchGmsPlaylistPreview(userId, limit)` 로 후보를 로드해 cover/curator/affinity/confidence/track count 카드 그리드로 노출하고, 각 카드의 "Save to PMS" 가 공통 `ConfirmDialog` 로 확인을 받은 뒤 `saveGmsPlaylistToPms(playlistId, userId)` 를 호출한다. 저장 직후 동일 playlist 카드는 "Saved" 상태로 잠긴다. Sidebar workspace 메뉴에 "GMS Playlists" 등록.
 - GMS playlist 흐름 4차 (6축 ranking): `GmsPlaylistPreviewService`가 각 후보의 link된 track 리스트를 `PlaylistQualityEvaluator`에 통과시켜 coherence/diversity/redundancy 를 산출하고, `RecommendationAxisEvidenceBuilder`로 affinity/novelty/coherence/diversity/redundancy/confidence 6축 evidence를 만든다. novelty 는 candidate playlist 의 unique artist 가운데 사용자 PMS user_library 에 없는 비율로 계산한다. composite score(`0.45*affinity + 0.15*novelty + 0.15*coherence + 0.10*diversity + 0.10*confidence - 0.05*redundancy`) 기준으로 후보를 재정렬하고, 응답 `axis_evidence` + `composite_score` 를 `/gms-playlists` 카드 아래 evidence 패널과 Composite metric으로 표시한다.
 - GMS playlist 흐름 5차 (Preview before save): `/gms-playlists` 각 후보 카드에 "Preview tracks" 버튼 추가. 클릭 시 `fetchEmsCollectedPlaylistDetail(playlistId)` 로 트랙 목록을 로드한 모달이 열리며, 모달 안에서 트랙별/전체 재생을 기존 `playQueue` 로 시청할 수 있고 그 자리에서 바로 PMS 저장도 가능하다. 사용자는 저장 결정 전에 표지/제목만 보는 게 아니라 실제 트랙을 들어볼 수 있다.
+- Phase 6 feature coverage dashboard 1차: 관리자 전용 `GET /api/v1/recommendations/admin/feature-coverage?user_id&target_user_id` endpoint 가 PMS user library, EMS collected pool, learning data coverage를 한 응답으로 집계한다. Frontend `/recommendations/feature-coverage` 화면은 PMS audio/ISRC/playback target, EMS audio/ISRC/canonical link, source platform별 coverage, user event/recommendation snapshot 수를 표시한다. EMS repository가 없는 profile에서는 degraded warning을 노출해 저장소 경계 부재를 숨기지 않는다.
+- Phase 6 recommendation audit log 1차: `recommendation_audit_log` 테이블(V37)과 local/JPA store를 추가했다. GMS preview 생성 시 `preview_generated` 로그가 user/recommendation/request id, item count, model version, SASRec 적용 여부, fallback reason을 기록하고, GMS feedback 저장 시 `feedback_recorded` 로그가 feedback type과 target track/playlist를 기록한다. 관리자 전용 `GET /api/v1/recommendations/admin/audit-log/recent?user_id&target_user_id&limit` endpoint 로 최근 감사 로그를 조회한다.
 
 §13-5 첫 단계 운영 범위가 닫힘. 후속 강화 항목:
 
@@ -690,6 +692,8 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 - 남은 Phase 2 강화 항목: 없음 (다음은 별도 후속 항목).
 - ~~recommendation snapshot에 explanation/axis evidence를 더해 사용자에게 노출할 reason 텍스트 안정화~~ → Spring GMS preview response의 `RecommendationItem`에 `axis_evidence`(affinity/novelty/coherence/diversity/redundancy/confidence 각 6축의 score/level/한국어 summary)를 추가하고, 프론트 GMS Preview 카드 아래에 axis별 짧은 evidence 패널을 노출.
 - ~~recency baseline 대비 metric 개선 검증 자동화~~ → AI service `SasrecTrainingService`는 이미 매 학습마다 recency baseline metric을 계산해 SASRec과 비교한 `metric_delta`/`qualification`을 응답에 포함하고, qualified=true일 때만 promote 후보로 처리됨. Spring `SasrecAutoTrainScheduler`가 tick마다 Hit@K/MRR@K/nDCG@K 측정값과 baseline 비교값을 `sasrec_auto_train_log`(V35)에 영속 기록해 시계열을 보존함. `/recommendations/sasrec-admin`의 Auto-Train 결과와 Other user lookup `latest_train_log`에 SASRec vs Baseline vs Δ를 나란히 비교하는 표를 추가해, baseline 대비 개선(emerald) / 회귀(rose)를 관리자가 한눈에 확인 가능.
+- ~~feature coverage dashboard~~ → 관리자 전용 `/recommendations/feature-coverage`와 Spring feature coverage endpoint로 PMS/EMS/Learning coverage를 확인 가능.
+- ~~recommendation audit log~~ → GMS preview/feedback 경계에서 `recommendation_audit_log`를 기록하고 admin recent endpoint로 조회 가능.
 - 최신 SASRec artifact 조회를 넘어서는 model registry 승격/비활성화/롤백 정책
 
 ## 14. 내부 참고 문서
