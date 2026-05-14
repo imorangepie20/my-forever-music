@@ -101,6 +101,17 @@ const GmsPreviewPage = () => {
         () => response?.warnings.some((warning) => warning.startsWith('Cold-start fallback applied:')) ?? false,
         [response],
     )
+    const pmsLibraryEmpty = useMemo(() => {
+        if (!bootstrap) {
+            return false
+        }
+        const playlists = bootstrap.playlists ?? []
+        if (playlists.length === 0) {
+            return true
+        }
+        return playlists.every((playlist) => (playlist.track_count ?? 0) === 0)
+    }, [bootstrap])
+    const showColdStartIntro = !isContextLoading && pmsLibraryEmpty && !response
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault()
@@ -203,6 +214,26 @@ const GmsPreviewPage = () => {
 
     return (
         <div className="space-y-6">
+            {showColdStartIntro && (
+                <section className="flex flex-col gap-3 rounded-2xl border border-hud-accent-primary/40 bg-hud-accent-primary/10 p-5 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-start gap-3">
+                        <Bookmark size={20} className="mt-1 text-hud-accent-primary" />
+                        <div>
+                            <p className="text-xs uppercase tracking-[0.24em] text-hud-accent-primary">PMS Library Empty</p>
+                            <p className="mt-2 text-sm leading-6 text-hud-text-secondary">
+                                Submitting a preview now will return EMS-pool cold-start fallback tracks.
+                                Import a connected platform playlist first to unlock personalized ranking and 6-axis evidence.
+                            </p>
+                        </div>
+                    </div>
+                    <Link to="/pms" className="md:shrink-0">
+                        <Button type="button" variant="primary">
+                            <Bookmark size={16} />
+                            Open PMS Import
+                        </Button>
+                    </Link>
+                </section>
+            )}
             <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
                 <div className="space-y-6">
                     <HudCard title="GMS Approval Request" subtitle="Generate candidates from PMS and EMS context for final user approval">
