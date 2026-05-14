@@ -59,7 +59,7 @@ class AuthRegistrationServiceTest {
     }
 
     @Test
-    void shouldRejectTidalUntilRealProviderIsImplemented() {
+    void shouldRegisterTidalAsPrimaryStreamingPlatform() {
         AuthRegistrationService service = new AuthRegistrationService(
             new InMemoryAuthAccountStore(),
             new BCryptPasswordEncoder()
@@ -75,9 +75,11 @@ class AuthRegistrationServiceTest {
             true
         );
 
-        assertThatThrownBy(() -> service.register(request))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("real PMS playlist import");
+        AuthRegistrationResponse response = service.register(request);
+
+        assertThat(response.status()).isEqualTo("registered");
+        assertThat(response.onboarding().preferredPlatformId()).isEqualTo("tidal");
+        assertThat(response.onboarding().nextStepPath()).isEqualTo("/platforms");
     }
 
     @Test

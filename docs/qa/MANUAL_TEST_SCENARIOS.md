@@ -12,6 +12,46 @@
 
 ---
 
+## 시나리오 0 — TIDAL PMS import/provider 경계
+
+목적: TIDAL을 preferred platform으로 둔 사용자가 실제 playlist를 PMS로 가져오고, provider 오류가 빈 playlist로 숨겨지지 않는지
+
+1. 새 계정을 만들 때 `preferred_platform_id=tidal`을 선택하거나, 기존 관리자 계정에서 `/platforms` TIDAL 연결을 완료
+2. `/pms` 진입 → Platform Import Queue 가 `TIDAL`로 표시되는지 확인
+3. import 가능한 TIDAL playlist 1개 선택 → Import
+4. 검증:
+   - import 성공 후 PMS playlist card가 `source_platform=tidal`로 표시
+   - DB 활성 프로필이면 `pms_imported_playlist.source_platform='tidal'`, `pms_user_track.source_platform='tidal'` row 생성
+   - TIDAL track의 `audio_feature_source`는 `reccobeats_isrc_match` 또는 `unavailable`이며, 임의 수치로 채워지지 않음
+   - provider 오류가 발생하면 API 응답은 `502`, `code=platform_provider_operation_failed`, message에 TIDAL 실패 원인이 포함됨
+
+## 시나리오 0-B — Discogs canonical label enrichment
+
+목적: accepted Discogs candidate 승격 시 canonical track에 실제 release label이 보강되는지
+
+1. `DISCOGS_TOKEN` 설정 후 API 재시작
+2. `/recommendations/metadata-admin`에서 title/artist 입력 → Discogs lookup, `persist=true`
+3. 점수가 높은 `discogs_master_id` candidate를 Accept
+4. 해당 candidate Promote
+5. 검증:
+   - promote 결과 요약에 release `year`, `country`, `label`이 함께 표시
+   - DB 활성 프로필이면 `canonical_track.release_label`이 null이 아님
+   - token 미설정 또는 Discogs provider 실패 시 빈 label/mock으로 성공 처리하지 않고 오류 응답이 표시됨
+
+## 시나리오 0-C — Cold-start GMS fallback → PMS import 유도
+
+목적: PMS library가 비어 있는 사용자가 EMS fallback 추천을 보고 곧바로 PMS import로 이동할 수 있는지
+
+1. 새 사용자 생성 후 아직 PMS playlist를 import 하지 않음
+2. EMS 본 테이블에 TIDAL 또는 Spotify track이 있는 상태에서 `/gms-preview` 진입
+3. PMS Context가 `EMS Fallback`으로 표시되는지 확인
+4. Preview 요청
+5. 검증:
+   - 결과 warning에 `Cold-start fallback applied` 표시
+   - 후보 카드가 표시되고 source badge가 `cold_start` 또는 fallback source로 표시
+   - Response Feed 또는 Current PMS Playlist 영역의 `Open PMS Import` 버튼으로 `/pms` 이동 가능
+   - DB 활성 프로필이면 `recommendation_audit_log.fallback_reason='cold_start_pms_empty'` row 생성
+
 ## 시나리오 1 — TIDAL 자연 종료 → `play_completed`
 
 목적: 트랙 끝까지 듣기가 `user_music_event` 에 적재되는지

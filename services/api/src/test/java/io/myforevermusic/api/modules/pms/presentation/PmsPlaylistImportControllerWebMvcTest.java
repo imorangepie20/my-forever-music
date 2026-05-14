@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.myforevermusic.api.common.error.ApiExceptionHandler;
+import io.myforevermusic.api.modules.platform.application.PlatformProviderOperationException;
 import io.myforevermusic.api.modules.platform.application.PlatformReconnectRequiredException;
 import io.myforevermusic.api.modules.pms.application.PmsPlaylistImportService;
 import java.time.Instant;
@@ -85,6 +86,31 @@ class PmsPlaylistImportControllerWebMvcTest {
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("platform_reconnect_required"))
             .andExpect(jsonPath("$.message").value("Reconnect Spotify and try again."));
+    }
+
+    @Test
+    void shouldReturnProviderOperationErrorWhenPlatformProviderFails() throws Exception {
+        when(pmsPlaylistImportService.importPlaylists(any()))
+            .thenThrow(new PlatformProviderOperationException(
+                "tidal",
+                "listing playlists",
+                new IllegalStateException("TIDAL upstream 503")
+            ));
+
+        PmsPlaylistImportRequest request = new PmsPlaylistImportRequest(
+            "user-001",
+            "tidal",
+            List.of("playlist-001")
+        );
+
+        mockMvc.perform(post("/api/v1/pms/import/playlists")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsBytes(request)))
+            .andExpect(status().isBadGateway())
+            .andExpect(jsonPath("$.code").value("platform_provider_operation_failed"))
+            .andExpect(jsonPath("$.message").value(
+                "tidal provider operation failed while listing playlists: TIDAL upstream 503"
+            ));
     }
 
     private PmsPlaylistImportBootstrapResponse sampleBootstrapResponse() {

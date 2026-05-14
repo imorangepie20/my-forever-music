@@ -2,6 +2,7 @@ package io.myforevermusic.api.common.error;
 
 import io.myforevermusic.api.modules.auth.application.AuthEmailAlreadyRegisteredException;
 import io.myforevermusic.api.modules.auth.application.AuthInvalidCredentialsException;
+import io.myforevermusic.api.modules.platform.application.PlatformProviderOperationException;
 import io.myforevermusic.api.modules.platform.application.PlatformReconnectRequiredException;
 import java.time.Instant;
 import java.util.List;
@@ -36,6 +37,16 @@ public class ApiExceptionHandler {
         return buildResponse(
             HttpStatus.CONFLICT,
             "platform_reconnect_required",
+            exception.getMessage(),
+            List.of()
+        );
+    }
+
+    @ExceptionHandler(PlatformProviderOperationException.class)
+    public ResponseEntity<ApiErrorResponse> handlePlatformProviderOperation(PlatformProviderOperationException exception) {
+        return buildResponse(
+            HttpStatus.BAD_GATEWAY,
+            "platform_provider_operation_failed",
             exception.getMessage(),
             List.of()
         );

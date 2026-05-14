@@ -38,6 +38,7 @@ public class InMemoryCanonicalTrackIdentityStore implements CanonicalTrackIdenti
             normalizeOptional(draft.displayArtistName()),
             normalizeOptional(draft.releaseYear()),
             normalizeOptional(draft.releaseCountry()),
+            null,
             now,
             now
         );
@@ -82,10 +83,11 @@ public class InMemoryCanonicalTrackIdentityStore implements CanonicalTrackIdenti
     }
 
     @Override
-    public CanonicalTrackEntry fillReleaseContextIfMissing(
+    public CanonicalTrackEntry fillReleaseMetadataIfMissing(
         Long canonicalTrackId,
         String releaseYear,
         String releaseCountry,
+        String releaseLabel,
         Instant now
     ) {
         CanonicalTrackEntry existing = tracks.get(canonicalTrackId);
@@ -98,8 +100,12 @@ public class InMemoryCanonicalTrackIdentityStore implements CanonicalTrackIdenti
         String nextCountry = (existing.releaseCountry() == null || existing.releaseCountry().isBlank())
             ? normalizeOptional(releaseCountry)
             : existing.releaseCountry();
+        String nextLabel = (existing.releaseLabel() == null || existing.releaseLabel().isBlank())
+            ? normalizeOptional(releaseLabel)
+            : existing.releaseLabel();
         if (java.util.Objects.equals(nextYear, existing.releaseYear())
-            && java.util.Objects.equals(nextCountry, existing.releaseCountry())) {
+            && java.util.Objects.equals(nextCountry, existing.releaseCountry())
+            && java.util.Objects.equals(nextLabel, existing.releaseLabel())) {
             return existing;
         }
         Instant resolvedNow = now == null ? Instant.now() : now;
@@ -109,6 +115,7 @@ public class InMemoryCanonicalTrackIdentityStore implements CanonicalTrackIdenti
             existing.displayArtistName(),
             nextYear,
             nextCountry,
+            nextLabel,
             existing.createdAt(),
             resolvedNow
         );

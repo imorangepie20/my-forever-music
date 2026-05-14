@@ -83,18 +83,20 @@ public class JpaCanonicalTrackIdentityStore implements CanonicalTrackIdentitySto
 
     @Override
     @Transactional
-    public CanonicalTrackEntry fillReleaseContextIfMissing(
+    public CanonicalTrackEntry fillReleaseMetadataIfMissing(
         Long canonicalTrackId,
         String releaseYear,
         String releaseCountry,
+        String releaseLabel,
         Instant now
     ) {
         CanonicalTrackEntity track = trackRepository.findById(canonicalTrackId)
             .orElseThrow(() -> new IllegalArgumentException("canonical track was not found: " + canonicalTrackId));
         Instant resolvedNow = now == null ? Instant.now() : now;
-        track.fillReleaseContextIfMissing(
+        track.fillReleaseMetadataIfMissing(
             normalizeOptional(releaseYear),
             normalizeOptional(releaseCountry),
+            normalizeOptional(releaseLabel),
             resolvedNow
         );
         return trackRepository.save(track).toEntry();

@@ -30,6 +30,9 @@ public class CanonicalTrackEntity {
     @Column(name = "release_country", length = 50)
     private String releaseCountry;
 
+    @Column(name = "release_label", length = 255)
+    private String releaseLabel;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -60,6 +63,7 @@ public class CanonicalTrackEntity {
             displayArtistName,
             releaseYear,
             releaseCountry,
+            releaseLabel,
             createdAt,
             updatedAt
         );
@@ -77,7 +81,16 @@ public class CanonicalTrackEntity {
         return releaseCountry;
     }
 
-    public boolean fillReleaseContextIfMissing(String releaseYear, String releaseCountry, Instant now) {
+    public String getReleaseLabel() {
+        return releaseLabel;
+    }
+
+    public boolean fillReleaseMetadataIfMissing(
+        String releaseYear,
+        String releaseCountry,
+        String releaseLabel,
+        Instant now
+    ) {
         boolean changed = false;
         if ((this.releaseYear == null || this.releaseYear.isBlank())
             && releaseYear != null && !releaseYear.isBlank()) {
@@ -87,6 +100,11 @@ public class CanonicalTrackEntity {
         if ((this.releaseCountry == null || this.releaseCountry.isBlank())
             && releaseCountry != null && !releaseCountry.isBlank()) {
             this.releaseCountry = truncate(releaseCountry, 50);
+            changed = true;
+        }
+        if ((this.releaseLabel == null || this.releaseLabel.isBlank())
+            && releaseLabel != null && !releaseLabel.isBlank()) {
+            this.releaseLabel = truncate(releaseLabel, 255);
             changed = true;
         }
         if (changed) {

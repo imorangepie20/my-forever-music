@@ -15,9 +15,9 @@
 
 ## 2. 현재 적용 기준
 
-- PMS playlist import의 실제 구현 대상은 현재 `Spotify`입니다.
+- PMS playlist import의 실제 구현 대상은 현재 `Spotify`, `TIDAL`입니다.
 - 플랫폼 확장 순서는 `Spotify -> TIDAL -> YouTube Music`입니다.
-- `TIDAL`은 다음 실제 provider 대상이지만, playlist provider와 provider-neutral audio feature enrichment 검증이 끝날 때까지 가입 기본 플랫폼과 PMS import 대상에서 제외합니다.
+- `TIDAL`은 실제 provider가 있으나 아직 운영 안정화 단계로 취급합니다.
 - `YouTube Music`은 TIDAL 안정화 이후 진행합니다.
 - `Apple Music`은 Apple Developer 계정 준비 전까지 보류합니다.
 - `Last.fm`은 스트리밍 구독 플랫폼이 아니라 청취 이력 signal source로만 연결합니다.

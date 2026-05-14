@@ -135,14 +135,12 @@ docs/
 
 ## 8. 지금 시점의 우선순위
 
-### 1차 집중: Spotify & TIDAL PMS 안정화
+### 1차 마감: 추천 모델 / EMS 데이터 풀 운영 완성
 
-1. Spotify OAuth, playlist import, PMS user library 영속 저장 안정화
-2. TIDAL 실제 provider와 PMS import 검증
-3. ReccoBeats 등 외부 provider 기반 오디오 특성 보강 파이프라인 정리
-4. 사용자별 음악 학습 모델 개발
-5. 추천 결과 평가 저장과 사용자 제작 playlist 구현
-6. 사이트 내부 재생 이벤트, 저장, 스킵, playlist 추가 같은 행동 데이터 모델 정의
+현재는 Spotify/TIDAL 기반 PMS import, 추천 event/snapshot, SASRec 학습/registry, GMS feedback, feature coverage/drift, EMS acquisition 1차 흐름이 들어간 상태입니다.
+문서 정리, TIDAL PMS provider 오류 경계 보강, Discogs label enrichment, cold-start import 유도 UX는 반영했습니다. 남은 작업은 새 기능 확장이 아니라 추천/EMS 1차 제품형 마감에 필요한 아래 항목입니다.
+
+1. EMS acquisition 운영 확장 — source 품질, 주기 실행, skip/drift 운영값, 수집량 목표 관리
 
 ### 보류: YouTube Music & Apple Music
 
@@ -167,7 +165,7 @@ docs/
 - `POST /api/v1/platforms/oauth/*`는 사용자 플로우에서 실제 Spotify OAuth 설정이 있어야 시작됨
 - `GET/POST /api/v1/pms/import/*` PMS playlist import 경로 추가 완료
 - `services/api`에는 platform credential 저장소와 playlist provider 추상화가 추가되어 실제 Spotify import를 처리함
-- `services/api`는 실제 Spotify playlist listing/item import를 처리하며, 오디오 특성은 현재 legacy Spotify lookup path와 placeholder 저장 구조가 함께 남아 있음
+- `services/api`는 실제 Spotify/TIDAL playlist listing/item import를 처리하며, 오디오 특성을 확보하지 못한 track은 `unavailable` 스냅샷으로 남김
 - `services/api`는 Spotify access token 만료 시 refresh token 기반 자동 갱신을 수행함
 - `services/api`와 `apps/web`는 refresh 실패 시 `reconnect_required` 상태와 재연결 UX까지 반영함
 - `services/api`는 DB 활성 프로필에서 PMS import 결과를 `pms_imported_*` 테이블에 영속 저장함
@@ -224,7 +222,7 @@ docs/
 - `apps/web`는 `/gms-playlists`에서 사용자에게 EMS 평가 playlist 후보를 composite/affinity 점수와 6축 evidence 패널과 함께 카드로 노출하고, "Preview tracks" 모달에서 트랙 목록을 보고 개별/전체 재생으로 사전 청취한 뒤 ConfirmDialog로 PMS 저장 흐름을 승인받음
 - `services/api`는 Phase 2 metadata normalization identity pipeline을 제공함: MusicBrainz/Wikidata/Discogs lookup, `track_identity_candidate` accept/auto-accept, accepted candidate → EMS/PMS 본 테이블 ISRC/MBID 갱신, `canonical_track`/`canonical_track_identity`로 동일 곡 연결, audit log 영속 저장, 주기적 apply scheduler까지 관리자 전용 `/recommendations/metadata-admin`에서 운영함
 - `services/api`의 metadata candidate save 경로는 source(`musicbrainz`/`wikidata`/`discogs`)와 무관하게 `CandidateQualityScorer`를 거쳐 normalized 0..1 `candidate_score`를 부여함. Jaccard 토큰 유사도 + 부분 문자열 보너스로 title × 0.6 + artist × 0.4를 base로 계산하고, MusicBrainz Lucene score는 0.2 weight로 blend됨. Wikidata description의 `song by X` / `album by Y` 패턴과 Discogs `Artist - Title` 포맷에서 artist를 자동 추출함. 같은 auto-accept threshold가 모든 source에서 일관되게 동작함
-- `services/api`의 canonical track promote 흐름은 Discogs candidate일 때 candidate metadata의 year/country를 파싱해 `canonical_track`의 `release_year` / `release_country`(V34)로 적재함. 동일 canonical track이 이미 있고 release 필드가 비어 있으면 후속 promote에서 fill-if-null 정책으로 채워지며, 기존 값이 있으면 덮어쓰지 않음. 관리자 화면 `/recommendations/metadata-admin`의 promote 결과 요약에 release 정보가 함께 노출됨
+- `services/api`의 canonical track promote 흐름은 Discogs candidate일 때 candidate metadata의 year/country를 파싱하고, Discogs master detail의 `main_release`를 release detail로 조회해 primary label을 `canonical_track.release_label`(V39)에 fill-if-null로 보강함. 기존 release 필드는 덮어쓰지 않으며 관리자 화면 `/recommendations/metadata-admin`의 promote 결과 요약에 year/country/label이 함께 노출됨
 - `services/api`의 SASRec auto-train 스케줄러는 매 tick마다 `RecommendationModelTrainingResponse`의 `metrics`/`baseline_metrics`/`metric_delta`(Hit@K, MRR@K, nDCG@K)를 추출해 `sasrec_auto_train_log`(V35)에 함께 영속 기록함. `/recommendations/sasrec-admin`의 Auto-Train 결과와 Other user lookup `latest_train_log` 패널에 SASRec vs recency baseline vs Δ를 나란히 비교하는 표가 추가되어, baseline 대비 회귀(rose) / 개선(emerald)을 한눈에 볼 수 있음. AI service의 recency baseline 비교 자동화는 이전부터 있었지만, 운영 가시성과 시계열 보존이 이번에 보강됨
 - `services/api`는 Phase 6 feature coverage dashboard를 제공함: 관리자 전용 `GET /api/v1/recommendations/admin/feature-coverage?user_id&target_user_id` endpoint와 `/recommendations/feature-coverage` 화면이 PMS user library(audio/ISRC/playback target), EMS collected pool(source platform별 audio/ISRC/canonical link coverage), learning signal(user event/recommendation snapshot 수)를 한 응답으로 집계해 노출함. EMS repository가 없는 local 프로필에서는 degraded warning을 노출해 경계 부재를 숨기지 않음
 - `services/api`는 feature coverage 응답에 `DriftSignalEvaluator`가 생성한 drift signal 목록을 포함함. PMS audio/playback/ISRC, EMS source별 audio/ISRC/canonical link, learning data event 수가 사전 정의 임계치 미달이면 `category`/`severity`(warn|info)/`target_scope`/`message`/`actual_value`/`threshold`/`sample_size`를 갖는 signal을 생성하고, EMS source 단위 신호는 표본 부족(예: 20 미만 track) 시 가드로 억제됨. 임계치는 `app.recommendation.drift.*` 설정으로 운영자가 튜닝하고, `/recommendations/feature-coverage` 화면이 신호 banner로 표시함 (warn 호박색, info 회색)

@@ -117,7 +117,7 @@
   - class name은 legacy 호환 때문에 유지하지만 컬럼 매핑은 `audio_*`를 사용합니다
 - 트랙 엔터티: [PmsCatalogTrackEntity.java](/Users/woosungjo/music-space/my-forever-music/services/api/src/main/java/io/myforevermusic/api/modules/pms/infrastructure/persistence/PmsCatalogTrackEntity.java)
 - PMS bootstrap 응답은 track별 `audio_features_filled`, `audio_feature_source`를 권장 필드로 내려주고 legacy `spotify_*` alias도 함께 유지합니다
-- 현재 Spotify import provider는 audio-features 조회가 실패해도 import를 계속 진행하고, `source=unavailable`, `filled=false` placeholder를 저장합니다
+- 현재 Spotify/TIDAL import provider는 audio-features 조회가 실패해도 import를 계속 진행하고, `source=unavailable`, `filled=false` 스냅샷을 저장합니다
 - 이 동작은 새 provider-neutral 정책과 더 가깝고, 과거 문서의 `import 중단` 설명은 더 이상 기준이 아닙니다
 
 ## 다음 연결 지점

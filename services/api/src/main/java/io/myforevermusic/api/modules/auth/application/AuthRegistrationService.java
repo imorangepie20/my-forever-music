@@ -13,7 +13,8 @@ import org.springframework.stereotype.Service;
 public class AuthRegistrationService {
 
     private static final Set<String> SUPPORTED_PRIMARY_STREAMING_PLATFORM_IDS = Set.of(
-        "spotify"
+        "spotify",
+        "tidal"
     );
 
     private final AuthAccountStore authAccountStore;

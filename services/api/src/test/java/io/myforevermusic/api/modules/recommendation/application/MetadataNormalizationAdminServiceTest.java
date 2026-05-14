@@ -22,6 +22,9 @@ import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemor
 import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryTrackIdentityCandidateAuditStore;
 import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryTrackIdentityCandidateStore;
 import io.myforevermusic.api.modules.recommendation.infrastructure.discogs.DiscogsClient;
+import io.myforevermusic.api.modules.recommendation.infrastructure.discogs.DiscogsClient.DiscogsMasterDetail;
+import io.myforevermusic.api.modules.recommendation.infrastructure.discogs.DiscogsClient.DiscogsReleaseDetail;
+import io.myforevermusic.api.modules.recommendation.infrastructure.discogs.DiscogsClient.DiscogsReleaseLabel;
 import io.myforevermusic.api.modules.recommendation.infrastructure.discogs.DiscogsClient.DiscogsSearchResponse;
 import io.myforevermusic.api.modules.recommendation.infrastructure.discogs.DiscogsClient.DiscogsSearchResult;
 import io.myforevermusic.api.modules.recommendation.infrastructure.musicbrainz.MusicBrainzClient;
@@ -364,6 +367,25 @@ class MetadataNormalizationAdminServiceTest {
 
     @Test
     void shouldPopulateReleaseContextWhenPromotingDiscogsCandidate() {
+        when(discogsClient.getMaster(12345)).thenReturn(new DiscogsMasterDetail(
+            12345,
+            "Queen - Bohemian Rhapsody",
+            1975,
+            67890,
+            "https://api.discogs.com/releases/67890"
+        ));
+        when(discogsClient.getRelease(67890)).thenReturn(new DiscogsReleaseDetail(
+            67890,
+            "Queen - Bohemian Rhapsody",
+            "UK",
+            "1975",
+            List.of(new DiscogsReleaseLabel(
+                123,
+                "EMI",
+                "EMI 2375",
+                "https://api.discogs.com/labels/123"
+            ))
+        ));
         TrackIdentityCandidateStore.Entry candidate = candidateStore.save(new TrackIdentityCandidateStore.Draft(
             "Bohemian Rhapsody",
             "Queen",
@@ -388,6 +410,41 @@ class MetadataNormalizationAdminServiceTest {
 
         assertThat(result.canonicalTrack().releaseYear()).isEqualTo("1975");
         assertThat(result.canonicalTrack().releaseCountry()).isEqualTo("UK");
+        assertThat(result.canonicalTrack().releaseLabel()).isEqualTo("EMI");
+    }
+
+    @Test
+    void shouldPropagateDiscogsDetailFailureDuringLabelEnrichment() {
+        when(discogsClient.getMaster(12345))
+            .thenThrow(new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.BAD_GATEWAY,
+                "Discogs responded with 502"
+            ));
+        TrackIdentityCandidateStore.Entry candidate = candidateStore.save(new TrackIdentityCandidateStore.Draft(
+            "Bohemian Rhapsody",
+            "Queen",
+            "discogs",
+            "discogs_master_id",
+            "12345",
+            0.95d,
+            "{\"id\":12345,\"type\":\"master\",\"title\":\"Queen - Bohemian Rhapsody\",\"country\":\"UK\",\"year\":\"1975\"}",
+            ADMIN_USER_ID,
+            Instant.parse("2026-05-12T00:00:00Z")
+        ));
+        TrackIdentityCandidateStore.Entry accepted = candidateStore.updateStatus(
+            candidate.id(),
+            TrackIdentityCandidateStore.STATUS_ACCEPTED,
+            ADMIN_USER_ID,
+            "accepted",
+            Instant.parse("2026-05-12T00:01:00Z")
+        );
+
+        assertThatThrownBy(() -> service.promoteCandidateToCanonicalIdentity(ADMIN_USER_ID, accepted.id()))
+            .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+            .hasMessageContaining("Discogs responded with 502");
+
+        assertThat(canonicalTrackIdentityStore.findActiveIdentity("discogs", "discogs_master_id", "12345"))
+            .isEmpty();
     }
 
     @Test

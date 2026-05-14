@@ -1,11 +1,16 @@
 package io.myforevermusic.api.modules.gms.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.myforevermusic.api.modules.auth.application.AuthRegistrationService;
 import io.myforevermusic.api.modules.auth.infrastructure.local.InMemoryAuthAccountStore;
 import io.myforevermusic.api.modules.auth.presentation.AuthRegistrationRequest;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackEntity;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackRepository;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsTrackAudioFeatures;
 import io.myforevermusic.api.modules.gms.infrastructure.ai.AiRecommendationPreviewClient;
 import io.myforevermusic.api.modules.gms.infrastructure.ai.AiSasrecRankingClient;
 import io.myforevermusic.api.modules.gms.presentation.GmsRecommendationPreviewRequest;
@@ -29,6 +34,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class GmsRecommendationPreviewServiceTest {
 
@@ -236,6 +242,69 @@ class GmsRecommendationPreviewServiceTest {
             .isEqualTo("preview_generated");
         assertThat(auditLogStore.findRecentByUserId("user-001", 1).getFirst().itemCount())
             .isEqualTo(1);
+    }
+
+    @Test
+    void shouldUseColdStartFallbackWhenPmsLibraryIsEmpty() {
+        InMemoryAuthAccountStore authAccountStore = new InMemoryAuthAccountStore();
+        AuthRegistrationService authRegistrationService = new AuthRegistrationService(
+            authAccountStore,
+            new BCryptPasswordEncoder()
+        );
+        String userId = authRegistrationService.register(new AuthRegistrationRequest(
+            "Forever Listener",
+            "gms-cold-start@example.com",
+            "music2026",
+            "tidal",
+            false,
+            true,
+            true
+        )).user().userId();
+        InMemoryPmsUserLibraryStore pmsUserLibraryStore = new InMemoryPmsUserLibraryStore();
+        EmsCollectedTrackRepository emsTrackRepository = mock(EmsCollectedTrackRepository.class);
+        when(emsTrackRepository.findBySourcePlatformOrderByCollectedAtDesc("tidal"))
+            .thenReturn(List.of(emsTrackWithId(88L, "TIDAL Fallback", "Fallback Artist", "tidal")));
+        InMemoryRecommendationAuditLogStore auditLogStore = new InMemoryRecommendationAuditLogStore();
+        GmsRecommendationPreviewService service = new GmsRecommendationPreviewService(
+            new SingleItemAiRecommendationPreviewClient(),
+            Optional.empty(),
+            authAccountStore,
+            new InMemoryLastFmScrobbleStore(),
+            pmsUserLibraryStore,
+            Optional.empty(),
+            new RecommendationSnapshotService(new InMemoryRecommendationSnapshotStore()),
+            auditLogStore,
+            new PlaylistQualityEvaluator(),
+            new InMemoryUserPersonalizationProfileStore(),
+            new RecommendationReranker(),
+            new ColdStartFallbackService(authAccountStore, pmsUserLibraryStore, Optional.of(emsTrackRepository))
+        );
+
+        GmsRecommendationPreviewResponse response = service.previewRecommendations(
+            new GmsRecommendationPreviewRequest(
+                "request-cold-start",
+                userId,
+                null,
+                "gms",
+                "upbeat",
+                4,
+                2,
+                5,
+                List.of(),
+                List.of(),
+                List.of(),
+                true
+            )
+        );
+
+        assertThat(response.items()).singleElement().satisfies(item -> {
+            assertThat(item.trackId()).isEqualTo("ems-88");
+            assertThat(item.sourceSpace()).isEqualTo("cold_start");
+            assertThat(item.title()).isEqualTo("TIDAL Fallback");
+        });
+        assertThat(response.warnings()).anyMatch(warning -> warning.startsWith("Cold-start fallback applied:"));
+        assertThat(auditLogStore.findRecentByUserId(userId, 1).getFirst().fallbackReason())
+            .isEqualTo("cold_start_pms_empty");
     }
 
     @Test
@@ -584,5 +653,36 @@ class GmsRecommendationPreviewServiceTest {
                 )
             )
         );
+    }
+
+    private EmsCollectedTrackEntity emsTrackWithId(long id, String title, String artist, String platform) {
+        EmsTrackAudioFeatures features = new EmsTrackAudioFeatures(
+            "audio-" + id,
+            "reccobeats",
+            true,
+            null, null, null, null,
+            null, null, null, null,
+            null, null, null, null,
+            null, null, null, null, null,
+            Instant.parse("2026-05-14T00:00:00Z")
+        );
+        EmsCollectedTrackEntity entity = new EmsCollectedTrackEntity(
+            "external-" + id,
+            title,
+            artist,
+            platform,
+            null,
+            "Fallback Album",
+            null,
+            null,
+            null,
+            null,
+            210000,
+            "acquisition_pool",
+            Instant.parse("2026-05-14T00:00:00Z"),
+            features
+        );
+        ReflectionTestUtils.setField(entity, "id", id);
+        return entity;
     }
 }

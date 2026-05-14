@@ -1,11 +1,13 @@
 package io.myforevermusic.api.modules.platform.infrastructure.tidal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.myforevermusic.api.modules.auth.application.AuthRegisteredAccount;
 import io.myforevermusic.api.modules.platform.application.PlatformAccountCredential;
 import io.myforevermusic.api.modules.platform.application.PlatformOAuthProperties;
+import io.myforevermusic.api.modules.platform.application.PlatformProviderOperationException;
 import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsAudioFeaturesClient;
 import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsAudioFeaturesClient.ReccoBeatsAudioFeaturesSnapshot;
 
@@ -120,7 +122,7 @@ class TidalPlatformPlaylistProviderTest {
     }
 
     @Test
-    void shouldStorePlaceholderWhenTidalIsrcLookupHasNoMatch() {
+    void shouldStoreUnavailableAudioFeaturesWhenTidalIsrcLookupHasNoMatch() {
         TidalPlatformPlaylistProvider provider = new TidalPlatformPlaylistProvider(
             new FakeTidalWebApiClient(
                 List.of(new TidalWebApiClient.TidalPlaylistSummary(
@@ -165,6 +167,61 @@ class TidalPlatformPlaylistProviderTest {
         assertThat(importedPlaylists.get(0).tracks().get(0).audioFeatures().isComplete()).isFalse();
     }
 
+    @Test
+    void shouldExposeTidalPlaylistListingFailure() {
+        TidalPlatformPlaylistProvider provider = new TidalPlatformPlaylistProvider(
+            new FakeTidalWebApiClient(List.of(), Map.of()) {
+                @Override
+                public List<TidalPlaylistSummary> getUserPlaylists(PlatformAccountCredential credential) {
+                    throw new IllegalStateException("TIDAL upstream 503");
+                }
+            },
+            new FakeReccoBeatsAudioFeaturesClient(Map.of())
+        );
+
+        assertThatThrownBy(() -> provider.listImportablePlaylists(sampleAccount(), tidalCredential()))
+            .isInstanceOf(PlatformProviderOperationException.class)
+            .hasMessageContaining("tidal provider operation failed while listing playlists")
+            .hasMessageContaining("TIDAL upstream 503");
+    }
+
+    @Test
+    void shouldExposeTidalPlaylistTrackLoadFailure() {
+        TidalPlatformPlaylistProvider provider = new TidalPlatformPlaylistProvider(
+            new FakeTidalWebApiClient(
+                List.of(new TidalWebApiClient.TidalPlaylistSummary(
+                    "playlist-001",
+                    "Noir Rotation",
+                    "Imported from TIDAL.",
+                    1,
+                    null,
+                    null,
+                    "https://tidal.com/browse/playlist/playlist-001",
+                    "playlist-uuid-001"
+                )),
+                Map.of()
+            ) {
+                @Override
+                public List<TidalPlaylistTrack> getPlaylistTracks(
+                    PlatformAccountCredential credential,
+                    String playlistId
+                ) {
+                    throw new IllegalStateException("TIDAL playlist items timeout");
+                }
+            },
+            new FakeReccoBeatsAudioFeaturesClient(Map.of())
+        );
+
+        assertThatThrownBy(() -> provider.loadPlaylistsForImport(
+            sampleAccount(),
+            tidalCredential(),
+            List.of("playlist-001")
+        ))
+            .isInstanceOf(PlatformProviderOperationException.class)
+            .hasMessageContaining("tidal provider operation failed while loading playlist tracks for playlist-001")
+            .hasMessageContaining("TIDAL playlist items timeout");
+    }
+
     private AuthRegisteredAccount sampleAccount() {
         return new AuthRegisteredAccount(
             "user-001",
@@ -199,7 +256,7 @@ class TidalPlatformPlaylistProviderTest {
         );
     }
 
-    private static final class FakeTidalWebApiClient extends TidalWebApiClient {
+    private static class FakeTidalWebApiClient extends TidalWebApiClient {
 
         private final List<TidalPlaylistSummary> playlists;
         private final Map<String, List<TidalPlaylistTrack>> tracksByPlaylistId;

@@ -16,14 +16,24 @@ public interface CanonicalTrackIdentityStore {
     List<IdentityEntry> findIdentitiesByCanonicalTrackId(Long canonicalTrackId);
 
     /**
-     * 기존 canonical track에 release_year/release_country가 비어 있으면 채운다.
-     * 둘 다 채워져 있으면 no-op. 새 값이 null이면 그 자리는 건드리지 않는다.
+     * 기존 canonical track에 release_year/release_country/release_label이 비어 있으면 채운다.
+     * 이미 채워진 값은 no-op. 새 값이 null이면 그 자리는 건드리지 않는다.
      * @return 갱신된 (또는 그대로인) canonical track entry
      */
-    CanonicalTrackEntry fillReleaseContextIfMissing(
+    default CanonicalTrackEntry fillReleaseContextIfMissing(
         Long canonicalTrackId,
         String releaseYear,
         String releaseCountry,
+        Instant now
+    ) {
+        return fillReleaseMetadataIfMissing(canonicalTrackId, releaseYear, releaseCountry, null, now);
+    }
+
+    CanonicalTrackEntry fillReleaseMetadataIfMissing(
+        Long canonicalTrackId,
+        String releaseYear,
+        String releaseCountry,
+        String releaseLabel,
         Instant now
     );
 
@@ -76,6 +86,7 @@ public interface CanonicalTrackIdentityStore {
         String displayArtistName,
         String releaseYear,
         String releaseCountry,
+        String releaseLabel,
         Instant createdAt,
         Instant updatedAt
     ) {}

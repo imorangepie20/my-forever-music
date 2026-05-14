@@ -10,6 +10,9 @@ import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsImportedT
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsUserTrackEntity;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsUserTrackRepository;
 import io.myforevermusic.api.modules.recommendation.infrastructure.discogs.DiscogsClient;
+import io.myforevermusic.api.modules.recommendation.infrastructure.discogs.DiscogsClient.DiscogsMasterDetail;
+import io.myforevermusic.api.modules.recommendation.infrastructure.discogs.DiscogsClient.DiscogsReleaseDetail;
+import io.myforevermusic.api.modules.recommendation.infrastructure.discogs.DiscogsClient.DiscogsReleaseLabel;
 import io.myforevermusic.api.modules.recommendation.infrastructure.discogs.DiscogsClient.DiscogsSearchResult;
 import io.myforevermusic.api.modules.recommendation.infrastructure.discogs.DiscogsClient.DiscogsSearchResponse;
 import io.myforevermusic.api.modules.recommendation.infrastructure.musicbrainz.MusicBrainzClient;
@@ -267,7 +270,7 @@ public class MetadataNormalizationAdminService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "candidate value is empty.");
         }
 
-        DiscogsReleaseContext discogsContext = extractDiscogsReleaseContext(candidate);
+        DiscogsReleaseMetadata discogsMetadata = resolveDiscogsReleaseMetadata(candidate);
         Instant now = Instant.now();
         CanonicalTrackIdentityStore.UpsertResult result;
         try {
@@ -279,19 +282,20 @@ public class MetadataNormalizationAdminService {
                 candidate.source(),
                 candidate.candidateScore(),
                 candidate.id(),
-                discogsContext.year(),
-                discogsContext.country(),
+                discogsMetadata.year(),
+                discogsMetadata.country(),
                 now
             ));
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
         }
-        if (!result.createdCanonicalTrack() && discogsContext.hasAnyField()) {
+        if (discogsMetadata.hasAnyField()) {
             CanonicalTrackIdentityStore.CanonicalTrackEntry filled = canonicalTrackIdentityStore
-                .fillReleaseContextIfMissing(
+                .fillReleaseMetadataIfMissing(
                     result.canonicalTrack().canonicalTrackId(),
-                    discogsContext.year(),
-                    discogsContext.country(),
+                    discogsMetadata.year(),
+                    discogsMetadata.country(),
+                    discogsMetadata.label(),
                     now
                 );
             result = new CanonicalTrackIdentityStore.UpsertResult(
@@ -778,25 +782,97 @@ public class MetadataNormalizationAdminService {
         );
     }
 
-    private DiscogsReleaseContext extractDiscogsReleaseContext(TrackIdentityCandidateStore.Entry candidate) {
+    private DiscogsReleaseMetadata resolveDiscogsReleaseMetadata(TrackIdentityCandidateStore.Entry candidate) {
+        DiscogsReleaseMetadata searchMetadata = extractDiscogsReleaseMetadata(candidate);
+        DiscogsReleaseMetadata detailMetadata = fetchDiscogsReleaseMetadata(candidate);
+        return searchMetadata.merge(detailMetadata);
+    }
+
+    private DiscogsReleaseMetadata extractDiscogsReleaseMetadata(TrackIdentityCandidateStore.Entry candidate) {
         if (!"discogs".equalsIgnoreCase(candidate.source()) || candidate.metadata() == null) {
-            return DiscogsReleaseContext.empty();
+            return DiscogsReleaseMetadata.empty();
         }
         try {
             DiscogsSearchResult parsed = objectMapper.readValue(candidate.metadata(), DiscogsSearchResult.class);
-            return new DiscogsReleaseContext(parsed.year(), parsed.country());
+            return new DiscogsReleaseMetadata(parsed.year(), parsed.country(), null);
         } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
-            return DiscogsReleaseContext.empty();
+            return DiscogsReleaseMetadata.empty();
         }
     }
 
-    private record DiscogsReleaseContext(String year, String country) {
-        static DiscogsReleaseContext empty() {
-            return new DiscogsReleaseContext(null, null);
+    private DiscogsReleaseMetadata fetchDiscogsReleaseMetadata(TrackIdentityCandidateStore.Entry candidate) {
+        if (!"discogs".equalsIgnoreCase(candidate.source())) {
+            return DiscogsReleaseMetadata.empty();
+        }
+        Integer candidateId = parseDiscogsCandidateId(candidate);
+        if ("discogs_release_id".equalsIgnoreCase(candidate.candidateKind())) {
+            DiscogsReleaseDetail release = discogsClient.getRelease(candidateId);
+            return new DiscogsReleaseMetadata(release.year(), release.country(), primaryDiscogsLabel(release.labels()));
+        }
+        DiscogsMasterDetail master = discogsClient.getMaster(candidateId);
+        if (master.mainRelease() == null || master.mainRelease() <= 0) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_GATEWAY,
+                "Discogs master detail did not include a main release id."
+            );
+        }
+        DiscogsReleaseDetail release = discogsClient.getRelease(master.mainRelease());
+        return new DiscogsReleaseMetadata(
+            release.year() == null && master.year() != null ? String.valueOf(master.year()) : release.year(),
+            release.country(),
+            primaryDiscogsLabel(release.labels())
+        );
+    }
+
+    private Integer parseDiscogsCandidateId(TrackIdentityCandidateStore.Entry candidate) {
+        try {
+            return Integer.parseInt(candidate.candidateValue());
+        } catch (NumberFormatException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Discogs candidate value must be a numeric id.");
+        }
+    }
+
+    private String primaryDiscogsLabel(List<DiscogsReleaseLabel> labels) {
+        return Optional.ofNullable(labels)
+            .orElse(List.of())
+            .stream()
+            .map(DiscogsReleaseLabel::name)
+            .filter(name -> name != null && !name.isBlank())
+            .map(String::trim)
+            .findFirst()
+            .orElse(null);
+    }
+
+    private record DiscogsReleaseMetadata(String year, String country, String label) {
+        static DiscogsReleaseMetadata empty() {
+            return new DiscogsReleaseMetadata(null, null, null);
         }
 
         boolean hasAnyField() {
-            return (year != null && !year.isBlank()) || (country != null && !country.isBlank());
+            return (year != null && !year.isBlank())
+                || (country != null && !country.isBlank())
+                || (label != null && !label.isBlank());
+        }
+
+        DiscogsReleaseMetadata merge(DiscogsReleaseMetadata detail) {
+            if (detail == null) {
+                return this;
+            }
+            return new DiscogsReleaseMetadata(
+                firstNonBlank(detail.year(), year),
+                firstNonBlank(detail.country(), country),
+                firstNonBlank(detail.label(), label)
+            );
+        }
+
+        private String firstNonBlank(String primary, String fallback) {
+            if (primary != null && !primary.isBlank()) {
+                return primary.trim();
+            }
+            if (fallback != null && !fallback.isBlank()) {
+                return fallback.trim();
+            }
+            return null;
         }
     }
 

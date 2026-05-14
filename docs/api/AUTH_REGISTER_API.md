@@ -22,10 +22,10 @@
 - `email`
 - `password`
 - `preferred_platform_id`
-  - 현재 허용값: `spotify`
+  - 현재 허용값: `spotify`, `tidal`
   - 이 값은 PMS playlist import를 시작할 기본 구독 스트리밍 플랫폼입니다.
   - 플랫폼 확장 순서는 `spotify -> tidal -> youtube-music`입니다.
-  - `tidal`은 다음 구현 대상이지만 실제 PMS provider와 검증이 끝난 뒤에만 허용합니다.
+  - `tidal`은 실제 provider가 있으나 아직 운영 안정화 단계입니다.
   - `youtube-music`은 TIDAL 안정화 이후 허용합니다.
   - `apple-music`은 Apple Developer 계정 준비 전까지 보류합니다.
   - `last-fm`은 회원가입 기본 플랫폼이 아니라 가입 후 연결하는 청취 신호 플랫폼입니다.

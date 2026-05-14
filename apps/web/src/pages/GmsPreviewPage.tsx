@@ -97,11 +97,15 @@ const GmsPreviewPage = () => {
             null,
         [bootstrap, workspace.playlistId],
     )
+    const coldStartFallbackActive = useMemo(
+        () => response?.warnings.some((warning) => warning.startsWith('Cold-start fallback applied:')) ?? false,
+        [response],
+    )
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault()
-        if (!session || !activePlaylist) {
-            setContextError('Import a real PMS playlist before requesting GMS recommendations.')
+        if (!session) {
+            setContextError('Log in before requesting GMS recommendations.')
             return
         }
 
@@ -111,7 +115,7 @@ const GmsPreviewPage = () => {
         const payload = {
             request_id: `web-preview-${Date.now()}`,
             user_id: session.userId,
-            playlist_id: activePlaylist.playlist_id,
+            playlist_id: activePlaylist?.playlist_id,
             mood: workspace.mood,
             energy_level: workspace.energyLevel,
             familiarity_bias: workspace.familiarityBias,
@@ -268,7 +272,7 @@ const GmsPreviewPage = () => {
                                 <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
                                     <p className="text-[11px] uppercase tracking-[0.24em] text-hud-text-muted">PMS Context</p>
                                     <p className="mt-2 text-sm font-semibold text-hud-text-primary">
-                                        {activePlaylist ? 'Ready' : 'Missing'}
+                                        {activePlaylist ? 'Ready' : session ? 'EMS Fallback' : 'Missing'}
                                     </p>
                                 </div>
                                 <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
@@ -287,11 +291,16 @@ const GmsPreviewPage = () => {
                                         Back to EMS
                                     </Button>
                                 </Link>
-                                <Button type="submit" variant="primary" glow fullWidth disabled={isSubmitting || !session || !activePlaylist}>
+                                <Button type="submit" variant="primary" glow fullWidth disabled={isSubmitting || !session}>
                                     {isSubmitting ? (
                                         <>
                                             <RefreshCw size={18} className="animate-spin" />
                                             Generating Preview
+                                        </>
+                                    ) : !activePlaylist ? (
+                                        <>
+                                            <Sparkles size={18} />
+                                            Preview EMS Fallback
                                         </>
                                     ) : (
                                         <>
@@ -353,6 +362,21 @@ const GmsPreviewPage = () => {
                                     </div>
                                 )}
 
+                                {coldStartFallbackActive && (
+                                    <div className="rounded-2xl border border-hud-accent-primary/40 bg-hud-accent-primary/10 p-4">
+                                        <p className="text-xs uppercase tracking-[0.24em] text-hud-accent-primary">Import Next</p>
+                                        <p className="mt-3 text-sm leading-6 text-hud-text-secondary">
+                                            These candidates came from the EMS pool because the PMS library is empty. Import a connected platform playlist to personalize the next preview.
+                                        </p>
+                                        <Link to="/pms" className="mt-4 inline-flex">
+                                            <Button type="button" variant="primary">
+                                                <Bookmark size={16} />
+                                                Open PMS Import
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                )}
+
                                 {saveMessage && (
                                     <div className="rounded-2xl border border-hud-accent-primary/40 bg-hud-accent-primary/10 p-4 text-sm leading-6 text-hud-text-secondary">
                                         {saveMessage}
@@ -408,12 +432,23 @@ const GmsPreviewPage = () => {
                             />
                         ) : (
                             <div className="rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">
-                                Pick a PMS playlist first so GMS can rank real playable tracks.
+                                <p>
+                                    No PMS playlist is imported yet. You can preview EMS-backed cold-start candidates now, then import a playlist for personalized ranking.
+                                </p>
+                                <Link to="/pms" className="mt-4 inline-flex">
+                                    <Button type="button" variant="outline">
+                                        <Bookmark size={16} />
+                                        Open PMS Import
+                                    </Button>
+                                </Link>
                             </div>
                         )}
                     </HudCard>
 
-                    <HudCard title="Recommendation Candidates" subtitle="Playable tracks resolved back into the PMS user library">
+                    <HudCard
+                        title="Recommendation Candidates"
+                        subtitle={coldStartFallbackActive ? 'EMS fallback tracks ready for import-driven personalization' : 'Playable tracks resolved back into the PMS user library'}
+                    >
                         {response ? (
                             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                                 {response.items.map((item) => (

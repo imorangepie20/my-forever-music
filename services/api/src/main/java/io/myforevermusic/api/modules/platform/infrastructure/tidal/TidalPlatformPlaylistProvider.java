@@ -2,6 +2,7 @@ package io.myforevermusic.api.modules.platform.infrastructure.tidal;
 
 import io.myforevermusic.api.modules.auth.application.AuthRegisteredAccount;
 import io.myforevermusic.api.modules.platform.application.PlatformAccountCredential;
+import io.myforevermusic.api.modules.platform.application.PlatformProviderOperationException;
 import io.myforevermusic.api.modules.platform.application.PlatformPlaylistProvider;
 import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsAudioFeaturesClient;
 import io.myforevermusic.api.modules.platform.infrastructure.reccobeats.ReccoBeatsAudioFeaturesClient.ReccoBeatsAudioFeaturesSnapshot;
@@ -13,9 +14,10 @@ import io.myforevermusic.api.modules.pms.application.PmsPlaylistImportCatalogSer
 import io.myforevermusic.api.modules.pms.application.PmsPlaylistImportCatalogService.ImportCandidateTrack;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,16 +67,11 @@ public class TidalPlatformPlaylistProvider implements PlatformPlaylistProvider {
         AuthRegisteredAccount account,
         PlatformAccountCredential credential
     ) {
-        try {
-            TidalUserProfile profile = tidalWebApiClient.getCurrentUserProfile(credential);
-            return tidalWebApiClient.getUserPlaylists(credential).stream()
-                .filter(playlist -> isOwnedByUser(profile, playlist))
-                .map(this::toImportCandidatePlaylist)
-                .toList();
-        } catch (Exception exception) {
-            log.warn("TIDAL playlist listing failed: {}", exception.getMessage());
-            return List.of();
-        }
+        TidalUserProfile profile = getCurrentUserProfile(credential);
+        return getUserPlaylists(credential, "listing playlists").stream()
+            .filter(playlist -> isOwnedByUser(profile, playlist))
+            .map(this::toImportCandidatePlaylist)
+            .toList();
     }
 
     @Override
@@ -83,61 +80,53 @@ public class TidalPlatformPlaylistProvider implements PlatformPlaylistProvider {
         PlatformAccountCredential credential,
         List<String> externalPlaylistIds
     ) {
-        try {
-            return externalPlaylistIds.stream()
-                .map(playlistId -> loadSinglePlaylist(credential, playlistId))
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .toList();
-        } catch (Exception exception) {
-            log.warn("TIDAL playlist loading failed: {}", exception.getMessage());
-            return List.of();
-        }
+        Map<String, TidalPlaylistSummary> playlistsById = getUserPlaylists(credential, "loading playlist summaries")
+            .stream()
+            .collect(Collectors.toMap(
+                TidalPlaylistSummary::playlistId,
+                playlist -> playlist,
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
+
+        return externalPlaylistIds.stream()
+            .map(playlistId -> loadSinglePlaylist(credential, playlistId, playlistsById.get(playlistId)))
+            .toList();
     }
 
-    private Optional<ImportCandidatePlaylist> loadSinglePlaylist(
+    private ImportCandidatePlaylist loadSinglePlaylist(
         PlatformAccountCredential credential,
-        String playlistId
+        String playlistId,
+        TidalPlaylistSummary summary
     ) {
-        try {
-            TidalPlaylistSummary summary = tidalWebApiClient.getUserPlaylists(credential).stream()
-                .filter(p -> p.playlistId().equals(playlistId))
-                .findFirst()
-                .orElse(null);
-
-            if (summary == null) {
-                log.warn("TIDAL playlist not found: {}", playlistId);
-                return Optional.empty();
-            }
-
-            List<TidalPlaylistTrack> tracks = tidalWebApiClient.getPlaylistTracks(credential, playlistId);
-            Map<String, ReccoBeatsAudioFeaturesSnapshot> audioFeaturesByTrackId = resolveAudioFeatures(tracks);
-            Instant resolvedAt = Instant.now();
-            List<ImportCandidateTrack> importTracks = IntStream.range(0, tracks.size())
-                .mapToObj(index -> toImportCandidateTrack(
-                    tracks.get(index),
-                    index < 2,
-                    audioFeaturesByTrackId.get(tracks.get(index).tidalTrackId()),
-                    resolvedAt
-                ))
-                .toList();
-
-            return Optional.of(new ImportCandidatePlaylist(
-                summary.playlistId(),
-                summary.name(),
-                "tidal",
-                "TIDAL User",
-                normalizeDescription(summary.description()),
-                summary.coverImageUrl(),
-                summary.externalUrl(),
-                "tidal:playlist:%s".formatted(summary.uuid()),
-                importTracks.size(),
-                importTracks
-            ));
-        } catch (Exception exception) {
-            log.warn("Failed to load TIDAL playlist {}: {}", playlistId, exception.getMessage());
-            return Optional.empty();
+        if (summary == null) {
+            throw new IllegalArgumentException("TIDAL playlist is not available for import: %s".formatted(playlistId));
         }
+
+        List<TidalPlaylistTrack> tracks = getPlaylistTracks(credential, playlistId);
+        Map<String, ReccoBeatsAudioFeaturesSnapshot> audioFeaturesByTrackId = resolveAudioFeatures(tracks);
+        Instant resolvedAt = Instant.now();
+        List<ImportCandidateTrack> importTracks = IntStream.range(0, tracks.size())
+            .mapToObj(index -> toImportCandidateTrack(
+                tracks.get(index),
+                index < 2,
+                audioFeaturesByTrackId.get(tracks.get(index).tidalTrackId()),
+                resolvedAt
+            ))
+            .toList();
+
+        return new ImportCandidatePlaylist(
+            summary.playlistId(),
+            summary.name(),
+            "tidal",
+            "TIDAL User",
+            normalizeDescription(summary.description()),
+            summary.coverImageUrl(),
+            summary.externalUrl(),
+            "tidal:playlist:%s".formatted(summary.uuid()),
+            importTracks.size(),
+            importTracks
+        );
     }
 
     private boolean isOwnedByUser(TidalUserProfile profile, TidalPlaylistSummary playlist) {
@@ -209,7 +198,7 @@ public class TidalPlatformPlaylistProvider implements PlatformPlaylistProvider {
             return reccoBeatsAudioFeaturesClient.getAudioFeaturesForExternalTracksByIsrc(lookupRequests);
         } catch (RuntimeException exception) {
             log.warn(
-                "ReccoBeats ISRC audio-features lookup for TIDAL failed: {}. Proceeding with placeholders.",
+                "ReccoBeats ISRC audio-features lookup for TIDAL failed: {}. Proceeding with unavailable audio feature snapshots.",
                 exception.getMessage()
             );
             return Map.of();
@@ -248,7 +237,11 @@ public class TidalPlatformPlaylistProvider implements PlatformPlaylistProvider {
             );
         }
 
-        log.info("No ReccoBeats audio features for TIDAL track {} ({}). Storing placeholder.", track.tidalTrackId(), track.title());
+        log.info(
+            "No ReccoBeats audio features for TIDAL track {} ({}). Storing unavailable audio feature snapshot.",
+            track.tidalTrackId(),
+            track.title()
+        );
         return new PmsTrackAudioFeatures(
             null,
             "unavailable",
@@ -262,6 +255,44 @@ public class TidalPlatformPlaylistProvider implements PlatformPlaylistProvider {
             null, null, null, null, null, null, null, null, null,
             resolvedAt
         );
+    }
+
+    private TidalUserProfile getCurrentUserProfile(PlatformAccountCredential credential) {
+        try {
+            return tidalWebApiClient.getCurrentUserProfile(credential);
+        } catch (RuntimeException exception) {
+            throw providerOperationFailed("loading user profile", exception);
+        }
+    }
+
+    private List<TidalPlaylistSummary> getUserPlaylists(
+        PlatformAccountCredential credential,
+        String operation
+    ) {
+        try {
+            return tidalWebApiClient.getUserPlaylists(credential);
+        } catch (RuntimeException exception) {
+            throw providerOperationFailed(operation, exception);
+        }
+    }
+
+    private List<TidalPlaylistTrack> getPlaylistTracks(
+        PlatformAccountCredential credential,
+        String playlistId
+    ) {
+        try {
+            return tidalWebApiClient.getPlaylistTracks(credential, playlistId);
+        } catch (RuntimeException exception) {
+            throw providerOperationFailed("loading playlist tracks for %s".formatted(playlistId), exception);
+        }
+    }
+
+    private PlatformProviderOperationException providerOperationFailed(
+        String operation,
+        RuntimeException exception
+    ) {
+        log.warn("TIDAL provider operation failed while {}: {}", operation, exception.getMessage());
+        return new PlatformProviderOperationException("tidal", operation, exception);
     }
 
     private String buildSpotifyUri(String spotifyTrackId) {

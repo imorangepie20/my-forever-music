@@ -489,6 +489,7 @@ public class MetadataNormalizationAdminController {
         String displayArtistName,
         String releaseYear,
         String releaseCountry,
+        String releaseLabel,
         Instant createdAt,
         Instant updatedAt
     ) {
@@ -499,6 +500,7 @@ public class MetadataNormalizationAdminController {
                 entry.displayArtistName(),
                 entry.releaseYear(),
                 entry.releaseCountry(),
+                entry.releaseLabel(),
                 entry.createdAt(),
                 entry.updatedAt()
             );

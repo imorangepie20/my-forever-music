@@ -150,4 +150,34 @@ class CanonicalTrackIdentityStoreTest {
         assertThat(filled.releaseYear()).isEqualTo("1975");
         assertThat(filled.releaseCountry()).isEqualTo("UK");
     }
+
+    @Test
+    void fillReleaseMetadataWritesLabelWhenExistingValueIsNull() {
+        CanonicalTrackIdentityStore store = new InMemoryCanonicalTrackIdentityStore();
+        CanonicalTrackIdentityStore.UpsertResult created = store.upsertIdentity(new CanonicalTrackIdentityStore.Draft(
+            "Track Without Label",
+            "Artist",
+            "discogs_master_id",
+            "12345",
+            "discogs",
+            0.9d,
+            null,
+            "1975",
+            "UK",
+            Instant.parse("2026-05-13T00:00:00Z")
+        ));
+        assertThat(created.canonicalTrack().releaseLabel()).isNull();
+
+        CanonicalTrackIdentityStore.CanonicalTrackEntry filled = store.fillReleaseMetadataIfMissing(
+            created.canonicalTrack().canonicalTrackId(),
+            "1976",
+            "US",
+            "EMI",
+            Instant.parse("2026-05-13T00:05:00Z")
+        );
+
+        assertThat(filled.releaseYear()).isEqualTo("1975");
+        assertThat(filled.releaseCountry()).isEqualTo("UK");
+        assertThat(filled.releaseLabel()).isEqualTo("EMI");
+    }
 }

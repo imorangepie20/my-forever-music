@@ -48,12 +48,7 @@ public class DiscogsClient {
         if (title == null || title.isBlank()) {
             throw new IllegalArgumentException("title is required for Discogs master search.");
         }
-        if (token.isBlank()) {
-            throw new ResponseStatusException(
-                BAD_REQUEST,
-                "Discogs token is required. Set DISCOGS_TOKEN before running Discogs metadata lookup."
-            );
-        }
+        assertTokenConfigured();
         int safeLimit = Math.max(1, Math.min(25, limit));
         String query = artist == null || artist.isBlank()
             ? title.trim()
@@ -61,10 +56,35 @@ public class DiscogsClient {
         String url = BASE_URL
             + "/database/search?type=master&page=1&per_page=" + safeLimit
             + "&q=" + URLEncoder.encode(query, StandardCharsets.UTF_8);
-        return send(url);
+        return send(url, DiscogsSearchResponse.class);
     }
 
-    private DiscogsSearchResponse send(String url) {
+    public DiscogsMasterDetail getMaster(int masterId) {
+        assertTokenConfigured();
+        if (masterId <= 0) {
+            throw new IllegalArgumentException("Discogs master id must be positive.");
+        }
+        return send(BASE_URL + "/masters/" + masterId, DiscogsMasterDetail.class);
+    }
+
+    public DiscogsReleaseDetail getRelease(int releaseId) {
+        assertTokenConfigured();
+        if (releaseId <= 0) {
+            throw new IllegalArgumentException("Discogs release id must be positive.");
+        }
+        return send(BASE_URL + "/releases/" + releaseId, DiscogsReleaseDetail.class);
+    }
+
+    private void assertTokenConfigured() {
+        if (token.isBlank()) {
+            throw new ResponseStatusException(
+                BAD_REQUEST,
+                "Discogs token is required. Set DISCOGS_TOKEN before running Discogs metadata lookup."
+            );
+        }
+    }
+
+    private <T> T send(String url, Class<T> responseType) {
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("Accept", MediaType.APPLICATION_JSON_VALUE)
@@ -81,7 +101,7 @@ public class DiscogsClient {
                     "Discogs responded with " + response.statusCode() + ": " + response.body()
                 );
             }
-            return objectMapper.readValue(response.body(), DiscogsSearchResponse.class);
+            return objectMapper.readValue(response.body(), responseType);
         } catch (IOException ex) {
             throw new ResponseStatusException(BAD_GATEWAY, "Discogs response could not be parsed.", ex);
         } catch (InterruptedException ex) {
@@ -100,6 +120,32 @@ public class DiscogsClient {
         String title,
         String country,
         String year,
+        @JsonProperty("resource_url") String resourceUrl
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record DiscogsMasterDetail(
+        Integer id,
+        String title,
+        Integer year,
+        @JsonProperty("main_release") Integer mainRelease,
+        @JsonProperty("main_release_url") String mainReleaseUrl
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record DiscogsReleaseDetail(
+        Integer id,
+        String title,
+        String country,
+        String year,
+        List<DiscogsReleaseLabel> labels
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record DiscogsReleaseLabel(
+        Integer id,
+        String name,
+        @JsonProperty("catno") String catalogNumber,
         @JsonProperty("resource_url") String resourceUrl
     ) {}
 }

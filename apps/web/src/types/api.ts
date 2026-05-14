@@ -1409,6 +1409,7 @@ export interface CanonicalTrackItem {
     display_artist_name: string | null
     release_year: string | null
     release_country: string | null
+    release_label: string | null
     created_at: string
     updated_at: string
 }

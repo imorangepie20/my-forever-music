@@ -104,7 +104,8 @@
 - 이 응답은 `플랫폼별 제품 역할`과 `구현 우선순위`를 설명하는 카탈로그입니다.
 - 현재 코드 기준 PMS import provider는 `Spotify`, `TIDAL`이 존재하며, 안정화 우선순위는 `Spotify`가 먼저입니다.
 - 확장 우선순위는 `Spotify -> TIDAL -> YouTube Music`이며, `Apple Music`은 개발자 계정 준비 전까지 보류합니다.
-- `TIDAL`, `YouTube Music`, `Apple Music`은 실제 provider가 완성되기 전까지 `pms_import_supported=false`로 내려줍니다.
+- `TIDAL`은 실제 provider가 있어 `pms_import_supported=true`로 내려주지만, 아직 `testing-provider` 단계입니다.
+- `YouTube Music`, `Apple Music`은 실제 provider가 완성되기 전까지 `pms_import_supported=false`로 내려줍니다.
 - `Last.fm`은 PMS import보다 장기 청취 분석 신호용 플랫폼으로 취급합니다.
 - `primary_audio_feature_source`는 더 이상 `spotify` 고정값이 아니라, provider-neutral 전환 상태를 설명하는 값으로 해석합니다.
 - 이 문서는 [PROJECT_KEY_SERVICE.md](/Users/woosungjo/music-space/my-forever-music/docs/PROJECT_KEY_SERVICE.md) 와 [PMS_TRACK_AUDIO_FEATURE_STORAGE.md](/Users/woosungjo/music-space/my-forever-music/docs/api/PMS_TRACK_AUDIO_FEATURE_STORAGE.md) 를 구현 계약 관점에서 연결합니다.

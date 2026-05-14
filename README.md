@@ -131,7 +131,7 @@ my-forever-music/
 - `apps/web`는 `/gms-playlists` 화면에서 사용자에게 EMS 평가 플레이리스트 후보를 composite/affinity 점수와 6축 evidence 패널과 함께 카드로 노출하고, "Preview tracks" 모달에서 트랙 목록과 개별/전체 재생을 시청한 뒤 ConfirmDialog로 PMS 저장을 승인받음
 - `services/api`는 Phase 2 metadata normalization identity pipeline을 갖춤: MusicBrainz/Wikidata/Discogs lookup → `track_identity_candidate` accept/reject/auto-accept → 적용 시 실제 EMS/PMS track 행의 ISRC/MBID 갱신 + canonical track identity 연결, audit log 영속 저장, 주기적 apply scheduler까지 관리자 화면 `/recommendations/metadata-admin`에 노출
 - `services/api`는 MusicBrainz/Wikidata/Discogs candidate에 source별로 다르게 들어오던 raw score 대신, title/artist Jaccard 토큰 유사도 + 부분 문자열 보너스 + raw score blend로 계산한 normalized 0..1 `candidate_score`를 일관되게 부여함. 동일 auto-accept threshold(`>=0.95`)가 모든 source에서 같은 의미로 동작함
-- `services/api`의 canonical track promote 흐름은 Discogs candidate일 때 metadata의 year/country를 `canonical_track.release_year` / `release_country`(V34)에 함께 적재하고, 동일 canonical track이 이미 있고 release 필드가 비어 있으면 후속 promote에서 채움
+- `services/api`의 canonical track promote 흐름은 Discogs candidate일 때 metadata의 year/country를 `canonical_track.release_year` / `release_country`(V34)에 함께 적재하고, Discogs master/detail의 main release label을 `release_label`(V39)에 fill-if-null로 보강함
 - `services/api`의 SASRec auto-train 스케줄러는 매 tick마다 학습 모델의 Hit@K/MRR@K/nDCG@K 측정값과 recency baseline 비교값을 `sasrec_auto_train_log`(V35)에 함께 영속 기록함. `/recommendations/sasrec-admin`의 Auto-Train 결과 패널과 Other user lookup 패널이 SASRec/Baseline/Δ를 나란히 비교하는 표(개선 emerald, 회귀 rose 색)로 표시함
 - `services/api`는 RSS editorial source(Pitchfork, Stereogum, NME 등 12개 기본) → `services/ai` signal 추출 → Spotify/TIDAL seed → EMS pool 적재까지 한 번에 잇는 EMS acquisition pipeline을 제공함. 관리자 화면 `/ems/acquisition-admin`에서 run 트리거/모니터링이 가능하며 `collection_source='acquisition_pool'`로 본 테이블에 누적됨
 - `services/api`는 관리자 전용 `/recommendations/feature-coverage`로 PMS user library (audio feature/ISRC/playback target 보유율), EMS collected pool (source platform별 audio/ISRC/canonical link), learning signal (user event/recommendation snapshot 수) 커버리지를 한 화면에서 확인하게 함. EMS repository 없는 프로필에서는 degraded warning을 노출해 저장소 부재를 숨기지 않음
@@ -152,7 +152,7 @@ my-forever-music/
 아직 실제 provider 구현 전이라 사용자 플로우에 열지 않는 핵심 서비스 문서의 목표:
 
 - Spotify 장기 세션 운영 고도화와 refresh 실패 관측/운영 정책
-- TIDAL 실제 PMS provider 연동
+- TIDAL 실제 계정 E2E 회귀와 provider 운영 관측
 - YouTube Music 실제 PMS provider 연동
 - Apple Music 실제 PMS provider 연동은 개발자 계정 준비 후 진행
 - Last.fm scrobble 주기 동기화와 시계열 취향 변화 반영
@@ -164,14 +164,14 @@ my-forever-music/
 - EMS 외부 플레이리스트 수집, GMS 추천 통과, 사용자 평가의 PMS 환류
 - 페이지 이동 간 유지되는 공통 음악 플레이어의 행동 이벤트 저장
 
-## 다음 추천 작업
+## 1차 마감 작업
 
-1. MacBook 로컬에서 핵심 사용자 플로우를 끝까지 안정화
-2. Spotify OAuth, playlist import, PMS user library 영속 저장 안정화
-3. TIDAL 실제 플랫폼 provider 설계와 PMS import 검증
-4. YouTube Music 실제 플랫폼 provider 설계
-5. 사용자별 음악 학습 모델 개발
-6. 추천 결과 평가 저장과 사용자 제작 playlist 구현
+문서 정리, TIDAL PMS provider 오류 경계 보강, Discogs label enrichment, cold-start import 유도 UX는 반영했습니다.
+현재 추천 모델/EMS 데이터 풀을 실제 운영 가능한 1차 제품형 상태로 닫기 위해 남은 순서는 아래로 고정합니다.
+
+1. EMS acquisition 운영 확장 — source 품질, 주기 실행, skip/drift 운영값, 수집량 목표 관리
+
+이 항목 이후 전체 회귀 테스트, 실제 TIDAL 계정 import, EMS acquisition runbook을 한 번 더 실행하면 추천/EMS 1차 마감으로 본다.
 
 ## 로컬 데이터베이스 설정
 
