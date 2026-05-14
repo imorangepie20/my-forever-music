@@ -57,7 +57,8 @@ class FeatureCoverageAdminServiceTest {
             pmsUserLibraryStore,
             eventStore,
             snapshotStore,
-            Optional.of(emsTrackRepository)
+            Optional.of(emsTrackRepository),
+            new DriftSignalEvaluator()
         ).summarize("admin-user", "target-user");
 
         assertThat(report.status()).isEqualTo("ok");
@@ -97,7 +98,8 @@ class FeatureCoverageAdminServiceTest {
             pmsUserLibraryStore,
             eventStore,
             snapshotStore,
-            Optional.empty()
+            Optional.empty(),
+            new DriftSignalEvaluator()
         ).summarize("admin-user", null);
 
         assertThat(report.status()).isEqualTo("degraded");
@@ -115,7 +117,8 @@ class FeatureCoverageAdminServiceTest {
             mock(PmsUserLibraryStore.class),
             mock(UserMusicEventStore.class),
             mock(RecommendationSnapshotStore.class),
-            Optional.empty()
+            Optional.empty(),
+            new DriftSignalEvaluator()
         );
 
         assertThatThrownBy(() -> service.summarize("user-001", null))

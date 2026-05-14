@@ -24,19 +24,22 @@ public class FeatureCoverageAdminService {
     private final UserMusicEventStore eventStore;
     private final RecommendationSnapshotStore snapshotStore;
     private final Optional<EmsCollectedTrackRepository> emsTrackRepository;
+    private final DriftSignalEvaluator driftSignalEvaluator;
 
     public FeatureCoverageAdminService(
         AuthAccountStore authAccountStore,
         PmsUserLibraryStore pmsUserLibraryStore,
         UserMusicEventStore eventStore,
         RecommendationSnapshotStore snapshotStore,
-        Optional<EmsCollectedTrackRepository> emsTrackRepository
+        Optional<EmsCollectedTrackRepository> emsTrackRepository,
+        DriftSignalEvaluator driftSignalEvaluator
     ) {
         this.authAccountStore = authAccountStore;
         this.pmsUserLibraryStore = pmsUserLibraryStore;
         this.eventStore = eventStore;
         this.snapshotStore = snapshotStore;
         this.emsTrackRepository = emsTrackRepository;
+        this.driftSignalEvaluator = driftSignalEvaluator;
     }
 
     public FeatureCoverageReport summarize(String adminUserId, String targetUserId) {
@@ -56,14 +59,27 @@ public class FeatureCoverageAdminService {
         List<String> warnings = new ArrayList<>();
         warnings.addAll(emsCoverage.warnings());
 
-        return new FeatureCoverageReport(
+        FeatureCoverageReport draft = new FeatureCoverageReport(
             resolvedTargetUserId,
             Instant.now(),
             warnings.isEmpty() ? "ok" : "degraded",
             pmsCoverage,
             emsCoverage,
             learningCoverage,
-            warnings
+            warnings,
+            List.of()
+        );
+        List<DriftSignalEvaluator.DriftSignal> driftSignals = driftSignalEvaluator.evaluate(draft);
+        String status = warnings.isEmpty() && driftSignals.isEmpty() ? "ok" : "degraded";
+        return new FeatureCoverageReport(
+            draft.targetUserId(),
+            draft.generatedAt(),
+            status,
+            draft.pmsLibrary(),
+            draft.emsPool(),
+            draft.learningData(),
+            draft.warnings(),
+            driftSignals
         );
     }
 
@@ -190,7 +206,8 @@ public class FeatureCoverageAdminService {
         PmsLibraryCoverage pmsLibrary,
         EmsPoolCoverage emsPool,
         LearningDataCoverage learningData,
-        List<String> warnings
+        List<String> warnings,
+        List<DriftSignalEvaluator.DriftSignal> driftSignals
     ) {}
 
     public record PmsLibraryCoverage(

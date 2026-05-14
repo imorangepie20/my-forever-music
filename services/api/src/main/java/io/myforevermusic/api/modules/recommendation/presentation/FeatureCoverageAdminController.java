@@ -2,6 +2,7 @@ package io.myforevermusic.api.modules.recommendation.presentation;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import io.myforevermusic.api.modules.recommendation.application.DriftSignalEvaluator;
 import io.myforevermusic.api.modules.recommendation.application.FeatureCoverageAdminService;
 import io.myforevermusic.api.modules.recommendation.application.FeatureCoverageAdminService.EmsPoolCoverage;
 import io.myforevermusic.api.modules.recommendation.application.FeatureCoverageAdminService.EmsSourceCoverage;
@@ -43,7 +44,8 @@ public class FeatureCoverageAdminController {
         PmsLibraryCoverageItem pmsLibrary,
         EmsPoolCoverageItem emsPool,
         LearningDataCoverageItem learningData,
-        List<String> warnings
+        List<String> warnings,
+        List<DriftSignalItem> driftSignals
     ) {
         static FeatureCoverageAdminResponse from(FeatureCoverageAdminService.FeatureCoverageReport report) {
             return new FeatureCoverageAdminResponse(
@@ -54,7 +56,33 @@ public class FeatureCoverageAdminController {
                 PmsLibraryCoverageItem.from(report.pmsLibrary()),
                 EmsPoolCoverageItem.from(report.emsPool()),
                 LearningDataCoverageItem.from(report.learningData()),
-                report.warnings()
+                report.warnings(),
+                report.driftSignals() == null
+                    ? List.of()
+                    : report.driftSignals().stream().map(DriftSignalItem::from).toList()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record DriftSignalItem(
+        String category,
+        String severity,
+        String targetScope,
+        String message,
+        Double actualValue,
+        Double threshold,
+        long sampleSize
+    ) {
+        static DriftSignalItem from(DriftSignalEvaluator.DriftSignal signal) {
+            return new DriftSignalItem(
+                signal.category(),
+                signal.severity(),
+                signal.targetScope(),
+                signal.message(),
+                signal.actualValue(),
+                signal.threshold(),
+                signal.sampleSize()
             );
         }
     }

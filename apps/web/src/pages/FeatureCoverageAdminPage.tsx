@@ -172,6 +172,32 @@ const FeatureCoverageAdminPage = () => {
                         <span>{warning}</span>
                     </div>
                 ))}
+                {report?.drift_signals && report.drift_signals.length > 0 && (
+                    <div className="mt-5 space-y-2">
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-hud-text-muted">Drift signals</p>
+                        {report.drift_signals.map((signal) => {
+                            const isWarn = signal.severity === 'warn'
+                            const containerClass = isWarn
+                                ? 'border-amber-300/30 bg-amber-300/10 text-amber-100'
+                                : 'border-hud-border-secondary bg-hud-bg-primary/60 text-hud-text-secondary'
+                            return (
+                                <div
+                                    key={`${signal.category}-${signal.target_scope}`}
+                                    className={`flex items-start gap-3 rounded-xl border p-3 text-xs ${containerClass}`}
+                                >
+                                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                                    <div className="space-y-1">
+                                        <p>
+                                            <span className="font-semibold">[{signal.severity}]</span>{' '}
+                                            <span className="opacity-80">{signal.category} · {signal.target_scope}</span>
+                                        </p>
+                                        <p>{signal.message}</p>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
             </section>
 
             {report && totals && (

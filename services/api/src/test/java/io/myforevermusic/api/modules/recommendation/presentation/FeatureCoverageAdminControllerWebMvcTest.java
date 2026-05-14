@@ -81,6 +81,7 @@ class FeatureCoverageAdminControllerWebMvcTest {
                 List.of()
             ),
             new FeatureCoverageAdminService.LearningDataCoverage(21L, 5L, 1000),
+            List.of(),
             List.of()
         );
     }

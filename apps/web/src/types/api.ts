@@ -1211,6 +1211,16 @@ export interface FeatureCoverageLearningData {
     recent_recommendation_snapshot_limit: number
 }
 
+export interface FeatureCoverageDriftSignal {
+    category: string
+    severity: 'warn' | 'info' | string
+    target_scope: string
+    message: string
+    actual_value: number | null
+    threshold: number | null
+    sample_size: number
+}
+
 export interface FeatureCoverageAdminResponse {
     service: string
     status: string
@@ -1220,6 +1230,7 @@ export interface FeatureCoverageAdminResponse {
     ems_pool: FeatureCoverageEmsPool
     learning_data: FeatureCoverageLearningData
     warnings: string[]
+    drift_signals: FeatureCoverageDriftSignal[]
 }
 
 export interface RecommendationAuditLogItem {
