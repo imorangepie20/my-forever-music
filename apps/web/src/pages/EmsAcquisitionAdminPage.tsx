@@ -105,6 +105,42 @@ const EmsAcquisitionAdminPage = () => {
         }
     }, [runs])
 
+    const skipDrift = useMemo(() => {
+        const completedRuns = runs.filter((run) =>
+            run.status === 'completed' || run.status === 'completed_with_failures'
+        )
+        const totals = completedRuns.reduce(
+            (acc, run) => {
+                acc.articlesAttempted += run.article_count + run.skipped_article_count
+                acc.articlesSkipped += run.skipped_article_count
+                acc.seedsAttempted += run.seed_count + run.skipped_seed_count
+                acc.seedsSkipped += run.skipped_seed_count
+                return acc
+            },
+            { articlesAttempted: 0, articlesSkipped: 0, seedsAttempted: 0, seedsSkipped: 0 },
+        )
+        const totalAttempted = totals.articlesAttempted + totals.seedsAttempted
+        const totalSkipped = totals.articlesSkipped + totals.seedsSkipped
+        const skipRatio = totalAttempted === 0 ? 0 : totalSkipped / totalAttempted
+        let severity: 'ok' | 'warn' | 'critical' = 'ok'
+        if (skipRatio >= 0.8) {
+            severity = 'critical'
+        } else if (skipRatio >= 0.5) {
+            severity = 'warn'
+        }
+        return {
+            runsConsidered: completedRuns.length,
+            totalAttempted,
+            totalSkipped,
+            skipRatio,
+            articlesAttempted: totals.articlesAttempted,
+            articlesSkipped: totals.articlesSkipped,
+            seedsAttempted: totals.seedsAttempted,
+            seedsSkipped: totals.seedsSkipped,
+            severity,
+        }
+    }, [runs])
+
     useEffect(() => {
         if (session?.userId && !targetUserId) {
             setTargetUserId(session.userId)
@@ -465,6 +501,56 @@ const EmsAcquisitionAdminPage = () => {
                 )}
             </section>
 
+            <section className={`rounded-2xl border p-5 ${
+                skipDrift.severity === 'critical'
+                    ? 'border-rose-300/40 bg-rose-500/10'
+                    : skipDrift.severity === 'warn'
+                        ? 'border-amber-300/40 bg-amber-300/10'
+                        : 'border-hud-border-secondary bg-hud-bg-secondary/80'
+            }`}>
+                <div className="mb-4 flex items-center gap-2 text-sm font-medium text-hud-text-primary">
+                    <AlertTriangle size={18} className={
+                        skipDrift.severity === 'critical' ? 'text-rose-300'
+                            : skipDrift.severity === 'warn' ? 'text-amber-200'
+                                : 'text-hud-text-muted'
+                    } />
+                    Skip drift
+                    <span className={`ml-2 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] ${
+                        skipDrift.severity === 'critical'
+                            ? 'border-rose-300/40 bg-rose-500/10 text-rose-100'
+                            : skipDrift.severity === 'warn'
+                                ? 'border-amber-300/40 bg-amber-300/10 text-amber-100'
+                                : 'border-hud-border-secondary bg-hud-bg-primary text-hud-text-muted'
+                    }`}>
+                        {skipDrift.severity}
+                    </span>
+                </div>
+                {skipDrift.runsConsidered === 0 ? (
+                    <p className="rounded-lg border border-hud-border-secondary bg-hud-bg-primary/60 p-3 text-xs text-hud-text-muted">
+                        완료된 run이 아직 없습니다. 실행 후 다시 확인하세요.
+                    </p>
+                ) : (
+                    <>
+                        <div className="grid gap-3 sm:grid-cols-4">
+                            <Stat label="Skip ratio" value={`${(skipDrift.skipRatio * 100).toFixed(1)}%`} />
+                            <Stat label="Skipped (total)" value={skipDrift.totalSkipped} />
+                            <Stat label="Skipped articles" value={skipDrift.articlesSkipped} />
+                            <Stat label="Skipped seeds" value={skipDrift.seedsSkipped} />
+                        </div>
+                        <p className="mt-3 text-xs text-hud-text-secondary">
+                            최근 {skipDrift.runsConsidered}개 완료 run 기준 ·
+                            attempts: {skipDrift.totalAttempted} (articles {skipDrift.articlesAttempted} + seeds {skipDrift.seedsAttempted})
+                        </p>
+                        {skipDrift.severity !== 'ok' && (
+                            <p className="mt-2 text-xs text-hud-text-primary">
+                                skip ratio가 임계치({skipDrift.severity === 'critical' ? '80%' : '50%'})를 초과했습니다.
+                                source 품질, AI signal cutoff, dedupe 기준을 점검하세요.
+                            </p>
+                        )}
+                    </>
+                )}
+            </section>
+
             <section className="rounded-2xl border border-hud-border-secondary bg-hud-bg-secondary/80 p-5">
                 <div className="mb-4 flex items-center gap-2 text-sm font-medium text-hud-text-primary">
                     <RefreshCw size={18} />
@@ -538,7 +624,7 @@ const NumberInput = ({
     </label>
 )
 
-const Stat = ({ label, value }: { label: string; value: number }) => (
+const Stat = ({ label, value }: { label: string; value: number | string }) => (
     <div className="rounded-xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
         <p className="text-xs uppercase tracking-[0.16em] text-hud-text-muted">{label}</p>
         <p className="mt-2 text-2xl font-semibold text-hud-text-primary">{value}</p>
