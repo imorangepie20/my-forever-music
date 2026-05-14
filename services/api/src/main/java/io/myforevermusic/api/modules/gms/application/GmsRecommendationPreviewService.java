@@ -15,7 +15,9 @@ import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityE
 import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluator;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationAuditLogStore;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationAxisEvidenceBuilder;
+import io.myforevermusic.api.modules.recommendation.application.RecommendationReranker;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationSnapshotService;
+import io.myforevermusic.api.modules.recommendation.application.UserPersonalizationProfileStore;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -41,6 +43,8 @@ public class GmsRecommendationPreviewService {
     private final RecommendationSnapshotService recommendationSnapshotService;
     private final RecommendationAuditLogStore recommendationAuditLogStore;
     private final PlaylistQualityEvaluator playlistQualityEvaluator;
+    private final UserPersonalizationProfileStore userPersonalizationProfileStore;
+    private final RecommendationReranker recommendationReranker;
 
     public GmsRecommendationPreviewService(
         AiRecommendationPreviewClient aiRecommendationPreviewClient,
@@ -51,7 +55,9 @@ public class GmsRecommendationPreviewService {
         Optional<LastFmWebApiClient> lastFmWebApiClient,
         RecommendationSnapshotService recommendationSnapshotService,
         RecommendationAuditLogStore recommendationAuditLogStore,
-        PlaylistQualityEvaluator playlistQualityEvaluator
+        PlaylistQualityEvaluator playlistQualityEvaluator,
+        UserPersonalizationProfileStore userPersonalizationProfileStore,
+        RecommendationReranker recommendationReranker
     ) {
         this.aiRecommendationPreviewClient = aiRecommendationPreviewClient;
         this.aiSasrecRankingClient = aiSasrecRankingClient;
@@ -62,6 +68,8 @@ public class GmsRecommendationPreviewService {
         this.recommendationSnapshotService = recommendationSnapshotService;
         this.recommendationAuditLogStore = recommendationAuditLogStore;
         this.playlistQualityEvaluator = playlistQualityEvaluator;
+        this.userPersonalizationProfileStore = userPersonalizationProfileStore;
+        this.recommendationReranker = recommendationReranker;
     }
 
     public GmsRecommendationPreviewResponse previewRecommendations(GmsRecommendationPreviewRequest request) {
@@ -99,6 +107,7 @@ public class GmsRecommendationPreviewService {
                 playableItems,
                 response.warnings()
             );
+            finalResponse = applyPersonalizationRerank(finalResponse, enrichedRequest);
             finalResponse = withAxisEvidence(finalResponse, enrichedRequest);
             recommendationSnapshotService.recordGmsPreview(enrichedRequest, finalResponse);
             recordPreviewAudit(enrichedRequest, finalResponse);
@@ -118,10 +127,54 @@ public class GmsRecommendationPreviewService {
             playableItems.isEmpty() ? response.items() : playableItems,
             List.copyOf(mergedWarnings)
         );
+        finalResponse = applyPersonalizationRerank(finalResponse, enrichedRequest);
         finalResponse = withAxisEvidence(finalResponse, enrichedRequest);
         recommendationSnapshotService.recordGmsPreview(enrichedRequest, finalResponse);
         recordPreviewAudit(enrichedRequest, finalResponse);
         return finalResponse;
+    }
+
+    /**
+     * Phase 5 sub-item 2: 사용자 personalization 프로필이 있으면 그 신호로 후보 순서를 재정렬한다.
+     * 프로필이 없거나 비어 있으면 입력을 그대로 돌려준다.
+     */
+    private GmsRecommendationPreviewResponse applyPersonalizationRerank(
+        GmsRecommendationPreviewResponse response,
+        GmsRecommendationPreviewRequest request
+    ) {
+        if (response.items() == null || response.items().isEmpty()) {
+            return response;
+        }
+        String userId = request.userId();
+        if (userId == null || userId.isBlank()) {
+            return response;
+        }
+        return userPersonalizationProfileStore.findByUserId(userId)
+            .map(profile -> {
+                RecommendationReranker.RerankResult result =
+                    recommendationReranker.rerank(response.items(), profile);
+                if (!result.orderChanged() && result.matchedCount() == 0) {
+                    return response;
+                }
+                List<String> mergedWarnings = new ArrayList<>(response.warnings());
+                mergedWarnings.add(
+                    "Session reranked %d candidate(s) via personalization profile (order_changed=%s).".formatted(
+                        result.matchedCount(),
+                        result.orderChanged()
+                    )
+                );
+                return new GmsRecommendationPreviewResponse(
+                    response.requestId(),
+                    response.generatedAt(),
+                    response.service(),
+                    response.status(),
+                    response.context(),
+                    response.inputSummary(),
+                    result.items(),
+                    List.copyOf(mergedWarnings)
+                );
+            })
+            .orElse(response);
     }
 
     private void recordPreviewAudit(
