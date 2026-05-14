@@ -17,6 +17,7 @@ import io.myforevermusic.api.modules.platform.infrastructure.local.InMemoryLastF
 import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
+import io.myforevermusic.api.modules.recommendation.application.ColdStartFallbackService;
 import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluator;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationReranker;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationSnapshotService;
@@ -61,7 +62,8 @@ class GmsRecommendationPreviewServiceTest {
             new InMemoryRecommendationAuditLogStore(),
             new PlaylistQualityEvaluator(),
             new InMemoryUserPersonalizationProfileStore(),
-            new RecommendationReranker()
+            new RecommendationReranker(),
+            new ColdStartFallbackService(authAccountStore, new InMemoryPmsUserLibraryStore(), Optional.empty())
         );
 
         GmsRecommendationPreviewResponse response = service.previewRecommendations(
@@ -159,7 +161,8 @@ class GmsRecommendationPreviewServiceTest {
             new InMemoryRecommendationAuditLogStore(),
             new PlaylistQualityEvaluator(),
             new InMemoryUserPersonalizationProfileStore(),
-            new RecommendationReranker()
+            new RecommendationReranker(),
+            new ColdStartFallbackService(authAccountStore, new InMemoryPmsUserLibraryStore(), Optional.empty())
         );
 
         GmsRecommendationPreviewResponse response = service.previewRecommendations(
@@ -202,7 +205,8 @@ class GmsRecommendationPreviewServiceTest {
             auditLogStore,
             new PlaylistQualityEvaluator(),
             new InMemoryUserPersonalizationProfileStore(),
-            new RecommendationReranker()
+            new RecommendationReranker(),
+            new ColdStartFallbackService(authAccountStore, new InMemoryPmsUserLibraryStore(), Optional.empty())
         );
 
         GmsRecommendationPreviewResponse response = service.previewRecommendations(
@@ -251,7 +255,8 @@ class GmsRecommendationPreviewServiceTest {
             new InMemoryRecommendationAuditLogStore(),
             new PlaylistQualityEvaluator(),
             new InMemoryUserPersonalizationProfileStore(),
-            new RecommendationReranker()
+            new RecommendationReranker(),
+            new ColdStartFallbackService(authAccountStore, new InMemoryPmsUserLibraryStore(), Optional.empty())
         );
 
         GmsRecommendationPreviewResponse response = service.previewRecommendations(

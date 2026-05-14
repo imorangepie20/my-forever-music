@@ -11,6 +11,7 @@ import io.myforevermusic.api.modules.platform.infrastructure.lastfm.LastFmWebApi
 import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
 import io.myforevermusic.api.modules.recommendation.application.AxisEvidence;
+import io.myforevermusic.api.modules.recommendation.application.ColdStartFallbackService;
 import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluation;
 import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluator;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationAuditLogStore;
@@ -45,6 +46,7 @@ public class GmsRecommendationPreviewService {
     private final PlaylistQualityEvaluator playlistQualityEvaluator;
     private final UserPersonalizationProfileStore userPersonalizationProfileStore;
     private final RecommendationReranker recommendationReranker;
+    private final ColdStartFallbackService coldStartFallbackService;
 
     public GmsRecommendationPreviewService(
         AiRecommendationPreviewClient aiRecommendationPreviewClient,
@@ -57,7 +59,8 @@ public class GmsRecommendationPreviewService {
         RecommendationAuditLogStore recommendationAuditLogStore,
         PlaylistQualityEvaluator playlistQualityEvaluator,
         UserPersonalizationProfileStore userPersonalizationProfileStore,
-        RecommendationReranker recommendationReranker
+        RecommendationReranker recommendationReranker,
+        ColdStartFallbackService coldStartFallbackService
     ) {
         this.aiRecommendationPreviewClient = aiRecommendationPreviewClient;
         this.aiSasrecRankingClient = aiSasrecRankingClient;
@@ -70,6 +73,7 @@ public class GmsRecommendationPreviewService {
         this.playlistQualityEvaluator = playlistQualityEvaluator;
         this.userPersonalizationProfileStore = userPersonalizationProfileStore;
         this.recommendationReranker = recommendationReranker;
+        this.coldStartFallbackService = coldStartFallbackService;
     }
 
     public GmsRecommendationPreviewResponse previewRecommendations(GmsRecommendationPreviewRequest request) {
@@ -83,13 +87,28 @@ public class GmsRecommendationPreviewService {
             enrichmentWarnings,
             appliedSasrecModelVersions
         );
+        boolean coldStartFallbackUsed = false;
         if ((response.items() != null && !response.items().isEmpty()) && playableItems.isEmpty()) {
-            throw new IllegalArgumentException(
-                "GMS recommendations require imported PMS user library tracks. Import a real playlist before requesting recommendations."
-            );
+            if (coldStartFallbackService.isColdStart(enrichedRequest.userId())) {
+                List<GmsRecommendationPreviewResponse.RecommendationItem> fallback =
+                    coldStartFallbackService.fallbackItems(enrichedRequest.userId(), enrichedRequest.limit());
+                if (!fallback.isEmpty()) {
+                    playableItems = renumberRanks(fallback);
+                    coldStartFallbackUsed = true;
+                    enrichmentWarnings.add(
+                        "Cold-start fallback applied: showing %d EMS pool track(s) because the user has no imported PMS library yet."
+                            .formatted(playableItems.size())
+                    );
+                }
+            }
+            if (!coldStartFallbackUsed) {
+                throw new IllegalArgumentException(
+                    "GMS recommendations require imported PMS user library tracks. Import a real playlist before requesting recommendations."
+                );
+            }
         }
 
-        if (!playableItems.isEmpty()) {
+        if (!playableItems.isEmpty() && !coldStartFallbackUsed) {
             enrichmentWarnings.add(
                 "GMS preview items were resolved against the PMS user library so they can be played inside the rebuild shell."
             );
@@ -132,6 +151,42 @@ public class GmsRecommendationPreviewService {
         recommendationSnapshotService.recordGmsPreview(enrichedRequest, finalResponse);
         recordPreviewAudit(enrichedRequest, finalResponse);
         return finalResponse;
+    }
+
+    /**
+     * Cold-start fallback 으로 주어진 EMS-backed item 들에 1..N rank 를 재부여한다.
+     * (원본은 rank=null 인 placeholder 상태이고, 후속 axis evidence/snapshot 이 rank 를 기대함.)
+     */
+    private List<GmsRecommendationPreviewResponse.RecommendationItem> renumberRanks(
+        List<GmsRecommendationPreviewResponse.RecommendationItem> items
+    ) {
+        List<GmsRecommendationPreviewResponse.RecommendationItem> result = new ArrayList<>(items.size());
+        for (int index = 0; index < items.size(); index++) {
+            GmsRecommendationPreviewResponse.RecommendationItem item = items.get(index);
+            result.add(new GmsRecommendationPreviewResponse.RecommendationItem(
+                index + 1,
+                item.trackId(),
+                item.title(),
+                item.artistName(),
+                item.sourcePlatform(),
+                item.sourcePlaylistId(),
+                item.sourcePlaylistTitle(),
+                item.albumTitle(),
+                item.albumImageUrl(),
+                item.platformExternalUrl(),
+                item.platformUri(),
+                item.previewUrl(),
+                item.spotifyTrackId(),
+                item.audioFeatureTrackId(),
+                item.durationMs(),
+                item.score(),
+                item.sourceSpace(),
+                item.energyLevel(),
+                item.reason(),
+                item.axisEvidence()
+            ));
+        }
+        return result;
     }
 
     /**
@@ -186,6 +241,7 @@ public class GmsRecommendationPreviewService {
         }
         int itemCount = response.items() == null ? 0 : response.items().size();
         boolean sasrecApplied = hasSasrecModel(response);
+        String fallbackReason = resolveFallbackReason(response, sasrecApplied);
         recommendationAuditLogStore.save(new RecommendationAuditLogStore.AuditDraft(
             request.userId(),
             response.requestId(),
@@ -197,12 +253,23 @@ public class GmsRecommendationPreviewService {
             null,
             itemCount,
             sasrecApplied,
-            sasrecApplied ? null : "sasrec_not_applied",
+            fallbackReason,
             null,
             null,
             request.playlistId(),
             response.generatedAt() == null ? Instant.now() : response.generatedAt()
         ));
+    }
+
+    private String resolveFallbackReason(GmsRecommendationPreviewResponse response, boolean sasrecApplied) {
+        if (response.warnings() != null) {
+            for (String warning : response.warnings()) {
+                if (warning != null && warning.startsWith("Cold-start fallback applied:")) {
+                    return "cold_start_pms_empty";
+                }
+            }
+        }
+        return sasrecApplied ? null : "sasrec_not_applied";
     }
 
     private String resolveAuditModelVersion(GmsRecommendationPreviewResponse response) {
