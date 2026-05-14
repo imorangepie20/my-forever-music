@@ -1428,6 +1428,7 @@ export interface SasrecAutoTrainAdminResponse {
     service: string
     status: string
     generated_at: string
+    user_id: string
     qualified: boolean
     promoted: boolean
     model_version: string | null

@@ -509,11 +509,16 @@ export const rollbackSasrecModelForAdmin = (userId: string) =>
         { method: 'POST' },
     )
 
-export const autoTrainSasrecForAdmin = (userId: string) =>
-    requestJson<SasrecAutoTrainAdminResponse>(
-        `/api/v1/recommendations/admin/sasrec/models/auto-train?user_id=${encodeURIComponent(userId)}`,
+export const autoTrainSasrecForAdmin = (userId: string, targetUserId?: string) => {
+    const params = new URLSearchParams({ user_id: userId })
+    if (targetUserId?.trim()) {
+        params.set('target_user_id', targetUserId.trim())
+    }
+    return requestJson<SasrecAutoTrainAdminResponse>(
+        `/api/v1/recommendations/admin/sasrec/models/auto-train?${params.toString()}`,
         { method: 'POST' },
     )
+}
 
 export const fetchSasrecUserStatusForAdmin = (userId: string, targetUserId: string, signal?: AbortSignal) =>
     requestJson<SasrecUserModelStatusResponse>(

@@ -8,7 +8,6 @@ import io.myforevermusic.api.modules.recommendation.infrastructure.ai.AiSasrecTr
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -32,7 +31,7 @@ public class SasrecModelRegistryAdminService {
         PmsUserLibraryStore pmsUserLibraryStore,
         UserMusicEventStore eventStore,
         SasrecAutoTrainLogStore trainLogStore,
-        @Lazy RecommendationModelTrainingService trainingService
+        RecommendationModelTrainingService trainingService
     ) {
         this.registryClient = registryClient;
         this.authAccountStore = authAccountStore;
@@ -74,8 +73,21 @@ public class SasrecModelRegistryAdminService {
         Integer snapshotLimit,
         AiSasrecTrainingClient.SasrecTrainingOptions trainingOptions
     ) {
+        return autoTrainAndPromote(adminUserId, adminUserId, eventLimit, snapshotLimit, trainingOptions);
+    }
+
+    public RecommendationModelTrainingService.AutoTrainResult autoTrainAndPromote(
+        String adminUserId,
+        String targetUserId,
+        Integer eventLimit,
+        Integer snapshotLimit,
+        AiSasrecTrainingClient.SasrecTrainingOptions trainingOptions
+    ) {
         assertAdmin(adminUserId);
-        return trainingService.autoTrainAndPromote(adminUserId, eventLimit, snapshotLimit, trainingOptions);
+        String resolvedTargetUserId = targetUserId == null || targetUserId.isBlank()
+            ? adminUserId
+            : targetUserId.trim();
+        return trainingService.autoTrainAndPromote(resolvedTargetUserId, eventLimit, snapshotLimit, trainingOptions);
     }
 
     public UserModelStatus getUserModelStatus(String adminUserId, String targetUserId) {

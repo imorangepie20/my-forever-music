@@ -37,7 +37,7 @@ public class SasrecAutoTrainScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(SasrecAutoTrainScheduler.class);
 
-    private final SasrecModelRegistryAdminService adminService;
+    private final RecommendationModelTrainingService trainingService;
     private final UserMusicEventStore eventStore;
     private final SasrecAutoTrainLogStore trainLogStore;
 
@@ -78,11 +78,11 @@ public class SasrecAutoTrainScheduler {
     private double learningRate;
 
     public SasrecAutoTrainScheduler(
-        SasrecModelRegistryAdminService adminService,
+        RecommendationModelTrainingService trainingService,
         UserMusicEventStore eventStore,
         SasrecAutoTrainLogStore trainLogStore
     ) {
-        this.adminService = adminService;
+        this.trainingService = trainingService;
         this.eventStore = eventStore;
         this.trainLogStore = trainLogStore;
     }
@@ -107,7 +107,7 @@ public class SasrecAutoTrainScheduler {
                 if (!shouldTrain(targetUserId)) {
                     continue;
                 }
-                RecommendationModelTrainingService.AutoTrainResult result = adminService.autoTrainAndPromote(
+                RecommendationModelTrainingService.AutoTrainResult result = trainingService.autoTrainAndPromote(
                     targetUserId,
                     eventLimit > 0 ? eventLimit : null,
                     snapshotLimit > 0 ? snapshotLimit : null,

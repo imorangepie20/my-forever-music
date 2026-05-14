@@ -69,6 +69,7 @@ public class SasrecModelRegistryAdminController {
     @PostMapping("/auto-train")
     public SasrecAutoTrainAdminResponse autoTrain(
         @RequestParam("user_id") String userId,
+        @RequestParam(value = "target_user_id", required = false) String targetUserId,
         @RequestParam(value = "event_limit", required = false) Integer eventLimit,
         @RequestParam(value = "snapshot_limit", required = false) Integer snapshotLimit,
         @RequestParam(value = "max_context_length", defaultValue = "32") int maxContextLength,
@@ -88,6 +89,7 @@ public class SasrecModelRegistryAdminController {
         );
         RecommendationModelTrainingService.AutoTrainResult result = adminService.autoTrainAndPromote(
             userId,
+            targetUserId,
             eventLimit,
             snapshotLimit,
             options
@@ -205,6 +207,7 @@ public class SasrecModelRegistryAdminController {
         String service,
         String status,
         Instant generatedAt,
+        String userId,
         boolean qualified,
         boolean promoted,
         String modelVersion,
@@ -220,6 +223,7 @@ public class SasrecModelRegistryAdminController {
                 "api",
                 "ok",
                 Instant.now(),
+                result.training().userId(),
                 result.qualified(),
                 promoteResult != null,
                 result.training().modelVersion(),

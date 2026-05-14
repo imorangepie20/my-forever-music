@@ -211,6 +211,12 @@ AI_SASREC_MODEL_VERSION=sasrec-your-model-version \
 curl -X POST "http://localhost:8081/api/v1/recommendations/datasets/users/{userId}/sasrec/train?event_limit=300&snapshot_limit=200&epochs=30&persist_artifact=true"
 ```
 
+관리자 계정으로 다른 사용자 모델을 학습/promote 하려면 admin endpoint에 `target_user_id`를 함께 넘긴다.
+
+```bash
+curl -X POST "http://localhost:8081/api/v1/recommendations/admin/sasrec/models/auto-train?user_id={adminUserId}&target_user_id={targetUserId}&event_limit=300&snapshot_limit=200&epochs=30&persist_artifact=true"
+```
+
 PostgreSQL을 붙여 PMS bootstrap을 DB 기반으로 확인하려면:
 
 ```bash

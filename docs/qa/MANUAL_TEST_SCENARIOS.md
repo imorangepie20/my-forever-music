@@ -87,6 +87,11 @@
    - 결과 카드에 qualified / promoted / Hit@K Δ + model_version 노출
    - qualified=true 면 Active Model 카드가 새 model 로 자동 promote
    - qualified=false 면 reason 표시, promote 안 됨
+4. 다른 사용자를 검증하려면 Other user lookup 에 target `user_id` 입력 → **Train Target** → ConfirmDialog
+5. 검증:
+   - 결과 카드 `User` 가 target user 로 표시됨
+   - target user lookup 의 `Latest train` / metric table 이 갱신됨
+   - admin Active Model 카드는 target user 학습만으로 바뀌지 않음
 
 ## 시나리오 9 — SASRec Auto-Train scheduler (DB 영속)
 
@@ -106,6 +111,7 @@ app:
 
 1. 설정 후 API 재시작
 2. 약 30초 후 첫 tick — API 로그에 `SASRec auto-train tick user=... qualified=... summary=...`
+   - `user-id` 를 비우면 최근 활성 일반 사용자도 target 으로 학습 가능해야 함
 3. DB 활성 프로필이면 `sasrec_auto_train_log` 에 row 1개 이상 (`trained_at`, `event_count_at_train`, `qualified`, `promoted`)
 4. 5분 후 다음 tick — 새 event 가 50개 미만이면 `skip user=... (delta=... < threshold=50)` 로그
 5. **재시작 후 드리프트 유지**: API 재시작 → 또 30초 후 tick → 새 row 가 안 생기거나 skip 출력 (DB store 기반 직전 학습 시점 인식)

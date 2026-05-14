@@ -36,7 +36,7 @@ type PendingAction =
     | { kind: 'promote'; modelVersion: string }
     | { kind: 'disable'; modelVersion: string }
     | { kind: 'rollback' }
-    | { kind: 'autoTrain' }
+    | { kind: 'autoTrain'; targetUserId?: string }
 
 const SasrecModelAdminPage = () => {
     const { session } = useAuthSession()
@@ -89,13 +89,19 @@ const SasrecModelAdminPage = () => {
         setNotice(null)
         try {
             if (pendingAction.kind === 'autoTrain') {
-                const result = await autoTrainSasrecForAdmin(session.userId)
+                const targetUserId = pendingAction.targetUserId?.trim()
+                const result = await autoTrainSasrecForAdmin(session.userId, targetUserId)
                 setAutoTrainResult(result)
                 setNotice(result.summary)
-                if (result.promote_result) {
-                    setRegistry(result.promote_result)
-                } else {
-                    await load()
+                if (!targetUserId || targetUserId === session.userId) {
+                    if (result.promote_result) {
+                        setRegistry(result.promote_result)
+                    } else {
+                        await load()
+                    }
+                } else if (userLookupInput.trim() === targetUserId) {
+                    const response = await fetchSasrecUserStatusForAdmin(session.userId, targetUserId)
+                    setUserLookupResult(response)
                 }
                 setPendingAction(null)
                 return
@@ -185,7 +191,8 @@ const SasrecModelAdminPage = () => {
             return `${pendingAction.modelVersion}을 disable 합니다.\nactive 였다면 직전 history 항목으로 자동 교체됩니다.`
         }
         if (pendingAction.kind === 'autoTrain') {
-            return '관리자 계정 기준 SASRec MVP 학습을 한 번 실행하고, qualification=true 이면 자동으로 active model 로 promote 합니다.\n학습 시간이 30초~몇 분 소요될 수 있습니다.'
+            const target = pendingAction.targetUserId?.trim()
+            return `${target ? target : '관리자 계정'} 기준 SASRec MVP 학습을 한 번 실행하고, qualification=true 이면 해당 사용자의 active model 로 promote 합니다.\n학습 시간이 30초~몇 분 소요될 수 있습니다.`
         }
         return 'rollback history의 가장 최근 항목을 active로 되돌립니다.\nhistory가 비어 있으면 실패합니다.'
     }
@@ -345,6 +352,11 @@ const SasrecModelAdminPage = () => {
                     </p>
                     <dl className="mt-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-3">
                         <Field
+                            label="User"
+                            value={autoTrainResult.user_id}
+                            multiline
+                        />
+                        <Field
                             label="Qualified"
                             value={autoTrainResult.qualified ? 'yes' : 'no'}
                         />
@@ -401,6 +413,15 @@ const SasrecModelAdminPage = () => {
                     >
                         <Search size={16} />
                         Lookup
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setPendingAction({ kind: 'autoTrain', targetUserId: userLookupInput.trim() })}
+                        disabled={busy || !userLookupInput.trim()}
+                    >
+                        <Sparkles size={16} />
+                        Train Target
                     </Button>
                 </div>
                 {userLookupError && (
