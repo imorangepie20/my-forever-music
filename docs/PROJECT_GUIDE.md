@@ -137,10 +137,12 @@ docs/
 
 ### 1차 마감: 추천 모델 / EMS 데이터 풀 운영 완성
 
-현재는 Spotify/TIDAL 기반 PMS import, 추천 event/snapshot, SASRec 학습/registry, GMS feedback, feature coverage/drift, EMS acquisition 1차 흐름이 들어간 상태입니다.
-문서 정리, TIDAL PMS provider 오류 경계 보강, Discogs label enrichment, cold-start import 유도 UX는 반영했습니다. 남은 작업은 새 기능 확장이 아니라 추천/EMS 1차 제품형 마감에 필요한 아래 항목입니다.
+현재는 Spotify/TIDAL 기반 PMS import, 추천 event/snapshot, SASRec 학습/registry, GMS feedback, feature coverage/drift, EMS acquisition 1차 흐름과 운영 확장까지 들어간 상태입니다.
+문서 정리, TIDAL PMS provider 오류 경계 보강, Discogs label enrichment, cold-start import 유도 UX, EMS acquisition source 품질/스케줄러/skip drift/source preset은 반영했습니다. 남은 작업은 새 기능 확장이 아니라 추천/EMS 1차 제품형 마감 검증입니다.
 
-1. EMS acquisition 운영 확장 — source 품질, 주기 실행, skip/drift 운영값, 수집량 목표 관리
+1. API/Web 전체 회귀 테스트
+2. 실제 TIDAL 계정 import 회귀
+3. EMS acquisition runbook 재실행, 가능하면 `editorial-expanded` preset 포함
 
 ### 보류: YouTube Music & Apple Music
 
@@ -236,6 +238,8 @@ docs/
 - `apps/web`의 `/ems/acquisition-admin` 운영 가시성: 각 run 카드에 `scheduled`/`manual` trigger 배지 + `message`/`last_error` 줄이 노출되어 운영자가 한눈에 skip 사유를 확인 가능. 별도 Scheduler 패널이 최근 기록 기준 scheduled/manual 횟수, skipped scheduled 횟수, 마지막 scheduled 실행 시각 + 메시지를 보여주고, scheduled 기록이 0이면 `app.ems.acquisition.user-id` 미설정 또는 scheduler disabled 여부 점검 가이드를 노출함
 - `services/api`는 `GET /api/v1/ems/acquisition/source-quality?days=N`(기본 14일, 최대 90일)로 `ems_acquisition_signal`을 source별로 집계해 signal_count / avg_confidence / last_signal_at을 반환함. `/ems/acquisition-admin`의 Source quality 표가 lookback 입력 + Reload 버튼과 함께 이를 표시해 운영자가 활발한 source와 산출이 막힌 source를 한눈에 식별할 수 있음. status fetch 시점에 함께 가져오고, lookback 변경 시 Reload로 단독 재조회 가능함
 - `apps/web`의 `/ems/acquisition-admin`은 `completed`/`completed_with_failures` runs를 합산해 (`skipped_article_count` + `skipped_seed_count`) / (signals + seeds + skips) 비율을 별도 Skip drift 패널로 노출함. severity는 warn ≥50%, critical ≥80% (frontend-only) — backend `DriftSignalEvaluator`의 `ems_acquisition_skips` 신호(`/recommendations/feature-coverage`에서 노출)와 같은 데이터 기반이지만, 운영자가 acquisition admin 페이지를 떠나지 않고도 빠르게 확인할 수 있게 함
+- `services/api`는 `GET /api/v1/ems/acquisition/source-presets`와 `POST /api/v1/ems/acquisition/run`의 `source_preset` 옵션을 제공함. `editorial-expanded` preset은 기본 source보다 큰 editorial RSS 묶음과 `max_articles_per_source=25`, `max_signals_per_run=120`, `per_seed_limit=10`을 함께 제공해 EMS pool 확대 run을 빠르게 실행할 수 있음
+- `apps/web`의 `/ems/acquisition-admin`은 Source preset selector와 Collection target 계산(Sources/Articles/Signals/Seed queries/Track cap)을 제공해 운영자가 수집량 목표를 확인하고 실행값을 조정할 수 있음
 - 현재 구현은 아직 `핵심 서비스 문서`의 전체 범위가 아니라, 그중 `PMS / EMS / GMS` 추천 흐름의 최소 검증 버전임
 
 ## 9. 참고 메모

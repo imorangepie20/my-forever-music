@@ -137,6 +137,8 @@ my-forever-music/
 - `apps/web`의 `/ems/acquisition-admin`은 scheduler 운영 상태를 surface함. 각 run 카드에 `scheduled`/`manual` trigger 배지와 message/last_error가 표시되고, 별도 Scheduler 패널이 최근 기록의 scheduled vs manual 횟수, skipped scheduled 횟수, 마지막 scheduled 실행 시각 + 메시지를 한눈에 보여줌. scheduled 기록이 0이면 `app.ems.acquisition.user-id` 누락/disabled 여부 확인 가이드를 노출함
 - `services/api`는 `GET /api/v1/ems/acquisition/source-quality?days=N` 엔드포인트로 최근 N일(기본 14일) 동안 source별 signal 수, 평균 confidence, 마지막 signal 시각을 집계해 반환함. `/ems/acquisition-admin`의 Source quality 표가 lookback 입력과 함께 노출되어 운영자가 어떤 RSS source가 활발하고 어떤 source가 산출이 막혔는지 한눈에 판단함
 - `apps/web`의 `/ems/acquisition-admin`은 완료된 최근 runs를 합산해 skip ratio (skipped articles + skipped seeds / total attempts)를 계산해 별도 Skip drift 패널로 표시함. 임계치(warn ≥50%, critical ≥80%)에 따라 패널 색이 amber/rose로 바뀌고 source 품질·AI cutoff·dedupe 기준 점검 가이드를 노출함
+- `services/api`는 `GET /api/v1/ems/acquisition/source-presets`와 `source_preset` 실행 옵션을 제공함. 기본 configured source 외에 `editorial-expanded` preset이 더 많은 editorial RSS source와 큰 run limit을 묶어 EMS pool 확대 실행에 사용됨
+- `apps/web`의 `/ems/acquisition-admin`은 source preset 선택과 collection target(Sources/Articles/Signals/Seed queries/Track cap) 계산을 제공해 운영자가 수집량 목표를 보고 실행값을 조정할 수 있음
 - `services/api`는 관리자 전용 `/recommendations/feature-coverage`로 PMS user library (audio feature/ISRC/playback target 보유율), EMS collected pool (source platform별 audio/ISRC/canonical link), learning signal (user event/recommendation snapshot 수) 커버리지를 한 화면에서 확인하게 함. EMS repository 없는 프로필에서는 degraded warning을 노출해 저장소 부재를 숨기지 않음
 - `services/api`는 feature coverage 응답에 drift signal 목록(`category`/`severity`/`target_scope`/`message`)을 함께 반환함. PMS audio/playback/ISRC, EMS source별 audio/ISRC/canonical link, learning event 수가 설정 임계치 미달이면 자동으로 신호를 생성하며, 임계치는 `app.recommendation.drift.*` 속성으로 운영자가 튜닝 가능함. `/recommendations/feature-coverage` 페이지가 신호를 status banner로 노출 (warn 호박색, info 회색)
 - `services/api`는 사용자별 가벼운 개인화 프로필을 `user_personalization_profile`(V38)에 영속 저장함. 최근 user_music_event 를 행동 별 가중치(저장/추가/반복 +1.5, like +1.0, 완청 +0.7, 미드스톱 -0.3, 조기스킵 -0.5, 거부 -1.0)로 집계해 top artist / top source platform 신호로 변환. 관리자 전용 `GET/POST /api/v1/recommendations/admin/personalization-profile[/recompute]` endpoint와 `/recommendations/sasrec-admin` Other user lookup 패널의 "Personalization Profile" 섹션에서 조회/재계산 가능. Phase 5의 fast-path 신호 기반으로, 후속 reranker가 이 프로필을 입력으로 사용
@@ -170,12 +172,12 @@ my-forever-music/
 
 ## 1차 마감 작업
 
-문서 정리, TIDAL PMS provider 오류 경계 보강, Discogs label enrichment, cold-start import 유도 UX는 반영했습니다.
-현재 추천 모델/EMS 데이터 풀을 실제 운영 가능한 1차 제품형 상태로 닫기 위해 남은 순서는 아래로 고정합니다.
+문서 정리, TIDAL PMS provider 오류 경계 보강, Discogs label enrichment, cold-start import 유도 UX, EMS acquisition 운영 확장까지 반영했습니다.
+이제 남은 것은 새 기능 구현이 아니라 최종 검증입니다.
 
-1. EMS acquisition 운영 확장 — source 품질, 주기 실행, skip/drift 운영값, 수집량 목표 관리
-
-이 항목 이후 전체 회귀 테스트, 실제 TIDAL 계정 import, EMS acquisition runbook을 한 번 더 실행하면 추천/EMS 1차 마감으로 본다.
+1. API/Web 전체 회귀 테스트
+2. 실제 TIDAL 계정 import 회귀
+3. EMS acquisition runbook 재실행, 가능하면 `editorial-expanded` preset 포함
 
 ## 로컬 데이터베이스 설정
 

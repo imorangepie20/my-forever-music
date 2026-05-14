@@ -191,6 +191,18 @@ app:
    - Target user input 에 다른 `user_id` 입력 후 조회하면 `target_user_id`와 PMS/Learning Data 집계가 바뀜
    - EMS repository가 없는 local profile에서는 degraded warning이 노출되고, 오류를 숨기지 않음
 
+## 시나리오 12-B — EMS Acquisition source preset / 수집량 목표
+
+1. admin 으로 `/ems/acquisition-admin` 진입
+2. `Source preset`에서 `Editorial Expanded` 선택
+3. 검증:
+   - RSS sources textarea가 expanded source 목록으로 채워짐
+   - Articles/source, Signals/run, Seed limit이 preset 값으로 바뀜
+   - Collection target의 Sources/Articles/Signals/Seed queries/Track cap이 기본값보다 커짐
+4. 실행 후 검증:
+   - latest run의 `source_count`가 기본 12보다 큼
+   - 실패 source가 있으면 run/card의 `failed_source_count` 또는 message/error로 노출되고 조용히 무시되지 않음
+
 ## 시나리오 13 — Recommendation audit log
 
 1. admin 으로 `/gms-preview` 에서 추천 한 번 실행

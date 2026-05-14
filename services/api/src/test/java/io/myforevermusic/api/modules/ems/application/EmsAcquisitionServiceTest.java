@@ -132,6 +132,7 @@ class EmsAcquisitionServiceTest {
             new EmsAcquisitionService.EmsAcquisitionRunCommand(
                 "user-001",
                 List.of("spotify"),
+                null,
                 List.of(sourceProperty("Pitchfork", "rss", "https://pitchfork.com/feed/")),
                 10,
                 5,
@@ -238,6 +239,7 @@ class EmsAcquisitionServiceTest {
             new EmsAcquisitionService.EmsAcquisitionRunCommand(
                 "user-001",
                 List.of("spotify"),
+                null,
                 List.of(sourceProperty("Pitchfork", "rss", "https://pitchfork.com/feed/")),
                 10,
                 5,
@@ -315,6 +317,7 @@ class EmsAcquisitionServiceTest {
             new EmsAcquisitionService.EmsAcquisitionRunCommand(
                 "user-001",
                 List.of("spotify"),
+                null,
                 List.of(sourceProperty("Pitchfork", "rss", "https://pitchfork.com/feed/")),
                 10,
                 5,
@@ -370,6 +373,7 @@ class EmsAcquisitionServiceTest {
             new EmsAcquisitionService.EmsAcquisitionRunCommand(
                 "user-001",
                 List.of("spotify"),
+                null,
                 List.of(sourceProperty("Pitchfork", "rss", "https://pitchfork.com/feed/")),
                 10,
                 5,
@@ -383,6 +387,116 @@ class EmsAcquisitionServiceTest {
         assertThat(result.run().seedCount()).isZero();
         verify(signalModel, never()).extractSignals(any(EmsAcquisitionSignalModelRequest.class));
         verify(collectionService, never()).queueAcquisitionSearchPool(anyString(), anyString(), anyString(), anyInt());
+    }
+
+    @Test
+    void shouldUseSourcePresetDefaultsWhenExplicitSourcesAreAbsent() {
+        EmsAcquisitionProperties properties = properties();
+        properties.setSourcePresets(List.of(sourcePresetProperty(
+            "editorial-expanded",
+            12,
+            60,
+            7,
+            sourceProperty("Bandcamp Daily", "rss", "https://daily.bandcamp.com/feed")
+        )));
+        EmsEditorialSource source = new EmsEditorialSource(
+            "Bandcamp Daily",
+            "rss",
+            "https://daily.bandcamp.com/feed",
+            1.0d
+        );
+        EmsEditorialArticle article = new EmsEditorialArticle(
+            "Bandcamp Daily",
+            "https://daily.bandcamp.com/feed",
+            "https://example.test/bandcamp",
+            "Bandcamp roundup",
+            "New artist feature.",
+            Instant.parse("2026-05-14T00:00:00Z")
+        );
+        List<EmsAcquisitionSignalEntity> savedSignals = new ArrayList<>();
+        List<EmsAcquisitionSeedEntity> savedSeeds = new ArrayList<>();
+        AtomicLong ids = new AtomicLong(1);
+
+        when(runRepository.save(any(EmsAcquisitionRunEntity.class))).thenAnswer(invocation -> {
+            EmsAcquisitionRunEntity entity = invocation.getArgument(0);
+            if (entity.getId() == null) {
+                ReflectionTestUtils.setField(entity, "id", ids.getAndIncrement());
+            }
+            return entity;
+        });
+        when(signalRepository.save(any(EmsAcquisitionSignalEntity.class))).thenAnswer(invocation -> {
+            EmsAcquisitionSignalEntity entity = invocation.getArgument(0);
+            ReflectionTestUtils.setField(entity, "id", ids.getAndIncrement());
+            savedSignals.add(entity);
+            return entity;
+        });
+        when(seedRepository.save(any(EmsAcquisitionSeedEntity.class))).thenAnswer(invocation -> {
+            EmsAcquisitionSeedEntity entity = invocation.getArgument(0);
+            if (entity.getId() == null) {
+                ReflectionTestUtils.setField(entity, "id", ids.getAndIncrement());
+            }
+            if (!savedSeeds.contains(entity)) {
+                savedSeeds.add(entity);
+            }
+            return entity;
+        });
+        when(signalRepository.findTop50ByRunIdOrderByIdAsc(1L)).thenReturn(savedSignals);
+        when(seedRepository.findTop100ByRunIdOrderByIdAsc(1L)).thenReturn(savedSeeds);
+        when(sourceClient.fetch(source, 12)).thenReturn(List.of(article));
+        when(signalModel.extractSignals(any(EmsAcquisitionSignalModelRequest.class)))
+            .thenReturn(new EmsAcquisitionSignalModelResponse(
+                "ai-001",
+                Instant.parse("2026-05-14T00:00:01Z"),
+                "test-model",
+                List.of(new EmsAcquisitionSignal(
+                    "https://example.test/bandcamp",
+                    "Bandcamp roundup",
+                    "playlist_query",
+                    "bandcamp daily new music",
+                    List.of(),
+                    0.84d,
+                    "Editorial roundup"
+                ))
+            ));
+        when(collectionService.queueAcquisitionSearchPool("user-001", "spotify", "bandcamp daily new music", 7))
+            .thenReturn(new EmsCollectionSearchPreviewResult(
+                "spotify",
+                "bandcamp daily new music",
+                44L,
+                List.of(),
+                List.of(),
+                7,
+                4,
+                Instant.parse("2026-05-14T00:00:02Z")
+            ));
+
+        EmsAcquisitionService service = new EmsAcquisitionService(
+            properties,
+            sourceClient,
+            signalModel,
+            collectionService,
+            runRepository,
+            signalRepository,
+            seedRepository
+        );
+
+        EmsAcquisitionService.EmsAcquisitionRunDetailSnapshot result = service.runNow(
+            new EmsAcquisitionService.EmsAcquisitionRunCommand(
+                "user-001",
+                List.of("spotify"),
+                "editorial-expanded",
+                null,
+                null,
+                null,
+                null
+            )
+        );
+
+        assertThat(result.run().status()).isEqualTo("completed");
+        assertThat(result.run().sourceCount()).isEqualTo(1);
+        assertThat(result.run().poolRunCount()).isEqualTo(1);
+        verify(sourceClient).fetch(source, 12);
+        verify(collectionService).queueAcquisitionSearchPool("user-001", "spotify", "bandcamp daily new music", 7);
     }
 
     private EmsAcquisitionProperties properties() {
@@ -402,5 +516,22 @@ class EmsAcquisitionServiceTest {
         source.setUrl(url);
         source.setWeight(1.0d);
         return source;
+    }
+
+    private EmsAcquisitionProperties.SourcePreset sourcePresetProperty(
+        String id,
+        int maxArticlesPerSource,
+        int maxSignalsPerRun,
+        int perSeedLimit,
+        EmsAcquisitionProperties.Source source
+    ) {
+        EmsAcquisitionProperties.SourcePreset preset = new EmsAcquisitionProperties.SourcePreset();
+        preset.setId(id);
+        preset.setName(id);
+        preset.setMaxArticlesPerSource(maxArticlesPerSource);
+        preset.setMaxSignalsPerRun(maxSignalsPerRun);
+        preset.setPerSeedLimit(perSeedLimit);
+        preset.setSources(List.of(source));
+        return preset;
     }
 }

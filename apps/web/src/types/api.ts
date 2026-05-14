@@ -1086,6 +1086,7 @@ export interface EmsAcquisitionSourceRequest {
 export interface EmsAcquisitionRunRequest {
     user_id: string
     platforms?: string[]
+    source_preset?: string
     sources?: EmsAcquisitionSourceRequest[]
     max_articles_per_source?: number
     max_signals_per_run?: number
@@ -1155,6 +1156,24 @@ export interface EmsAcquisitionRunsResponse {
     status: string
     generated_at: string
     runs: EmsAcquisitionRunItem[]
+}
+
+export interface EmsAcquisitionSourcePresetItem {
+    id: string
+    name: string
+    description: string | null
+    source_count: number
+    max_articles_per_source: number
+    max_signals_per_run: number
+    per_seed_limit: number
+    sources: EmsAcquisitionSourceRequest[]
+}
+
+export interface EmsAcquisitionSourcePresetsResponse {
+    service: string
+    status: string
+    generated_at: string
+    presets: EmsAcquisitionSourcePresetItem[]
 }
 
 export interface EmsAcquisitionSourceQualityItem {

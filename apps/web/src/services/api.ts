@@ -38,6 +38,7 @@ import type {
     EmsAcquisitionRunRequest,
     EmsAcquisitionRunResponse,
     EmsAcquisitionRunsResponse,
+    EmsAcquisitionSourcePresetsResponse,
     EmsAcquisitionSourceQualityResponse,
     EmsPoolAdminEntryRetryResponse,
     EmsPoolAdminRunCommandResponse,
@@ -480,6 +481,12 @@ export const fetchEmsAcquisitionStatus = (signal?: AbortSignal) =>
 
 export const fetchEmsAcquisitionRuns = (signal?: AbortSignal) =>
     requestJson<EmsAcquisitionRunsResponse>('/api/v1/ems/acquisition/runs', {
+        signal,
+        cache: 'no-store',
+    })
+
+export const fetchEmsAcquisitionSourcePresets = (signal?: AbortSignal) =>
+    requestJson<EmsAcquisitionSourcePresetsResponse>('/api/v1/ems/acquisition/source-presets', {
         signal,
         cache: 'no-store',
     })

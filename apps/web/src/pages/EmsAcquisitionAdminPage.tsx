@@ -1,10 +1,11 @@
 import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AlertTriangle, Bot, DatabaseZap, Play, RefreshCw, Rss, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, Bot, DatabaseZap, Play, RefreshCw, Rss, ShieldCheck, Target } from 'lucide-react'
 import Button from '@/components/common/Button'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
 import {
     fetchEmsAcquisitionRuns,
+    fetchEmsAcquisitionSourcePresets,
     fetchEmsAcquisitionSourceQuality,
     fetchEmsAcquisitionStatus,
     runEmsAcquisition,
@@ -14,6 +15,7 @@ import type {
     EmsAcquisitionRunResponse,
     EmsAcquisitionSeedItem,
     EmsAcquisitionSignalItem,
+    EmsAcquisitionSourcePresetItem,
     EmsAcquisitionSourceQualityItem,
     EmsAcquisitionSourceRequest,
 } from '@/types/api'
@@ -72,12 +74,14 @@ const EmsAcquisitionAdminPage = () => {
     const { session } = useAuthSession()
     const [targetUserId, setTargetUserId] = useState('')
     const [platforms, setPlatforms] = useState<string[]>(['spotify', 'tidal'])
+    const [selectedPresetId, setSelectedPresetId] = useState('custom')
     const [sourceLines, setSourceLines] = useState(DEFAULT_SOURCES)
     const [maxArticlesPerSource, setMaxArticlesPerSource] = useState(15)
     const [maxSignalsPerRun, setMaxSignalsPerRun] = useState(40)
     const [perSeedLimit, setPerSeedLimit] = useState(5)
     const [status, setStatus] = useState<EmsAcquisitionRunResponse | null>(null)
     const [runs, setRuns] = useState<EmsAcquisitionRunItem[]>([])
+    const [sourcePresets, setSourcePresets] = useState<EmsAcquisitionSourcePresetItem[]>([])
     const [sourceQuality, setSourceQuality] = useState<EmsAcquisitionSourceQualityItem[]>([])
     const [sourceQualityDays, setSourceQualityDays] = useState(14)
     const [loading, setLoading] = useState(false)
@@ -91,6 +95,20 @@ const EmsAcquisitionAdminPage = () => {
     const seeds = status?.seeds ?? []
 
     const parsedSources = useMemo(() => parseSources(sourceLines), [sourceLines])
+    const collectionTarget = useMemo(() => {
+        const sourceCount = parsedSources.length
+        const articleTarget = sourceCount * maxArticlesPerSource
+        const signalTarget = Math.min(maxSignalsPerRun, articleTarget)
+        const seedQueryTarget = signalTarget * Math.max(platforms.length, 1) * 4
+        const trackTarget = seedQueryTarget * perSeedLimit
+        return {
+            sourceCount,
+            articleTarget,
+            signalTarget,
+            seedQueryTarget,
+            trackTarget,
+        }
+    }, [maxArticlesPerSource, maxSignalsPerRun, parsedSources.length, perSeedLimit, platforms.length])
 
     const schedulerHealth = useMemo(() => {
         const scheduledRuns = runs.filter((run) => run.trigger_type === 'scheduled')
@@ -169,15 +187,17 @@ const EmsAcquisitionAdminPage = () => {
         setLoading(true)
         setError(null)
         try {
-            const [latest, recent] = await Promise.all([
+            const [latest, recent, presets] = await Promise.all([
                 fetchEmsAcquisitionStatus(controller.signal),
                 fetchEmsAcquisitionRuns(controller.signal),
+                fetchEmsAcquisitionSourcePresets(controller.signal),
             ])
             if (controller.signal.aborted) {
                 return
             }
             setStatus(latest)
             setRuns(recent.runs)
+            setSourcePresets(presets.presets)
             void loadSourceQuality(controller.signal)
         } catch (err) {
             if (!controller.signal.aborted) {
@@ -219,6 +239,18 @@ const EmsAcquisitionAdminPage = () => {
         )
     }
 
+    const applySourcePreset = (presetId: string) => {
+        setSelectedPresetId(presetId)
+        const preset = sourcePresets.find((item) => item.id === presetId)
+        if (!preset) {
+            return
+        }
+        setSourceLines(formatSources(preset.sources))
+        setMaxArticlesPerSource(preset.max_articles_per_source)
+        setMaxSignalsPerRun(preset.max_signals_per_run)
+        setPerSeedLimit(preset.per_seed_limit)
+    }
+
     const handleRun = async () => {
         if (!session) {
             return
@@ -243,6 +275,7 @@ const EmsAcquisitionAdminPage = () => {
             const response = await runEmsAcquisition({
                 user_id: userId,
                 platforms,
+                source_preset: selectedPresetId === 'custom' ? undefined : selectedPresetId,
                 sources: parsedSources,
                 max_articles_per_source: maxArticlesPerSource,
                 max_signals_per_run: maxSignalsPerRun,
@@ -343,10 +376,29 @@ const EmsAcquisitionAdminPage = () => {
                         </label>
 
                         <label className="block text-sm text-hud-text-secondary">
+                            Source preset
+                            <select
+                                value={selectedPresetId}
+                                onChange={(event) => applySourcePreset(event.target.value)}
+                                className="mt-2 w-full rounded-lg border border-hud-border-secondary bg-hud-bg-primary px-3 py-2 text-sm text-hud-text-primary outline-none transition-hud focus:border-hud-accent-primary"
+                            >
+                                <option value="custom">Custom sources</option>
+                                {sourcePresets.map((preset) => (
+                                    <option key={preset.id} value={preset.id}>
+                                        {preset.name} ({preset.source_count})
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+
+                        <label className="block text-sm text-hud-text-secondary">
                             RSS sources
                             <textarea
                                 value={sourceLines}
-                                onChange={(event) => setSourceLines(event.target.value)}
+                                onChange={(event) => {
+                                    setSourceLines(event.target.value)
+                                    setSelectedPresetId('custom')
+                                }}
                                 className="mt-2 min-h-[140px] w-full rounded-xl border border-hud-border-secondary bg-hud-bg-primary px-3 py-3 font-mono text-sm text-hud-text-primary outline-none transition-hud focus:border-hud-accent-primary"
                                 spellCheck={false}
                             />
@@ -356,6 +408,19 @@ const EmsAcquisitionAdminPage = () => {
                             <NumberInput label="Articles/source" value={maxArticlesPerSource} onChange={setMaxArticlesPerSource} min={1} max={50} />
                             <NumberInput label="Signals/run" value={maxSignalsPerRun} onChange={setMaxSignalsPerRun} min={1} max={200} />
                             <NumberInput label="Seed limit" value={perSeedLimit} onChange={setPerSeedLimit} min={1} max={50} />
+                        </div>
+                        <div className="rounded-xl border border-hud-border-secondary bg-hud-bg-primary/60 p-4">
+                            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-hud-text-primary">
+                                <Target size={16} />
+                                Collection target
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-5">
+                                <MiniStat label="Sources" value={collectionTarget.sourceCount} />
+                                <MiniStat label="Articles" value={collectionTarget.articleTarget} />
+                                <MiniStat label="Signals" value={collectionTarget.signalTarget} />
+                                <MiniStat label="Seed queries" value={collectionTarget.seedQueryTarget} />
+                                <MiniStat label="Track cap" value={collectionTarget.trackTarget} />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -631,6 +696,13 @@ const Stat = ({ label, value }: { label: string; value: number | string }) => (
     </div>
 )
 
+const MiniStat = ({ label, value }: { label: string; value: number | string }) => (
+    <div className="rounded-lg border border-hud-border-secondary bg-hud-bg-secondary/60 p-3">
+        <p className="text-[10px] uppercase tracking-[0.14em] text-hud-text-muted">{label}</p>
+        <p className="mt-1 text-lg font-semibold text-hud-text-primary">{value}</p>
+    </div>
+)
+
 const DataTable = ({
     title,
     icon,
@@ -716,5 +788,10 @@ const parseSources = (value: string): EmsAcquisitionSourceRequest[] =>
             }
         })
         .filter((source) => Boolean(source.url))
+
+const formatSources = (sources: EmsAcquisitionSourceRequest[]) =>
+    sources
+        .map((source) => `${source.name || source.url}|${source.url}|${source.weight ?? 1.0}`)
+        .join('\n')
 
 export default EmsAcquisitionAdminPage

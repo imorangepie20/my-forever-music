@@ -9,7 +9,9 @@ import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAc
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionRunSnapshot;
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionSeedSnapshot;
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionSignalSnapshot;
+import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionSourcePresetSnapshot;
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionSourceQualitySnapshot;
+import io.myforevermusic.api.modules.ems.application.EmsEditorialSource;
 import io.swagger.v3.oas.annotations.Operation;
 import java.time.Instant;
 import java.util.List;
@@ -65,6 +67,19 @@ public class EmsAcquisitionController {
         );
     }
 
+    @Operation(summary = "List configured EMS editorial acquisition source presets")
+    @GetMapping("/source-presets")
+    public EmsAcquisitionSourcePresetsResponse sourcePresets() {
+        return new EmsAcquisitionSourcePresetsResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            acquisitionService.listSourcePresets().stream()
+                .map(EmsAcquisitionSourcePresetItem::from)
+                .toList()
+        );
+    }
+
     @Operation(summary = "Summarize per-source signal count + average confidence over the recent window")
     @GetMapping("/source-quality")
     public EmsAcquisitionSourceQualityResponse sourceQuality(
@@ -83,11 +98,12 @@ public class EmsAcquisitionController {
 
     private static EmsAcquisitionRunCommand toCommand(EmsAcquisitionRunRequest request) {
         if (request == null) {
-            return new EmsAcquisitionRunCommand(null, null, null, null, null, null);
+            return new EmsAcquisitionRunCommand(null, null, null, null, null, null, null);
         }
         return new EmsAcquisitionRunCommand(
             request.userId(),
             request.platforms(),
+            request.sourcePreset(),
             request.sources() == null ? null : request.sources().stream().map(EmsAcquisitionController::toSource).toList(),
             request.maxArticlesPerSource(),
             request.maxSignalsPerRun(),
@@ -109,6 +125,7 @@ public class EmsAcquisitionController {
     public record EmsAcquisitionRunRequest(
         String userId,
         List<String> platforms,
+        String sourcePreset,
         List<EmsAcquisitionSourceRequest> sources,
         Integer maxArticlesPerSource,
         Integer maxSignalsPerRun,
@@ -153,6 +170,57 @@ public class EmsAcquisitionController {
         Instant generatedAt,
         List<EmsAcquisitionRunItem> runs
     ) {
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAcquisitionSourcePresetsResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        List<EmsAcquisitionSourcePresetItem> presets
+    ) {
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAcquisitionSourcePresetItem(
+        String id,
+        String name,
+        String description,
+        int sourceCount,
+        int maxArticlesPerSource,
+        int maxSignalsPerRun,
+        int perSeedLimit,
+        List<EmsAcquisitionSourceItem> sources
+    ) {
+        static EmsAcquisitionSourcePresetItem from(EmsAcquisitionSourcePresetSnapshot snapshot) {
+            return new EmsAcquisitionSourcePresetItem(
+                snapshot.id(),
+                snapshot.name(),
+                snapshot.description(),
+                snapshot.sources().size(),
+                snapshot.maxArticlesPerSource(),
+                snapshot.maxSignalsPerRun(),
+                snapshot.perSeedLimit(),
+                snapshot.sources().stream().map(EmsAcquisitionSourceItem::from).toList()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAcquisitionSourceItem(
+        String name,
+        String type,
+        String url,
+        double weight
+    ) {
+        static EmsAcquisitionSourceItem from(EmsEditorialSource source) {
+            return new EmsAcquisitionSourceItem(
+                source.name(),
+                source.type(),
+                source.url(),
+                source.weight()
+            );
+        }
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)

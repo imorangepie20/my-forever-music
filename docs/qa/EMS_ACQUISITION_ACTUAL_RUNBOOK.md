@@ -94,7 +94,7 @@ tail -n 120 tmp/local-stack/logs/ai.log
 
 ## 3. 실제 source로 acquisition run 실행
 
-기본 RSS source 12개를 실제 입력으로 사용합니다.
+기본 RSS source 12개를 실제 입력으로 사용합니다. 수집량 확대 검증은 같은 화면의 `Editorial Expanded` source preset 또는 `source_preset` API 옵션을 사용합니다.
 
 브라우저로 실행하려면:
 
@@ -103,6 +103,7 @@ http://127.0.0.1:5173/ems/acquisition-admin
 ```
 
 관리자 계정으로 접속한 뒤 `User ID`에 `${EMS_USER_ID}` 값을 넣고 기본 source를 그대로 두고 `실행`을 누릅니다.
+수집량 확대 검증 시 `Source preset`에서 `Editorial Expanded`를 선택하고 `Collection target`의 source/article/signal/track cap이 커지는지 확인한 뒤 실행합니다.
 반복 실행 시 이미 처리된 article URL과 이미 queue된 platform/query seed는 다시 넣지 않습니다.
 
 터미널로 실행하려면:
@@ -193,12 +194,27 @@ curl -fsS "$API/api/v1/ems/acquisition/run" \
   }"
 ```
 
+Preset만 사용해서 확대 run을 실행하려면:
+
+```bash
+curl -fsS "$API/api/v1/ems/acquisition/source-presets"
+
+curl -fsS "$API/api/v1/ems/acquisition/run" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"user_id\": \"${EMS_USER_ID}\",
+    \"platforms\": [\"spotify\", \"tidal\"],
+    \"source_preset\": \"editorial-expanded\"
+  }"
+```
+
 통과 기준:
 - HTTP 200
 - `status`가 `completed` 또는 `completed_with_failures`
 - `run.signal_count > 0`
 - `run.seed_count > 0`
 - `run.pool_run_count > 0`
+- `source_preset=editorial-expanded` run이면 `run.source_count`가 기본 12보다 큼
 - `query_variants`가 있으면 `seed_count`가 `signal_count * platform_count`보다 클 수 있음
 - 반복 실행 시 `skipped_article_count` 또는 `skipped_seed_count`가 증가할 수 있음
 - `seeds[*].pool_run_id`가 존재
@@ -423,4 +439,5 @@ services/ai/.venv/bin/python -m pytest services/ai/tests
 - seed별 `ems_pool_ingest_run`이 생성됨
 - acquisition POOL run은 `collection_source='acquisition_pool'`
 - background worker가 EMS 본 테이블로 반영
+- `source-presets` 응답에 `editorial-expanded`가 있고 expanded run의 `source_count`가 기본보다 큼
 - 실패는 source/seed/entry 단위 error로 남고 mock/fallback으로 숨겨지지 않음

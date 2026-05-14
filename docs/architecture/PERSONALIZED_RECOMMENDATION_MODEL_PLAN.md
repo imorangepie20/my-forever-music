@@ -705,11 +705,13 @@ SASRec/BERT4Rec 이전에 `metadata + behavior weight + playlist 6축 evaluator`
 
 ### 13-6. 현재 1차 마감 순서
 
-문서 정리, TIDAL PMS provider 오류 경계 보강, Discogs label enrichment, cold-start import 유도 UX는 완료했다. 추천 모델/EMS 데이터 풀을 실제 운영 가능한 1차 제품형 상태로 닫기 위한 남은 항목은 아래 순서로 고정한다.
+문서 정리, TIDAL PMS provider 오류 경계 보강, Discogs label enrichment, cold-start import 유도 UX, EMS acquisition 운영 확장은 완료했다. 추천 모델/EMS 데이터 풀을 실제 운영 가능한 1차 제품형 상태로 닫기 위한 남은 항목은 코드 구현이 아니라 최종 검증이다.
 
-1. **EMS acquisition 운영 확장** — source 품질 튜닝, 주기 실행 설정, skip/drift 운영값, 수집량 목표 관리를 추가해 EMS pool을 지속적으로 키운다.
+1. **전체 회귀 테스트** — API/Web 자동 테스트를 다시 실행한다.
+2. **실제 TIDAL import 회귀** — 실제 계정 PMS import와 provider 오류 경계를 확인한다.
+3. **EMS acquisition runbook 재실행** — 기본 source와 가능하면 `editorial-expanded` preset run까지 확인한다.
 
-이 항목이 끝나면 전체 회귀 테스트, 실제 TIDAL 계정 import, acquisition runbook을 한 번 더 실행하고, 추천/EMS 1차 마감 상태로 정리한다.
+운영 확장 구현 내용: `/api/v1/ems/acquisition/source-presets`, `source_preset` run 옵션, `editorial-expanded` preset, scheduler/source-quality/skip-drift/admin collection target UI.
 
 ## 14. 내부 참고 문서
 

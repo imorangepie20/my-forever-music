@@ -73,6 +73,7 @@ app:
       max-signals-per-run: ${EMS_ACQUISITION_MAX_SIGNALS_PER_RUN:40}
       per-seed-limit: ${EMS_ACQUISITION_PER_SEED_LIMIT:5}
       platforms: ${EMS_ACQUISITION_PLATFORMS:spotify,tidal}
+      source-preset: ${EMS_ACQUISITION_SOURCE_PRESET:}
       sources:
         - name: Pitchfork News
           type: rss
@@ -122,6 +123,102 @@ app:
           type: rss
           url: https://www.nme.com/?alt=rss
           weight: 1.0
+      source-presets:
+        - id: editorial-expanded
+          name: Editorial Expanded
+          description: Larger editorial RSS preset for growing the EMS acquisition pool.
+          max-articles-per-source: 25
+          max-signals-per-run: 120
+          per-seed-limit: 10
+          sources:
+            - name: Pitchfork News
+              type: rss
+              url: https://pitchfork.com/feed/feed-news/rss
+              weight: 1.0
+            - name: Pitchfork Track Reviews
+              type: rss
+              url: https://pitchfork.com/feed/feed-track-reviews/rss
+              weight: 1.1
+            - name: Pitchfork Best New Tracks
+              type: rss
+              url: https://pitchfork.com/feed/reviews/best/tracks/rss
+              weight: 1.4
+            - name: Stereogum
+              type: rss
+              url: https://www.stereogum.com/feed/
+              weight: 1.1
+            - name: BrooklynVegan
+              type: rss
+              url: https://www.brooklynvegan.com/feed/
+              weight: 1.0
+            - name: FACT Magazine
+              type: rss
+              url: https://www.factmag.com/feed/
+              weight: 1.0
+            - name: The FADER
+              type: rss
+              url: https://www.thefader.com/feed.rss
+              weight: 1.0
+            - name: Billboard Music News
+              type: rss
+              url: https://www.billboard.com/c/music/music-news/feed/
+              weight: 1.0
+            - name: Rolling Stone Music News
+              type: rss
+              url: https://www.rollingstone.com/music/music-news/feed/
+              weight: 1.0
+            - name: The Line of Best Fit
+              type: rss
+              url: https://www.thelineofbestfit.com/feed
+              weight: 1.0
+            - name: SPIN
+              type: rss
+              url: https://www.spinmagazine.com/feed/
+              weight: 0.9
+            - name: NME
+              type: rss
+              url: https://www.nme.com/?alt=rss
+              weight: 1.0
+            - name: NPR Music
+              type: rss
+              url: https://feeds.npr.org/1039/rss.xml
+              weight: 1.0
+            - name: Bandcamp Daily
+              type: rss
+              url: https://daily.bandcamp.com/feed
+              weight: 1.1
+            - name: Consequence Music
+              type: rss
+              url: https://consequence.net/music/feed/
+              weight: 1.0
+            - name: Clash Magazine
+              type: rss
+              url: https://www.clashmusic.com/feed/
+              weight: 1.0
+            - name: Gorilla vs Bear
+              type: rss
+              url: https://www.gorillavsbear.net/feed/
+              weight: 0.9
+            - name: Under the Radar
+              type: rss
+              url: https://www.undertheradarmag.com/site/feed/
+              weight: 0.9
+            - name: The Quietus
+              type: rss
+              url: https://thequietus.com/feed/
+              weight: 0.9
+            - name: Music Business Worldwide
+              type: rss
+              url: https://www.musicbusinessworldwide.com/feed/
+              weight: 0.8
+            - name: Resident Advisor News
+              type: rss
+              url: https://ra.co/xml/news.xml
+              weight: 0.9
+            - name: Hypebeast Music
+              type: rss
+              url: https://hypebeast.com/music/feed
+              weight: 0.8
   ai:
     base-url: ${AI_SERVICE_BASE_URL:http://127.0.0.1:8000}
     recommendation-preview-path: ${AI_RECOMMENDATION_PREVIEW_PATH:/v1/recommendations/preview}

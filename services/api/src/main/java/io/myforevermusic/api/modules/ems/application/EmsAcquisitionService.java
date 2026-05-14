@@ -20,6 +20,7 @@ import java.util.Locale;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -55,38 +56,41 @@ public class EmsAcquisitionService {
     }
 
     public EmsAcquisitionRunDetailSnapshot runScheduled() {
+        EmsAcquisitionSourceSelection sourceSelection = resolveSourceSelection(null, properties.getSourcePreset());
         return runAcquisition(
             "scheduled",
             properties.getUserId(),
             properties.getPlatforms(),
-            configuredSources(),
-            properties.getMaxArticlesPerSource(),
-            properties.getMaxSignalsPerRun(),
-            properties.getPerSeedLimit()
+            sourceSelection.sources(),
+            sourceSelection.maxArticlesPerSource(),
+            sourceSelection.maxSignalsPerRun(),
+            sourceSelection.perSeedLimit()
         );
     }
 
     public EmsAcquisitionRunDetailSnapshot runNow(EmsAcquisitionRunCommand command) {
         EmsAcquisitionRunCommand safeCommand = command == null
-            ? new EmsAcquisitionRunCommand(null, null, null, null, null, null)
+            ? new EmsAcquisitionRunCommand(null, null, null, null, null, null, null)
             : command;
+        EmsAcquisitionSourceSelection sourceSelection = resolveSourceSelection(
+            safeCommand.sources(),
+            safeCommand.sourcePreset()
+        );
         return runAcquisition(
             "manual",
             firstNonBlank(safeCommand.userId(), properties.getUserId()),
             safeCommand.platforms() == null || safeCommand.platforms().isEmpty()
                 ? properties.getPlatforms()
                 : safeCommand.platforms(),
-            safeCommand.sources() == null || safeCommand.sources().isEmpty()
-                ? configuredSources()
-                : safeCommand.sources().stream().map(this::toSource).toList(),
+            sourceSelection.sources(),
             safeCommand.maxArticlesPerSource() == null
-                ? properties.getMaxArticlesPerSource()
+                ? sourceSelection.maxArticlesPerSource()
                 : safeCommand.maxArticlesPerSource(),
             safeCommand.maxSignalsPerRun() == null
-                ? properties.getMaxSignalsPerRun()
+                ? sourceSelection.maxSignalsPerRun()
                 : safeCommand.maxSignalsPerRun(),
             safeCommand.perSeedLimit() == null
-                ? properties.getPerSeedLimit()
+                ? sourceSelection.perSeedLimit()
                 : safeCommand.perSeedLimit()
         );
     }
@@ -121,6 +125,43 @@ public class EmsAcquisitionService {
                 row.getLastSignalAt()
             ))
             .toList();
+    }
+
+    public List<EmsAcquisitionSourcePresetSnapshot> listSourcePresets() {
+        List<EmsAcquisitionSourcePresetSnapshot> presets = new ArrayList<>();
+        List<EmsEditorialSource> configured = configuredSources();
+        if (!configured.isEmpty()) {
+            presets.add(new EmsAcquisitionSourcePresetSnapshot(
+                "configured",
+                "Configured sources",
+                "app.ems.acquisition.sources",
+                clamp(properties.getMaxArticlesPerSource(), 1, 50),
+                clamp(properties.getMaxSignalsPerRun(), 1, 200),
+                clamp(properties.getPerSeedLimit(), 1, 50),
+                configured
+            ));
+        }
+        if (properties.getSourcePresets() != null) {
+            for (EmsAcquisitionProperties.SourcePreset preset : properties.getSourcePresets()) {
+                if (preset == null || !preset.isEnabled() || !hasText(preset.getId())) {
+                    continue;
+                }
+                List<EmsEditorialSource> sources = cleanSources(sourceProperties(preset.getSources()));
+                if (sources.isEmpty()) {
+                    continue;
+                }
+                presets.add(new EmsAcquisitionSourcePresetSnapshot(
+                    preset.getId().trim(),
+                    firstNonBlank(preset.getName(), preset.getId().trim()),
+                    preset.getDescription(),
+                    clamp(preset.getMaxArticlesPerSource(), 1, 50),
+                    clamp(preset.getMaxSignalsPerRun(), 1, 200),
+                    clamp(preset.getPerSeedLimit(), 1, 50),
+                    sources
+                ));
+            }
+        }
+        return presets;
     }
 
     private EmsAcquisitionRunDetailSnapshot runAcquisition(
@@ -357,10 +398,7 @@ public class EmsAcquisitionService {
     }
 
     private List<EmsEditorialSource> configuredSources() {
-        return properties.getSources().stream()
-            .filter(EmsAcquisitionProperties.Source::isEnabled)
-            .map(this::toSource)
-            .toList();
+        return cleanSources(sourceProperties(properties.getSources()));
     }
 
     private EmsEditorialSource toSource(EmsAcquisitionProperties.Source source) {
@@ -385,6 +423,52 @@ public class EmsAcquisitionService {
                 source.weight() <= 0.0d ? 1.0d : source.weight()
             ))
             .toList();
+    }
+
+    private List<EmsEditorialSource> sourceProperties(List<EmsAcquisitionProperties.Source> sources) {
+        if (sources == null) {
+            return List.of();
+        }
+        return sources.stream()
+            .filter(source -> source != null && source.isEnabled())
+            .map(this::toSource)
+            .toList();
+    }
+
+    private EmsAcquisitionSourceSelection resolveSourceSelection(
+        List<EmsAcquisitionProperties.Source> explicitSources,
+        String sourcePreset
+    ) {
+        if (explicitSources != null && explicitSources.stream().anyMatch(source -> source != null && source.isEnabled())) {
+            return new EmsAcquisitionSourceSelection(
+                cleanSources(sourceProperties(explicitSources)),
+                properties.getMaxArticlesPerSource(),
+                properties.getMaxSignalsPerRun(),
+                properties.getPerSeedLimit()
+            );
+        }
+        String presetId = normalizeRequired(sourcePreset, 80);
+        if (hasText(presetId)) {
+            return listSourcePresets().stream()
+                .filter(preset -> preset.id().equalsIgnoreCase(presetId))
+                .findFirst()
+                .map(preset -> new EmsAcquisitionSourceSelection(
+                    preset.sources(),
+                    preset.maxArticlesPerSource(),
+                    preset.maxSignalsPerRun(),
+                    preset.perSeedLimit()
+                ))
+                .orElseThrow(() -> new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Unknown EMS acquisition source preset: " + presetId
+                ));
+        }
+        return new EmsAcquisitionSourceSelection(
+            configuredSources(),
+            properties.getMaxArticlesPerSource(),
+            properties.getMaxSignalsPerRun(),
+            properties.getPerSeedLimit()
+        );
     }
 
     private static List<String> cleanValues(List<String> values) {
@@ -495,6 +579,7 @@ public class EmsAcquisitionService {
     public record EmsAcquisitionRunCommand(
         String userId,
         List<String> platforms,
+        String sourcePreset,
         List<EmsAcquisitionProperties.Source> sources,
         Integer maxArticlesPerSource,
         Integer maxSignalsPerRun,
@@ -566,6 +651,25 @@ public class EmsAcquisitionService {
         long signalCount,
         double avgConfidence,
         Instant lastSignalAt
+    ) {
+    }
+
+    public record EmsAcquisitionSourcePresetSnapshot(
+        String id,
+        String name,
+        String description,
+        int maxArticlesPerSource,
+        int maxSignalsPerRun,
+        int perSeedLimit,
+        List<EmsEditorialSource> sources
+    ) {
+    }
+
+    private record EmsAcquisitionSourceSelection(
+        List<EmsEditorialSource> sources,
+        int maxArticlesPerSource,
+        int maxSignalsPerRun,
+        int perSeedLimit
     ) {
     }
 }

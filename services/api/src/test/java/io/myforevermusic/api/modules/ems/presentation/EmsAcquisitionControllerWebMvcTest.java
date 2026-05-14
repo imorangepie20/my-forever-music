@@ -13,6 +13,8 @@ import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAc
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionRunSnapshot;
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionSeedSnapshot;
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionSignalSnapshot;
+import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionSourcePresetSnapshot;
+import io.myforevermusic.api.modules.ems.application.EmsEditorialSource;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -72,6 +74,7 @@ class EmsAcquisitionControllerWebMvcTest {
                     {
                       "user_id": "user-001",
                       "platforms": ["spotify"],
+                      "source_preset": "editorial-expanded",
                       "sources": [
                         {
                           "name": "Pitchfork",
@@ -95,6 +98,7 @@ class EmsAcquisitionControllerWebMvcTest {
             ArgumentCaptor.forClass(EmsAcquisitionRunCommand.class);
         verify(acquisitionService).runNow(commandCaptor.capture());
         org.assertj.core.api.Assertions.assertThat(commandCaptor.getValue().sources()).hasSize(1);
+        org.assertj.core.api.Assertions.assertThat(commandCaptor.getValue().sourcePreset()).isEqualTo("editorial-expanded");
     }
 
     @Test
@@ -104,6 +108,34 @@ class EmsAcquisitionControllerWebMvcTest {
         mockMvc.perform(get("/api/v1/ems/acquisition/status"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("not_run"));
+    }
+
+    @Test
+    void shouldExposeSourcePresets() throws Exception {
+        when(acquisitionService.listSourcePresets()).thenReturn(List.of(
+            new EmsAcquisitionSourcePresetSnapshot(
+                "editorial-expanded",
+                "Editorial Expanded",
+                "larger source set",
+                25,
+                120,
+                10,
+                List.of(new EmsEditorialSource(
+                    "Bandcamp Daily",
+                    "rss",
+                    "https://daily.bandcamp.com/feed",
+                    1.1d
+                ))
+            )
+        ));
+
+        mockMvc.perform(get("/api/v1/ems/acquisition/source-presets"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("ok"))
+            .andExpect(jsonPath("$.presets[0].id").value("editorial-expanded"))
+            .andExpect(jsonPath("$.presets[0].source_count").value(1))
+            .andExpect(jsonPath("$.presets[0].max_signals_per_run").value(120))
+            .andExpect(jsonPath("$.presets[0].sources[0].name").value("Bandcamp Daily"));
     }
 
     private EmsAcquisitionRunSnapshot runSnapshot(String status) {

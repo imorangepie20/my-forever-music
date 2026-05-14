@@ -139,6 +139,36 @@ limit 20;
 
 ---
 
+## 시나리오 2-B — source preset 확대 run
+
+목적: 운영자가 기본 source 직접 입력 없이 확대 preset으로 EMS pool 수집량을 키울 수 있는지 확인.
+
+1. preset 목록 확인:
+
+```bash
+curl -s http://127.0.0.1:8080/api/v1/ems/acquisition/source-presets
+```
+
+2. `editorial-expanded` preset으로 실행:
+
+```bash
+curl -s http://127.0.0.1:8080/api/v1/ems/acquisition/run \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_id": "user-001",
+    "platforms": ["spotify", "tidal"],
+    "source_preset": "editorial-expanded"
+  }'
+```
+
+검증:
+- preset 목록에 `editorial-expanded`가 있고 `source_count`가 기본 configured preset보다 큼
+- run 응답의 `run.source_count`가 기본 12보다 큼
+- `/ems/acquisition-admin`에서 같은 preset 선택 시 collection target이 기본값보다 커짐
+- 실패 source가 있으면 `failed_source_count`, `message`, `last_error` 중 하나로 운영자에게 노출됨
+
+---
+
 ## 시나리오 3 — POOL worker -> EMS 본 테이블 반영
 
 목적: acquisition으로 생성된 `ems_pool_entry`가 background worker를 통해 EMS collected playlist/track으로 반영되는지 확인.

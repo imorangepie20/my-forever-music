@@ -9,7 +9,9 @@ public class EmsAcquisitionProperties {
     private boolean enabled = true;
     private String userId = "";
     private List<String> platforms = List.of("spotify", "tidal");
+    private String sourcePreset = "";
     private List<Source> sources = List.of();
+    private List<SourcePreset> sourcePresets = List.of();
     private int maxArticlesPerSource = 20;
     private int maxSignalsPerRun = 40;
     private int perSeedLimit = 5;
@@ -38,12 +40,28 @@ public class EmsAcquisitionProperties {
         this.platforms = platforms;
     }
 
+    public String getSourcePreset() {
+        return sourcePreset;
+    }
+
+    public void setSourcePreset(String sourcePreset) {
+        this.sourcePreset = sourcePreset;
+    }
+
     public List<Source> getSources() {
         return sources;
     }
 
     public void setSources(List<Source> sources) {
         this.sources = sources;
+    }
+
+    public List<SourcePreset> getSourcePresets() {
+        return sourcePresets;
+    }
+
+    public void setSourcePresets(List<SourcePreset> sourcePresets) {
+        this.sourcePresets = sourcePresets;
     }
 
     public int getMaxArticlesPerSource() {
@@ -115,6 +133,81 @@ public class EmsAcquisitionProperties {
 
         public void setWeight(double weight) {
             this.weight = weight;
+        }
+    }
+
+    public static class SourcePreset {
+        private boolean enabled = true;
+        private String id = "";
+        private String name = "";
+        private String description = "";
+        private int maxArticlesPerSource = 20;
+        private int maxSignalsPerRun = 40;
+        private int perSeedLimit = 5;
+        private List<Source> sources = List.of();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public void setDescription(String description) {
+            this.description = description;
+        }
+
+        public int getMaxArticlesPerSource() {
+            return maxArticlesPerSource;
+        }
+
+        public void setMaxArticlesPerSource(int maxArticlesPerSource) {
+            this.maxArticlesPerSource = maxArticlesPerSource;
+        }
+
+        public int getMaxSignalsPerRun() {
+            return maxSignalsPerRun;
+        }
+
+        public void setMaxSignalsPerRun(int maxSignalsPerRun) {
+            this.maxSignalsPerRun = maxSignalsPerRun;
+        }
+
+        public int getPerSeedLimit() {
+            return perSeedLimit;
+        }
+
+        public void setPerSeedLimit(int perSeedLimit) {
+            this.perSeedLimit = perSeedLimit;
+        }
+
+        public List<Source> getSources() {
+            return sources;
+        }
+
+        public void setSources(List<Source> sources) {
+            this.sources = sources;
         }
     }
 }
