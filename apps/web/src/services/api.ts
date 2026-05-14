@@ -67,6 +67,7 @@ import type {
     EmsOverviewResponse,
     EmsWorkspaceAnalysisRequest,
     EmsWorkspaceAnalysisResponse,
+    GmsPlaylistDismissResponse,
     GmsPlaylistPreviewResponse,
     GmsPlaylistSaveRequest,
     GmsPlaylistSaveResponse,
@@ -888,4 +889,10 @@ export const saveGmsPlaylistToPms = (
             },
             body: JSON.stringify(payload ?? {}),
         },
+    )
+
+export const dismissGmsPlaylist = (playlistId: number, userId: string) =>
+    requestJson<GmsPlaylistDismissResponse>(
+        `/api/v1/gms/playlists/${playlistId}/dismiss?user_id=${encodeURIComponent(userId)}`,
+        { method: 'POST' },
     )

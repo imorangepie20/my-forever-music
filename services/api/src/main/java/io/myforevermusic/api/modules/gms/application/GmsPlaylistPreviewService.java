@@ -14,6 +14,7 @@ import io.myforevermusic.api.modules.recommendation.application.AxisEvidence;
 import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluation;
 import io.myforevermusic.api.modules.recommendation.application.PlaylistQualityEvaluator;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationAxisEvidenceBuilder;
+import io.myforevermusic.api.modules.recommendation.application.UserMusicEventStore;
 import io.myforevermusic.api.modules.recommendation.application.UserMusicEventService;
 import io.myforevermusic.api.modules.recommendation.presentation.UserMusicEventRequest;
 import java.time.Instant;
@@ -46,6 +47,7 @@ public class GmsPlaylistPreviewService {
     private final EmsCollectedPlaylistTrackRepository playlistTrackRepository;
     private final PmsPersonalPlaylistStore personalPlaylistStore;
     private final UserMusicEventService userMusicEventService;
+    private final UserMusicEventStore userMusicEventStore;
     private final PlaylistQualityEvaluator playlistQualityEvaluator;
 
     public GmsPlaylistPreviewService(
@@ -55,6 +57,7 @@ public class GmsPlaylistPreviewService {
         EmsCollectedPlaylistTrackRepository playlistTrackRepository,
         PmsPersonalPlaylistStore personalPlaylistStore,
         UserMusicEventService userMusicEventService,
+        UserMusicEventStore userMusicEventStore,
         PlaylistQualityEvaluator playlistQualityEvaluator
     ) {
         this.authAccountStore = authAccountStore;
@@ -63,6 +66,7 @@ public class GmsPlaylistPreviewService {
         this.playlistTrackRepository = playlistTrackRepository;
         this.personalPlaylistStore = personalPlaylistStore;
         this.userMusicEventService = userMusicEventService;
+        this.userMusicEventStore = userMusicEventStore;
         this.playlistQualityEvaluator = playlistQualityEvaluator;
     }
 
@@ -96,8 +100,13 @@ public class GmsPlaylistPreviewService {
         }
 
         Set<String> userArtists = collectUserArtists(userId);
+        Set<Long> dismissedPlaylistIds = dismissedPlaylistIds(userId);
+        Set<Long> savedPlaylistIds = savedPlaylistIds(userId);
 
         List<GmsPlaylistPreviewCandidate> candidates = source.stream()
+            .filter(playlist -> playlist.getId() != null
+                && !dismissedPlaylistIds.contains(playlist.getId())
+                && !savedPlaylistIds.contains(playlist.getId()))
             .map(playlist -> scoreCandidate(playlist, userArtists))
             .filter(candidate -> candidate.affinityScore() > 0.0d)
             .sorted((left, right) -> Double.compare(right.compositeScore(), left.compositeScore()))
@@ -111,6 +120,33 @@ public class GmsPlaylistPreviewService {
             Instant.now(),
             candidates
         );
+    }
+
+    private Set<Long> savedPlaylistIds(String userId) {
+        Set<Long> result = new HashSet<>();
+        personalPlaylistStore.findPlaylists(userId).forEach(playlist -> {
+            Long playlistId = parseGmsPersonalPlaylistId(playlist.playlistId());
+            if (playlistId != null) {
+                result.add(playlistId);
+            }
+        });
+        return result;
+    }
+
+    private Set<Long> dismissedPlaylistIds(String userId) {
+        Set<Long> result = new HashSet<>();
+        for (UserMusicEventStore.StoredEvent event : userMusicEventStore.findRecentByUserId(userId, 1000)) {
+            if (!"ignored_recommendation".equals(event.eventType())
+                || !"gms".equals(event.sourceSpace())
+                || !"playlist".equals(event.itemKind())) {
+                continue;
+            }
+            Long playlistId = parseGmsEmsPlaylistId(event.playlistId());
+            if (playlistId != null) {
+                result.add(playlistId);
+            }
+        }
+        return result;
     }
 
     private Set<String> collectUserArtists(String userId) {
@@ -288,6 +324,28 @@ public class GmsPlaylistPreviewService {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
+    private Long parseGmsEmsPlaylistId(String playlistId) {
+        if (playlistId == null || !playlistId.startsWith("ems-")) {
+            return null;
+        }
+        try {
+            return Long.parseLong(playlistId.substring("ems-".length()));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private Long parseGmsPersonalPlaylistId(String playlistId) {
+        if (playlistId == null || !playlistId.startsWith("gms-ems-")) {
+            return null;
+        }
+        try {
+            return Long.parseLong(playlistId.substring("gms-ems-".length()));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
     private double round(double value) {
         return Math.round(value * 100.0d) / 100.0d;
     }
@@ -318,7 +376,7 @@ public class GmsPlaylistPreviewService {
         List<GmsPlaylistPreviewCandidate> candidates
     ) {}
 
-    public SaveResult saveToPms(String userId, Long emsPlaylistId, String customTitle) {
+    public SaveResult saveToPms(String userId, Long emsPlaylistId, String customTitle, List<Long> excludedTrackIds) {
         if (userId == null || userId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "user_id is required.");
         }
@@ -350,6 +408,18 @@ public class GmsPlaylistPreviewService {
                 "EMS playlist has no tracks to import."
             );
         }
+        Set<Long> excludedIds = excludedTrackIds == null
+            ? Set.of()
+            : new HashSet<>(excludedTrackIds);
+        List<EmsCollectedPlaylistTrackEntity> selectedTrackLinks = trackLinks.stream()
+            .filter(link -> link.getTrack() != null && !excludedIds.contains(link.getTrack().getId()))
+            .toList();
+        if (selectedTrackLinks.isEmpty()) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "No tracks selected for PMS import."
+            );
+        }
 
         String personalPlaylistId = "gms-ems-%d".formatted(emsPlaylistId);
         String resolvedTitle = (customTitle != null && !customTitle.isBlank())
@@ -374,8 +444,8 @@ public class GmsPlaylistPreviewService {
 
         Instant now = Instant.now();
         int addedCount = 0;
-        for (int i = 0; i < trackLinks.size(); i++) {
-            EmsCollectedTrackEntity emsTrack = trackLinks.get(i).getTrack();
+        for (int i = 0; i < selectedTrackLinks.size(); i++) {
+            EmsCollectedTrackEntity emsTrack = selectedTrackLinks.get(i).getTrack();
             String trackId = "ems-%d".formatted(emsTrack.getId());
             if (existingTrackIds.contains(trackId)) {
                 continue;
@@ -439,6 +509,46 @@ public class GmsPlaylistPreviewService {
         );
     }
 
+    public DismissResult dismissFromGms(String userId, Long emsPlaylistId) {
+        if (userId == null || userId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "user_id is required.");
+        }
+        if (emsPlaylistId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "playlist_id is required.");
+        }
+
+        EmsCollectedPlaylistEntity emsPlaylist = playlistRepository.findById(emsPlaylistId)
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "EMS playlist not found: " + emsPlaylistId
+            ));
+        Instant now = Instant.now();
+        userMusicEventService.recordEvent(new UserMusicEventRequest(
+            userId,
+            "ignored_recommendation",
+            "gms",
+            emsPlaylist.getSourcePlatform(),
+            null,
+            "gms-ems-%d".formatted(emsPlaylistId),
+            "playlist",
+            null,
+            "ems-%d".formatted(emsPlaylistId),
+            null,
+            emsPlaylist.getSpotifyUri(),
+            emsPlaylist.getTitle(),
+            emsPlaylist.getCurator(),
+            null,
+            null,
+            null,
+            null,
+            null,
+            "gms-playlist-%d".formatted(emsPlaylistId),
+            null,
+            now
+        ));
+        return new DismissResult(userId, emsPlaylistId, now);
+    }
+
     public record SaveResult(
         String userId,
         Long emsPlaylistId,
@@ -447,5 +557,11 @@ public class GmsPlaylistPreviewService {
         int personalPlaylistTrackCount,
         int addedTrackCount,
         Instant savedAt
+    ) {}
+
+    public record DismissResult(
+        String userId,
+        Long emsPlaylistId,
+        Instant dismissedAt
     ) {}
 }

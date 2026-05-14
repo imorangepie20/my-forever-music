@@ -922,6 +922,7 @@ export interface GmsPlaylistPreviewItem {
 
 export interface GmsPlaylistSaveRequest {
     title?: string | null
+    excluded_track_ids?: number[]
 }
 
 export interface GmsPlaylistSaveResponse {
@@ -935,6 +936,15 @@ export interface GmsPlaylistSaveResponse {
     personal_playlist_track_count: number
     added_track_count: number
     saved_at: string
+}
+
+export interface GmsPlaylistDismissResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string
+    ems_playlist_id: number
+    dismissed_at: string
 }
 
 export interface EmsCollectionSearchRequest {

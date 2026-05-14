@@ -3,6 +3,7 @@ package io.myforevermusic.api.modules.gms.presentation;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService;
+import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.DismissResult;
 import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.GmsPlaylistPreviewCandidate;
 import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.GmsPlaylistPreviewResult;
 import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.SaveResult;
@@ -48,13 +49,45 @@ public class GmsPlaylistPreviewController {
         SaveResult result = service.saveToPms(
             userId,
             playlistId,
-            request == null ? null : request.title()
+            request == null ? null : request.title(),
+            request == null ? null : request.excludedTrackIds()
         );
         return GmsPlaylistSaveResponse.from(result);
     }
 
+    @Operation(summary = "Dismiss an EMS playlist from the user's GMS playlist candidates")
+    @PostMapping("/{playlistId}/dismiss")
+    public GmsPlaylistDismissResponse dismiss(
+        @PathVariable Long playlistId,
+        @RequestParam("user_id") String userId
+    ) {
+        DismissResult result = service.dismissFromGms(userId, playlistId);
+        return GmsPlaylistDismissResponse.from(result);
+    }
+
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    public record GmsPlaylistSaveRequest(String title) {}
+    public record GmsPlaylistSaveRequest(String title, List<Long> excludedTrackIds) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record GmsPlaylistDismissResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        String userId,
+        Long emsPlaylistId,
+        Instant dismissedAt
+    ) {
+        static GmsPlaylistDismissResponse from(DismissResult result) {
+            return new GmsPlaylistDismissResponse(
+                "api",
+                "ok",
+                Instant.now(),
+                result.userId(),
+                result.emsPlaylistId(),
+                result.dismissedAt()
+            );
+        }
+    }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record GmsPlaylistSaveResponse(

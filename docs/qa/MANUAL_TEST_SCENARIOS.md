@@ -95,6 +95,37 @@
    - 점수가 모두 null 이면 패널 자체가 안 보임
 4. 카드 Play 버튼 → TIDAL playable target resolve 후 재생
 
+## 시나리오 4-B — GMS Playlists preview player + track 제거
+
+1. `/gms-playlists` 진입 후 후보 playlist의 `Preview tracks` 클릭
+2. 프리뷰 모달에서 첫 트랙 재생 → 모달 상단 Preview player에 현재 트랙, seek, volume, prev/next, pause/play 표시
+3. 특정 트랙의 휴지통 버튼 클릭
+4. 검증:
+   - 해당 트랙이 preview 목록과 Play all queue에서 제외됨
+   - `removed before PMS save` 카운트가 증가하고 Restore로 복구 가능
+   - 제거된 상태에서 `PMS에 저장`을 누르면 요청 payload에 `excluded_track_ids`가 포함되고 PMS 저장 결과의 added track count가 제거 전보다 작음
+
+## 시나리오 4-C — GMS Playlist 후보 제거
+
+1. `/gms-playlists` 진입 후 후보 playlist 카드의 `Remove from GMS` 클릭
+2. ConfirmDialog에서 `제거` 클릭
+3. 검증:
+   - 해당 playlist 카드가 후보 목록에서 즉시 사라짐
+   - API `POST /api/v1/gms/playlists/{playlistId}/dismiss?user_id=...`가 200을 반환
+   - DB 활성 프로필이면 `user_music_event`에 `event_type='ignored_recommendation'`, `source_space='gms'`, `item_kind='playlist'`, `playlist_id='ems-{playlistId}'` row 생성
+   - 새로고침 후 같은 playlist가 GMS 후보에 다시 나오지 않음
+   - EMS 원본 playlist/track row는 삭제되지 않음
+
+## 시나리오 4-D — PMS 저장된 GMS Playlist 후보 제외
+
+1. `/gms-playlists` 진입 후 후보 playlist 카드의 `Save to PMS` 클릭
+2. ConfirmDialog에서 `저장` 클릭
+3. 검증:
+   - 저장 성공 후 해당 playlist 카드가 후보 목록에서 즉시 사라짐
+   - PMS personal playlist에 `playlist_id='gms-ems-{playlistId}'`로 저장됨
+   - 페이지 새로고침 또는 `Refresh` 후 같은 playlist가 GMS 후보에 다시 나오지 않음
+   - EMS 원본 playlist/track row는 삭제되지 않음
+
 ## 시나리오 5 — Sidebar 스크롤 (admin)
 
 1. admin 로그인 후 sidebar 메뉴 총 14개 (workspace 8 + admin 6)
