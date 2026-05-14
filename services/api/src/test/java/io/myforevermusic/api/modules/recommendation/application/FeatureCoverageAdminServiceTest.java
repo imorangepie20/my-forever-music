@@ -2,11 +2,14 @@ package io.myforevermusic.api.modules.recommendation.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.myforevermusic.api.modules.auth.application.AuthAccountStore;
 import io.myforevermusic.api.modules.auth.application.AuthRegisteredAccount;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsAcquisitionRunEntity;
+import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsAcquisitionRunRepository;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackRepository;
 import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
@@ -14,6 +17,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 class FeatureCoverageAdminServiceTest {
@@ -25,6 +29,7 @@ class FeatureCoverageAdminServiceTest {
         UserMusicEventStore eventStore = mock(UserMusicEventStore.class);
         RecommendationSnapshotStore snapshotStore = mock(RecommendationSnapshotStore.class);
         EmsCollectedTrackRepository emsTrackRepository = mock(EmsCollectedTrackRepository.class);
+        EmsAcquisitionRunRepository acquisitionRunRepository = mock(EmsAcquisitionRunRepository.class);
 
         when(authAccountStore.findByUserId("admin-user")).thenReturn(Optional.of(adminAccount("admin-user")));
         when(pmsUserLibraryStore.findPlaylists("target-user")).thenReturn(List.of(new PmsUserLibraryStore.LibraryPlaylistState(
@@ -47,9 +52,13 @@ class FeatureCoverageAdminServiceTest {
         )));
         when(eventStore.countEventsByUserIdAfter("target-user", Instant.EPOCH)).thenReturn(7L);
         when(snapshotStore.findRecentByUserId("target-user", 1000)).thenReturn(List.of(snapshot(1L), snapshot(2L)));
-        when(emsTrackRepository.summarizeFeatureCoverageBySourcePlatform()).thenReturn(List.of(
-            new EmsCoverageRow("spotify", 10L, 8L, 9L, 6L),
-            new EmsCoverageRow("tidal", 5L, 2L, 5L, 1L)
+        when(emsTrackRepository.summarizeFeatureCoverageBySourcePlatform(any(Instant.class))).thenReturn(List.of(
+            new EmsCoverageRow("spotify", 10L, 8L, 1L, Instant.parse("2026-05-14T00:00:00Z"), 9L, 6L),
+            new EmsCoverageRow("tidal", 5L, 2L, 0L, Instant.parse("2026-05-13T00:00:00Z"), 5L, 1L)
+        ));
+        when(acquisitionRunRepository.findTop20ByOrderByStartedAtDesc()).thenReturn(List.of(
+            acquisitionRun(20, 2, 8, 1),
+            acquisitionRun(10, 1, 2, 0)
         ));
 
         FeatureCoverageAdminService.FeatureCoverageReport report = new FeatureCoverageAdminService(
@@ -58,7 +67,8 @@ class FeatureCoverageAdminServiceTest {
             eventStore,
             snapshotStore,
             Optional.of(emsTrackRepository),
-            new DriftSignalEvaluator()
+            Optional.of(acquisitionRunRepository),
+            noDriftEvaluator()
         ).summarize("admin-user", "target-user");
 
         assertThat(report.status()).isEqualTo("ok");
@@ -72,10 +82,17 @@ class FeatureCoverageAdminServiceTest {
         assertThat(report.emsPool().trackCount()).isEqualTo(15);
         assertThat(report.emsPool().audioFeatureFilledCount()).isEqualTo(10);
         assertThat(report.emsPool().audioFeatureCoverageRatio()).isEqualTo(0.6667d);
+        assertThat(report.emsPool().staleAudioFeatureCount()).isEqualTo(1);
+        assertThat(report.emsPool().staleAudioFeatureRatio()).isEqualTo(0.1d);
+        assertThat(report.emsPool().latestAudioResolvedAt()).isEqualTo(Instant.parse("2026-05-14T00:00:00Z"));
         assertThat(report.emsPool().isrcCount()).isEqualTo(14);
         assertThat(report.emsPool().canonicalTrackCount()).isEqualTo(7);
         assertThat(report.emsPool().sources()).extracting(FeatureCoverageAdminService.EmsSourceCoverage::sourcePlatform)
             .containsExactly("spotify", "tidal");
+        assertThat(report.emsAcquisition().recentRunCount()).isEqualTo(2);
+        assertThat(report.emsAcquisition().skippedArticleCount()).isEqualTo(3);
+        assertThat(report.emsAcquisition().skippedSeedCount()).isEqualTo(1);
+        assertThat(report.emsAcquisition().skippedItemRatio()).isEqualTo(0.0976d);
         assertThat(report.learningData().eventCount()).isEqualTo(7);
         assertThat(report.learningData().recentRecommendationSnapshotCount()).isEqualTo(2);
         assertThat(report.warnings()).isEmpty();
@@ -99,12 +116,16 @@ class FeatureCoverageAdminServiceTest {
             eventStore,
             snapshotStore,
             Optional.empty(),
-            new DriftSignalEvaluator()
+            Optional.empty(),
+            noDriftEvaluator()
         ).summarize("admin-user", null);
 
         assertThat(report.status()).isEqualTo("degraded");
         assertThat(report.emsPool().warnings()).hasSize(1);
-        assertThat(report.warnings()).containsExactlyElementsOf(report.emsPool().warnings());
+        assertThat(report.emsAcquisition().warnings()).hasSize(1);
+        assertThat(report.warnings())
+            .containsAll(report.emsPool().warnings())
+            .containsAll(report.emsAcquisition().warnings());
     }
 
     @Test
@@ -118,7 +139,8 @@ class FeatureCoverageAdminServiceTest {
             mock(UserMusicEventStore.class),
             mock(RecommendationSnapshotStore.class),
             Optional.empty(),
-            new DriftSignalEvaluator()
+            Optional.empty(),
+            noDriftEvaluator()
         );
 
         assertThatThrownBy(() -> service.summarize("user-001", null))
@@ -237,10 +259,45 @@ class FeatureCoverageAdminServiceTest {
         );
     }
 
+    private DriftSignalEvaluator noDriftEvaluator() {
+        DriftSignalEvaluator evaluator = new DriftSignalEvaluator();
+        ReflectionTestUtils.setField(evaluator, "audioStaleMaxRatio", 1.0d);
+        ReflectionTestUtils.setField(evaluator, "emsAcquisitionSkipMaxRatio", 1.0d);
+        return evaluator;
+    }
+
+    private EmsAcquisitionRunEntity acquisitionRun(
+        int articleCount,
+        int skippedArticleCount,
+        int seedCount,
+        int skippedSeedCount
+    ) {
+        EmsAcquisitionRunEntity run = new EmsAcquisitionRunEntity(
+            "manual",
+            "admin-user",
+            Instant.parse("2026-05-14T00:00:00Z")
+        );
+        run.updateProgress(
+            1,
+            articleCount,
+            skippedArticleCount,
+            0,
+            seedCount,
+            skippedSeedCount,
+            0,
+            0,
+            0,
+            Instant.parse("2026-05-14T00:00:00Z")
+        );
+        return run;
+    }
+
     private record EmsCoverageRow(
         String sourcePlatform,
         Long trackCount,
         Long audioFeatureFilledCount,
+        Long staleAudioFeatureCount,
+        Instant latestAudioResolvedAt,
         Long isrcCount,
         Long canonicalTrackCount
     ) implements EmsCollectedTrackRepository.FeatureCoverageBySourcePlatform {
@@ -258,6 +315,16 @@ class FeatureCoverageAdminServiceTest {
         @Override
         public Long getAudioFeatureFilledCount() {
             return audioFeatureFilledCount;
+        }
+
+        @Override
+        public Long getStaleAudioFeatureCount() {
+            return staleAudioFeatureCount;
+        }
+
+        @Override
+        public Instant getLatestAudioResolvedAt() {
+            return latestAudioResolvedAt;
         }
 
         @Override

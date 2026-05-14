@@ -21,13 +21,17 @@ public interface EmsCollectedTrackRepository extends JpaRepository<EmsCollectedT
         select track.sourcePlatform as sourcePlatform,
                count(track) as trackCount,
                sum(case when track.audioFeatures.audioFeaturesFilled = true then 1 else 0 end) as audioFeatureFilledCount,
+               sum(case when track.audioFeatures.audioFeaturesFilled = true
+                    and (track.audioFeatures.resolvedAt is null or track.audioFeatures.resolvedAt < :staleCutoff)
+                    then 1 else 0 end) as staleAudioFeatureCount,
+               max(track.audioFeatures.resolvedAt) as latestAudioResolvedAt,
                sum(case when track.isrc is not null and track.isrc <> '' then 1 else 0 end) as isrcCount,
                sum(case when track.canonicalTrackId is not null then 1 else 0 end) as canonicalTrackCount
         from EmsCollectedTrackEntity track
         group by track.sourcePlatform
         order by track.sourcePlatform
         """)
-    List<FeatureCoverageBySourcePlatform> summarizeFeatureCoverageBySourcePlatform();
+    List<FeatureCoverageBySourcePlatform> summarizeFeatureCoverageBySourcePlatform(@Param("staleCutoff") Instant staleCutoff);
 
     List<EmsCollectedTrackEntity> findByTitleIgnoreCaseAndArtistNameIgnoreCase(String title, String artistName);
 
@@ -220,6 +224,8 @@ public interface EmsCollectedTrackRepository extends JpaRepository<EmsCollectedT
         String getSourcePlatform();
         Long getTrackCount();
         Long getAudioFeatureFilledCount();
+        Long getStaleAudioFeatureCount();
+        Instant getLatestAudioResolvedAt();
         Long getIsrcCount();
         Long getCanonicalTrackCount();
     }

@@ -214,7 +214,7 @@ const FeatureCoverageAdminPage = () => {
                         ))}
                     </section>
 
-                    <section className="grid gap-5 xl:grid-cols-3">
+                    <section className="grid gap-5 xl:grid-cols-4">
                         <CoveragePanel
                             icon={<Music2 size={20} />}
                             title="PMS Library"
@@ -222,6 +222,7 @@ const FeatureCoverageAdminPage = () => {
                                 ['Playlists', formatCount(report.pms_library.playlist_count)],
                                 ['Tracks', formatCount(report.pms_library.track_count)],
                                 ['Audio Features', audioCoverageText(report.pms_library)],
+                                ['Stale Audio', staleAudioText(report.pms_library)],
                                 ['ISRC', ratioText(report.pms_library.isrc_count, report.pms_library.track_count, report.pms_library.isrc_coverage_ratio)],
                                 ['Playback Target', ratioText(report.pms_library.playback_target_available_count, report.pms_library.track_count, report.pms_library.playback_target_coverage_ratio)],
                             ]}
@@ -232,9 +233,20 @@ const FeatureCoverageAdminPage = () => {
                             rows={[
                                 ['Tracks', formatCount(report.ems_pool.track_count)],
                                 ['Audio Features', audioCoverageText(report.ems_pool)],
+                                ['Stale Audio', staleAudioText(report.ems_pool)],
                                 ['ISRC', ratioText(report.ems_pool.isrc_count, report.ems_pool.track_count, report.ems_pool.isrc_coverage_ratio)],
                                 ['Canonical Link', ratioText(report.ems_pool.canonical_track_count, report.ems_pool.track_count, report.ems_pool.canonical_track_coverage_ratio)],
                                 ['Sources', formatCount(report.ems_pool.sources.length)],
+                            ]}
+                        />
+                        <CoveragePanel
+                            icon={<RefreshCw size={20} />}
+                            title="EMS Acquisition"
+                            rows={[
+                                ['Recent Runs', formatCount(report.ems_acquisition.recent_run_count)],
+                                ['Articles Skipped', ratioText(report.ems_acquisition.skipped_article_count, report.ems_acquisition.article_count, report.ems_acquisition.article_count > 0 ? report.ems_acquisition.skipped_article_count / report.ems_acquisition.article_count : 0)],
+                                ['Seeds Skipped', ratioText(report.ems_acquisition.skipped_seed_count, report.ems_acquisition.seed_count + report.ems_acquisition.skipped_seed_count, report.ems_acquisition.seed_count + report.ems_acquisition.skipped_seed_count > 0 ? report.ems_acquisition.skipped_seed_count / (report.ems_acquisition.seed_count + report.ems_acquisition.skipped_seed_count) : 0)],
+                                ['Overall Skip Ratio', ratioText(report.ems_acquisition.skipped_item_count, report.ems_acquisition.checked_item_count, report.ems_acquisition.skipped_item_ratio)],
                             ]}
                         />
                         <CoveragePanel
@@ -250,12 +262,13 @@ const FeatureCoverageAdminPage = () => {
                     </section>
 
                     <section className="overflow-hidden rounded-2xl border border-hud-border-secondary bg-hud-bg-secondary/80">
-                        <table className="w-full min-w-[860px] text-left text-sm">
+                        <table className="w-full min-w-[980px] text-left text-sm">
                             <thead className="bg-hud-bg-primary/80 text-xs uppercase tracking-[0.18em] text-hud-text-muted">
                                 <tr>
                                     <th className="px-4 py-3">Source</th>
                                     <th className="px-4 py-3">Tracks</th>
                                     <th className="px-4 py-3">Audio</th>
+                                    <th className="px-4 py-3">Stale Audio</th>
                                     <th className="px-4 py-3">ISRC</th>
                                     <th className="px-4 py-3">Canonical</th>
                                 </tr>
@@ -266,6 +279,7 @@ const FeatureCoverageAdminPage = () => {
                                         <td className="px-4 py-3 font-medium text-hud-text-primary">{source.source_platform}</td>
                                         <td className="px-4 py-3 text-hud-text-secondary">{formatCount(source.track_count)}</td>
                                         <td className="px-4 py-3 text-hud-text-secondary">{audioCoverageText(source)}</td>
+                                        <td className="px-4 py-3 text-hud-text-secondary">{staleAudioText(source)}</td>
                                         <td className="px-4 py-3 text-hud-text-secondary">
                                             {ratioText(source.isrc_count, source.track_count, source.isrc_coverage_ratio)}
                                         </td>
@@ -276,7 +290,7 @@ const FeatureCoverageAdminPage = () => {
                                 ))}
                                 {!report.ems_pool.sources.length && (
                                     <tr>
-                                        <td colSpan={5} className="px-4 py-8 text-center text-sm text-hud-text-muted">
+                                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-hud-text-muted">
                                             EMS source coverage가 없습니다.
                                         </td>
                                     </tr>
@@ -292,6 +306,9 @@ const FeatureCoverageAdminPage = () => {
 
 const audioCoverageText = (coverage: FeatureCoverageSummary) =>
     `${formatCount(coverage.audio_feature_filled_count)} / ${formatCount(coverage.track_count)} · ${formatPercent(coverage.audio_feature_coverage_ratio)}`
+
+const staleAudioText = (coverage: FeatureCoverageSummary) =>
+    `${formatCount(coverage.stale_audio_feature_count)} / ${formatCount(coverage.audio_feature_filled_count)} · ${formatPercent(coverage.stale_audio_feature_ratio)} · latest ${formatDateTime(coverage.latest_audio_resolved_at)}`
 
 const ratioText = (value: number, total: number, ratio: number) =>
     `${formatCount(value)} / ${formatCount(total)} · ${formatPercent(ratio)}`

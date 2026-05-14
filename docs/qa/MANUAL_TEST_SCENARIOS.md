@@ -144,7 +144,10 @@ app:
 2. admin 으로 같은 경로 → PMS Library / EMS Pool / Learning Data 패널 확인
 3. 검증:
    - PMS audio / EMS audio / EMS ISRC / Playback coverage 카드가 표시됨
-   - EMS source table 에 platform별 track/audio/ISRC/canonical coverage가 표시됨
+   - PMS Library / EMS Pool 패널에 `Stale Audio`가 표시되고 latest resolved timestamp가 함께 보임
+   - EMS Acquisition 패널에 최근 run, skipped article/seed, overall skip ratio가 표시됨
+   - EMS source table 에 platform별 track/audio/stale audio/ISRC/canonical coverage가 표시됨
+   - `drift_signals`에 `audio_stale` 또는 `ems_acquisition_skips`가 있으면 status banner로 노출됨
    - Target user input 에 다른 `user_id` 입력 후 조회하면 `target_user_id`와 PMS/Learning Data 집계가 바뀜
    - EMS repository가 없는 local profile에서는 degraded warning이 노출되고, 오류를 숨기지 않음
 
@@ -195,3 +198,5 @@ limit 20;
 | auto-train log 조회 | `select user_id, trained_at, dataset_fingerprint, sequence_item_count_at_train, qualified, promoted, summary from sasrec_auto_train_log order by trained_at desc limit 20;` |
 | candidate 조회 | `select id, query_title, candidate_kind, candidate_value, candidate_score, status from track_identity_candidate order by created_at desc limit 30;` |
 | recommendation audit 조회 | `select event_type, model_version, sasrec_applied, fallback_reason, feedback_type, created_at from recommendation_audit_log order by created_at desc limit 20;` |
+| EMS stale audio 조회 | `select source_platform, count(*) filter (where audio_features_filled), count(*) filter (where audio_features_filled and audio_resolved_at < now() - interval '90 days') from ems_collected_track group by source_platform;` |
+| EMS acquisition skip 조회 | `select count(*) as runs, sum(article_count) articles, sum(skipped_article_count) skipped_articles, sum(seed_count) seeds, sum(skipped_seed_count) skipped_seeds from (select * from ems_acquisition_run order by started_at desc limit 20) r;` |

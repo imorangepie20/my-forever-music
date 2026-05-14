@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.myforevermusic.api.modules.recommendation.application.DriftSignalEvaluator;
 import io.myforevermusic.api.modules.recommendation.application.FeatureCoverageAdminService;
+import io.myforevermusic.api.modules.recommendation.application.FeatureCoverageAdminService.EmsAcquisitionCoverage;
 import io.myforevermusic.api.modules.recommendation.application.FeatureCoverageAdminService.EmsPoolCoverage;
 import io.myforevermusic.api.modules.recommendation.application.FeatureCoverageAdminService.EmsSourceCoverage;
 import io.myforevermusic.api.modules.recommendation.application.FeatureCoverageAdminService.LearningDataCoverage;
@@ -43,6 +44,7 @@ public class FeatureCoverageAdminController {
         String targetUserId,
         PmsLibraryCoverageItem pmsLibrary,
         EmsPoolCoverageItem emsPool,
+        EmsAcquisitionCoverageItem emsAcquisition,
         LearningDataCoverageItem learningData,
         List<String> warnings,
         List<DriftSignalItem> driftSignals
@@ -55,6 +57,7 @@ public class FeatureCoverageAdminController {
                 report.targetUserId(),
                 PmsLibraryCoverageItem.from(report.pmsLibrary()),
                 EmsPoolCoverageItem.from(report.emsPool()),
+                EmsAcquisitionCoverageItem.from(report.emsAcquisition()),
                 LearningDataCoverageItem.from(report.learningData()),
                 report.warnings(),
                 report.driftSignals() == null
@@ -93,6 +96,9 @@ public class FeatureCoverageAdminController {
         long trackCount,
         long audioFeatureFilledCount,
         double audioFeatureCoverageRatio,
+        long staleAudioFeatureCount,
+        double staleAudioFeatureRatio,
+        Instant latestAudioResolvedAt,
         long isrcCount,
         double isrcCoverageRatio,
         long playbackTargetAvailableCount,
@@ -104,6 +110,9 @@ public class FeatureCoverageAdminController {
                 coverage.trackCount(),
                 coverage.audioFeatureFilledCount(),
                 coverage.audioFeatureCoverageRatio(),
+                coverage.staleAudioFeatureCount(),
+                coverage.staleAudioFeatureRatio(),
+                coverage.latestAudioResolvedAt(),
                 coverage.isrcCount(),
                 coverage.isrcCoverageRatio(),
                 coverage.playbackTargetAvailableCount(),
@@ -117,6 +126,9 @@ public class FeatureCoverageAdminController {
         long trackCount,
         long audioFeatureFilledCount,
         double audioFeatureCoverageRatio,
+        long staleAudioFeatureCount,
+        double staleAudioFeatureRatio,
+        Instant latestAudioResolvedAt,
         long isrcCount,
         double isrcCoverageRatio,
         long canonicalTrackCount,
@@ -129,6 +141,9 @@ public class FeatureCoverageAdminController {
                 coverage.trackCount(),
                 coverage.audioFeatureFilledCount(),
                 coverage.audioFeatureCoverageRatio(),
+                coverage.staleAudioFeatureCount(),
+                coverage.staleAudioFeatureRatio(),
+                coverage.latestAudioResolvedAt(),
                 coverage.isrcCount(),
                 coverage.isrcCoverageRatio(),
                 coverage.canonicalTrackCount(),
@@ -145,6 +160,9 @@ public class FeatureCoverageAdminController {
         long trackCount,
         long audioFeatureFilledCount,
         double audioFeatureCoverageRatio,
+        long staleAudioFeatureCount,
+        double staleAudioFeatureRatio,
+        Instant latestAudioResolvedAt,
         long isrcCount,
         double isrcCoverageRatio,
         long canonicalTrackCount,
@@ -156,10 +174,40 @@ public class FeatureCoverageAdminController {
                 coverage.trackCount(),
                 coverage.audioFeatureFilledCount(),
                 coverage.audioFeatureCoverageRatio(),
+                coverage.staleAudioFeatureCount(),
+                coverage.staleAudioFeatureRatio(),
+                coverage.latestAudioResolvedAt(),
                 coverage.isrcCount(),
                 coverage.isrcCoverageRatio(),
                 coverage.canonicalTrackCount(),
                 coverage.canonicalTrackCoverageRatio()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsAcquisitionCoverageItem(
+        long recentRunCount,
+        long articleCount,
+        long skippedArticleCount,
+        long seedCount,
+        long skippedSeedCount,
+        long checkedItemCount,
+        long skippedItemCount,
+        double skippedItemRatio,
+        List<String> warnings
+    ) {
+        static EmsAcquisitionCoverageItem from(EmsAcquisitionCoverage coverage) {
+            return new EmsAcquisitionCoverageItem(
+                coverage.recentRunCount(),
+                coverage.articleCount(),
+                coverage.skippedArticleCount(),
+                coverage.seedCount(),
+                coverage.skippedSeedCount(),
+                coverage.checkedItemCount(),
+                coverage.skippedItemCount(),
+                coverage.skippedItemRatio(),
+                coverage.warnings()
             );
         }
     }

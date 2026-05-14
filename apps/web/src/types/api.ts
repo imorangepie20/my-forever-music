@@ -1182,6 +1182,9 @@ export interface FeatureCoverageSummary {
     track_count: number
     audio_feature_filled_count: number
     audio_feature_coverage_ratio: number
+    stale_audio_feature_count: number
+    stale_audio_feature_ratio: number
+    latest_audio_resolved_at: string | null
     isrc_count: number
     isrc_coverage_ratio: number
 }
@@ -1211,6 +1214,18 @@ export interface FeatureCoverageLearningData {
     recent_recommendation_snapshot_limit: number
 }
 
+export interface FeatureCoverageEmsAcquisition {
+    recent_run_count: number
+    article_count: number
+    skipped_article_count: number
+    seed_count: number
+    skipped_seed_count: number
+    checked_item_count: number
+    skipped_item_count: number
+    skipped_item_ratio: number
+    warnings: string[]
+}
+
 export interface FeatureCoverageDriftSignal {
     category: string
     severity: 'warn' | 'info' | string
@@ -1228,6 +1243,7 @@ export interface FeatureCoverageAdminResponse {
     target_user_id: string
     pms_library: FeatureCoveragePmsLibrary
     ems_pool: FeatureCoverageEmsPool
+    ems_acquisition: FeatureCoverageEmsAcquisition
     learning_data: FeatureCoverageLearningData
     warnings: string[]
     drift_signals: FeatureCoverageDriftSignal[]

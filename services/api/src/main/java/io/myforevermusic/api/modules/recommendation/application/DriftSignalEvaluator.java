@@ -26,6 +26,8 @@ public class DriftSignalEvaluator {
     static final String CATEGORY_PMS_PLAYBACK = "pms_playback";
     static final String CATEGORY_PMS_ISRC = "pms_isrc";
     static final String CATEGORY_EMS_AUDIO = "ems_audio";
+    static final String CATEGORY_AUDIO_STALE = "audio_stale";
+    static final String CATEGORY_EMS_ACQUISITION_SKIPS = "ems_acquisition_skips";
     static final String CATEGORY_EMS_ISRC = "ems_isrc";
     static final String CATEGORY_EMS_CANONICAL = "ems_canonical";
     static final String CATEGORY_LEARNING_THIN = "learning_data";
@@ -54,6 +56,18 @@ public class DriftSignalEvaluator {
     @Value("${app.recommendation.drift.ems-canonical-min-track-count:50}")
     private long emsCanonicalMinTrackCount;
 
+    @Value("${app.recommendation.drift.audio-stale-max-ratio:0.25}")
+    private double audioStaleMaxRatio;
+
+    @Value("${app.recommendation.drift.audio-stale-min-filled-count:20}")
+    private long audioStaleMinFilledCount;
+
+    @Value("${app.recommendation.drift.ems-acquisition-skip-max-ratio:0.8}")
+    private double emsAcquisitionSkipMaxRatio;
+
+    @Value("${app.recommendation.drift.ems-acquisition-min-checked-count:10}")
+    private long emsAcquisitionMinCheckedCount;
+
     @Value("${app.recommendation.drift.learning-min-event-count:50}")
     private long learningMinEventCount;
 
@@ -64,6 +78,7 @@ public class DriftSignalEvaluator {
         List<DriftSignal> signals = new ArrayList<>();
         evaluatePms(report.pmsLibrary(), signals);
         evaluateEms(report.emsPool() == null ? null : report.emsPool().sources(), signals);
+        evaluateAcquisition(report.emsAcquisition(), signals);
         evaluateLearning(report.learningData(), signals);
         return signals;
     }
@@ -120,6 +135,23 @@ public class DriftSignalEvaluator {
                 pms.trackCount()
             ));
         }
+        if (pms.audioFeatureFilledCount() >= audioStaleMinFilledCount
+            && pms.staleAudioFeatureRatio() > audioStaleMaxRatio) {
+            signals.add(new DriftSignal(
+                CATEGORY_AUDIO_STALE,
+                SEVERITY_INFO,
+                "pms",
+                "PMS audio_resolved_at stale 비율이 임계치(%.0f%%) 초과(%.0f%%, %d/%d)".formatted(
+                    audioStaleMaxRatio * 100.0d,
+                    pms.staleAudioFeatureRatio() * 100.0d,
+                    pms.staleAudioFeatureCount(),
+                    pms.audioFeatureFilledCount()
+                ),
+                pms.staleAudioFeatureRatio(),
+                audioStaleMaxRatio,
+                pms.audioFeatureFilledCount()
+            ));
+        }
     }
 
     private void evaluateEms(List<EmsSourceCoverage> sources, List<DriftSignal> signals) {
@@ -147,6 +179,24 @@ public class DriftSignalEvaluator {
                         source.audioFeatureCoverageRatio(),
                         emsAudioMinRatio,
                         source.trackCount()
+                    ));
+                }
+                if (source.audioFeatureFilledCount() >= audioStaleMinFilledCount
+                    && source.staleAudioFeatureRatio() > audioStaleMaxRatio) {
+                    signals.add(new DriftSignal(
+                        CATEGORY_AUDIO_STALE,
+                        SEVERITY_INFO,
+                        scope,
+                        "EMS %s audio_resolved_at stale 비율이 임계치(%.0f%%) 초과(%.0f%%, %d/%d)".formatted(
+                            source.sourcePlatform(),
+                            audioStaleMaxRatio * 100.0d,
+                            source.staleAudioFeatureRatio() * 100.0d,
+                            source.staleAudioFeatureCount(),
+                            source.audioFeatureFilledCount()
+                        ),
+                        source.staleAudioFeatureRatio(),
+                        audioStaleMaxRatio,
+                        source.audioFeatureFilledCount()
                     ));
                 }
                 if (source.isrcCoverageRatio() < emsIsrcMinRatio) {
@@ -185,6 +235,31 @@ public class DriftSignalEvaluator {
                     source.trackCount()
                 ));
             }
+        }
+    }
+
+    private void evaluateAcquisition(
+        FeatureCoverageAdminService.EmsAcquisitionCoverage acquisition,
+        List<DriftSignal> signals
+    ) {
+        if (acquisition == null || acquisition.checkedItemCount() < emsAcquisitionMinCheckedCount) {
+            return;
+        }
+        if (acquisition.skippedItemRatio() > emsAcquisitionSkipMaxRatio) {
+            signals.add(new DriftSignal(
+                CATEGORY_EMS_ACQUISITION_SKIPS,
+                SEVERITY_INFO,
+                "ems:acquisition",
+                "최근 EMS acquisition skip 비율이 임계치(%.0f%%) 초과(%.0f%%, skipped=%d/%d) — seed/source 확장 필요".formatted(
+                    emsAcquisitionSkipMaxRatio * 100.0d,
+                    acquisition.skippedItemRatio() * 100.0d,
+                    acquisition.skippedItemCount(),
+                    acquisition.checkedItemCount()
+                ),
+                acquisition.skippedItemRatio(),
+                emsAcquisitionSkipMaxRatio,
+                acquisition.checkedItemCount()
+            ));
         }
     }
 

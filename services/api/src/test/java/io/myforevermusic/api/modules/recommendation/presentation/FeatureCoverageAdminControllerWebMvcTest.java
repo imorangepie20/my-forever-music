@@ -39,8 +39,11 @@ class FeatureCoverageAdminControllerWebMvcTest {
             .andExpect(jsonPath("$.target_user_id").value("target-user"))
             .andExpect(jsonPath("$.pms_library.playlist_count").value(2))
             .andExpect(jsonPath("$.pms_library.audio_feature_coverage_ratio").value(0.75))
+            .andExpect(jsonPath("$.pms_library.stale_audio_feature_ratio").value(0.1111))
             .andExpect(jsonPath("$.ems_pool.sources[0].source_platform").value("spotify"))
+            .andExpect(jsonPath("$.ems_pool.sources[0].latest_audio_resolved_at").value("2026-05-14T00:00:00Z"))
             .andExpect(jsonPath("$.ems_pool.sources[0].canonical_track_coverage_ratio").value(0.6))
+            .andExpect(jsonPath("$.ems_acquisition.skipped_item_ratio").value(0.2))
             .andExpect(jsonPath("$.learning_data.event_count").value(21))
             .andExpect(jsonPath("$.learning_data.recent_recommendation_snapshot_limit").value(1000));
     }
@@ -55,6 +58,9 @@ class FeatureCoverageAdminControllerWebMvcTest {
                 12L,
                 9L,
                 0.75d,
+                1L,
+                0.1111d,
+                Instant.parse("2026-05-14T00:00:00Z"),
                 10L,
                 0.8333d,
                 11L,
@@ -64,6 +70,9 @@ class FeatureCoverageAdminControllerWebMvcTest {
                 20L,
                 16L,
                 0.8d,
+                2L,
+                0.125d,
+                Instant.parse("2026-05-14T00:00:00Z"),
                 18L,
                 0.9d,
                 12L,
@@ -73,11 +82,25 @@ class FeatureCoverageAdminControllerWebMvcTest {
                     20L,
                     16L,
                     0.8d,
+                    2L,
+                    0.125d,
+                    Instant.parse("2026-05-14T00:00:00Z"),
                     18L,
                     0.9d,
                     12L,
                     0.6d
                 )),
+                List.of()
+            ),
+            new FeatureCoverageAdminService.EmsAcquisitionCoverage(
+                2L,
+                20L,
+                3L,
+                5L,
+                2L,
+                27L,
+                5L,
+                0.2d,
                 List.of()
             ),
             new FeatureCoverageAdminService.LearningDataCoverage(21L, 5L, 1000),
