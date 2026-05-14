@@ -9,8 +9,9 @@ import io.myforevermusic.api.modules.gms.presentation.GmsRecommendationFeedbackR
 import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.local.InMemoryPmsUserLibraryStore;
 import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudioFeatures;
-import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryRecommendationAuditLogStore;
+import io.myforevermusic.api.modules.recommendation.application.EventSignalWeights;
 import io.myforevermusic.api.modules.recommendation.application.UserMusicEventService;
+import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryRecommendationAuditLogStore;
 import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryUserMusicEventStore;
 import java.time.Instant;
 import java.util.List;
@@ -27,7 +28,7 @@ class GmsRecommendationFeedbackServiceTest {
         GmsRecommendationFeedbackService service = new GmsRecommendationFeedbackService(
             new InMemoryGmsRecommendationFeedbackStore(),
             userLibraryStore,
-            new UserMusicEventService(eventStore),
+            new UserMusicEventService(eventStore, new EventSignalWeights()),
             auditLogStore
         );
 
@@ -63,7 +64,7 @@ class GmsRecommendationFeedbackServiceTest {
         GmsRecommendationFeedbackService service = new GmsRecommendationFeedbackService(
             new InMemoryGmsRecommendationFeedbackStore(),
             new InMemoryPmsUserLibraryStore(),
-            new UserMusicEventService(new InMemoryUserMusicEventStore()),
+            new UserMusicEventService(new InMemoryUserMusicEventStore(), new EventSignalWeights()),
             new InMemoryRecommendationAuditLogStore()
         );
 

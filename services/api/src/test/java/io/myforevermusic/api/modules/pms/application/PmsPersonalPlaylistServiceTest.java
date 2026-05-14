@@ -9,6 +9,7 @@ import io.myforevermusic.api.modules.pms.infrastructure.persistence.PmsTrackAudi
 import io.myforevermusic.api.modules.pms.presentation.PmsPersonalPlaylistCommandResponse;
 import io.myforevermusic.api.modules.pms.presentation.PmsPersonalPlaylistCreateRequest;
 import io.myforevermusic.api.modules.pms.presentation.PmsPersonalPlaylistTrackSaveRequest;
+import io.myforevermusic.api.modules.recommendation.application.EventSignalWeights;
 import io.myforevermusic.api.modules.recommendation.application.UserMusicEventService;
 import io.myforevermusic.api.modules.recommendation.infrastructure.local.InMemoryUserMusicEventStore;
 import java.time.Instant;
@@ -22,7 +23,7 @@ class PmsPersonalPlaylistServiceTest {
         PmsPersonalPlaylistService service = new PmsPersonalPlaylistService(
             new InMemoryPmsPersonalPlaylistStore(),
             new InMemoryPmsUserLibraryStore(),
-            new UserMusicEventService(new InMemoryUserMusicEventStore())
+            new UserMusicEventService(new InMemoryUserMusicEventStore(), new EventSignalWeights())
         );
 
         PmsPersonalPlaylistCommandResponse response = service.createPlaylist(
@@ -46,7 +47,7 @@ class PmsPersonalPlaylistServiceTest {
         PmsPersonalPlaylistService service = new PmsPersonalPlaylistService(
             new InMemoryPmsPersonalPlaylistStore(),
             userLibraryStore,
-            new UserMusicEventService(eventStore)
+            new UserMusicEventService(eventStore, new EventSignalWeights())
         );
 
         PmsPersonalPlaylistCommandResponse response = service.saveTrack(
@@ -87,7 +88,7 @@ class PmsPersonalPlaylistServiceTest {
         PmsPersonalPlaylistService service = new PmsPersonalPlaylistService(
             new InMemoryPmsPersonalPlaylistStore(),
             new InMemoryPmsUserLibraryStore(),
-            new UserMusicEventService(new InMemoryUserMusicEventStore())
+            new UserMusicEventService(new InMemoryUserMusicEventStore(), new EventSignalWeights())
         );
 
         assertThatThrownBy(() -> service.saveTrack(

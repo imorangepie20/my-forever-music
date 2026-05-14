@@ -33,6 +33,7 @@ public class UserPersonalizationProfileService {
     private final AuthAccountStore authAccountStore;
     private final UserMusicEventStore eventStore;
     private final UserPersonalizationProfileStore profileStore;
+    private final EventSignalWeights eventSignalWeights;
 
     @Value("${app.recommendation.personalization.profile-event-limit:200}")
     private int eventLimit;
@@ -46,11 +47,13 @@ public class UserPersonalizationProfileService {
     public UserPersonalizationProfileService(
         AuthAccountStore authAccountStore,
         UserMusicEventStore eventStore,
-        UserPersonalizationProfileStore profileStore
+        UserPersonalizationProfileStore profileStore,
+        EventSignalWeights eventSignalWeights
     ) {
         this.authAccountStore = authAccountStore;
         this.eventStore = eventStore;
         this.profileStore = profileStore;
+        this.eventSignalWeights = eventSignalWeights;
     }
 
     /**
@@ -139,24 +142,15 @@ public class UserPersonalizationProfileService {
     }
 
     /**
-     * Event type 별 신호 강도. eventWeight 가 있으면 우선 사용하고, 없으면 기본값을 부여한다.
-     * 부정 신호(skip, reject)는 음수로 반영된다.
+     * Event type 별 신호 강도. eventWeight 가 있으면 우선 사용하고, 없으면
+     * {@link EventSignalWeights} canonical 가중치를 사용한다(unknown event는 0).
      */
     private double signalWeight(StoredEvent event) {
         if (event.eventWeight() != null) {
             return event.eventWeight();
         }
-        String type = event.eventType() == null ? "" : event.eventType().trim().toLowerCase(Locale.ROOT);
-        return switch (type) {
-            case "track_saved", "added_to_playlist", "repeat_played", "recommendation_saved" -> 1.5d;
-            case "recommendation_liked" -> 1.0d;
-            case "play_completed" -> 0.7d;
-            case "playlist_imported" -> 0.3d;
-            case "stopped_midway" -> -0.3d;
-            case "skipped_early" -> -0.5d;
-            case "recommendation_rejected" -> -1.0d;
-            default -> 0.0d;
-        };
+        Double canonical = eventSignalWeights.weightFor(event.eventType());
+        return canonical == null ? 0.0d : canonical;
     }
 
     private void assertAdmin(String userId) {

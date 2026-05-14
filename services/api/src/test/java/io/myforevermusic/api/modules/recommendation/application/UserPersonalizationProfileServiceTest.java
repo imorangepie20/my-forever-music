@@ -33,7 +33,7 @@ class UserPersonalizationProfileServiceTest {
         authAccountStore = mock(AuthAccountStore.class);
         eventStore = mock(UserMusicEventStore.class);
         profileStore = new InMemoryUserPersonalizationProfileStore();
-        service = new UserPersonalizationProfileService(authAccountStore, eventStore, profileStore);
+        service = new UserPersonalizationProfileService(authAccountStore, eventStore, profileStore, new EventSignalWeights());
         ReflectionTestUtils.setField(service, "eventLimit", 200);
         ReflectionTestUtils.setField(service, "topArtistLimit", 10);
         ReflectionTestUtils.setField(service, "topPlatformLimit", 5);
@@ -60,7 +60,8 @@ class UserPersonalizationProfileServiceTest {
         ).containsExactly("Queen", "Radiohead", "ColdBand");
         assertThat(result.profile().topArtists()).first()
             .satisfies(a -> {
-                assertThat(a.score()).isEqualTo(1.5d + 1.5d + 0.7d);
+                // canonical weights from EventSignalWeights: track_saved=2.0, play_completed=1.0
+                assertThat(a.score()).isEqualTo(2.0d + 2.0d + 1.0d);
                 assertThat(a.signalCount()).isEqualTo(3L);
             });
         assertThat(result.profile().topSourcePlatforms())
@@ -96,10 +97,10 @@ class UserPersonalizationProfileServiceTest {
         UserPersonalizationProfileService.RecomputeResult result =
             service.recomputeForAdmin(ADMIN_USER_ID, TARGET_USER_ID, null);
 
-        // unknown_event_kind has weight 0 → not counted, only the saved event contributes
+        // unknown_event_kind has no canonical weight → not counted, only the saved event contributes
         assertThat(result.signalCount()).isEqualTo(1L);
         assertThat(result.profile().topArtists()).first()
-            .satisfies(a -> assertThat(a.score()).isEqualTo(1.5d));
+            .satisfies(a -> assertThat(a.score()).isEqualTo(2.0d)); // track_saved canonical weight
     }
 
     @Test

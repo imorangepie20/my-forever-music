@@ -17,6 +17,7 @@ class UserMusicEventServiceTest {
     void shouldRecordPlaybackEventWithoutPmsLibraryDependency() {
         UserMusicEventService service = new UserMusicEventService(
             new InMemoryUserMusicEventStore(),
+            new EventSignalWeights(),
             Clock.fixed(Instant.parse("2026-05-11T00:00:00Z"), ZoneOffset.UTC)
         );
 
@@ -58,7 +59,10 @@ class UserMusicEventServiceTest {
 
     @Test
     void shouldRejectUnsupportedEventType() {
-        UserMusicEventService service = new UserMusicEventService(new InMemoryUserMusicEventStore());
+        UserMusicEventService service = new UserMusicEventService(
+            new InMemoryUserMusicEventStore(),
+            new EventSignalWeights()
+        );
 
         assertThatThrownBy(() -> service.recordEvent(
             new UserMusicEventRequest(

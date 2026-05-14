@@ -5,7 +5,6 @@ import io.myforevermusic.api.modules.recommendation.presentation.UserMusicEventR
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -29,32 +28,19 @@ public class UserMusicEventService {
         "ignored_recommendation",
         "stopped_midway"
     );
-    private static final Map<String, Double> EVENT_WEIGHTS = Map.ofEntries(
-        Map.entry("play_started", 0.0),
-        Map.entry("play_paused", 0.0),
-        Map.entry("play_resumed", 0.0),
-        Map.entry("play_completed", 1.0),
-        Map.entry("skip_next", -0.25),
-        Map.entry("skip_previous", 0.0),
-        Map.entry("replay", 1.5),
-        Map.entry("track_saved", 2.0),
-        Map.entry("added_to_playlist", 2.0),
-        Map.entry("recommendation_liked", 2.0),
-        Map.entry("recommendation_rejected", -2.0),
-        Map.entry("ignored_recommendation", -0.1),
-        Map.entry("stopped_midway", -0.25)
-    );
 
     private final UserMusicEventStore eventStore;
+    private final EventSignalWeights eventSignalWeights;
     private final Clock clock;
 
     @Autowired
-    public UserMusicEventService(UserMusicEventStore eventStore) {
-        this(eventStore, Clock.systemUTC());
+    public UserMusicEventService(UserMusicEventStore eventStore, EventSignalWeights eventSignalWeights) {
+        this(eventStore, eventSignalWeights, Clock.systemUTC());
     }
 
-    UserMusicEventService(UserMusicEventStore eventStore, Clock clock) {
+    UserMusicEventService(UserMusicEventStore eventStore, EventSignalWeights eventSignalWeights, Clock clock) {
         this.eventStore = eventStore;
+        this.eventSignalWeights = eventSignalWeights;
         this.clock = clock;
     }
 
@@ -70,7 +56,7 @@ public class UserMusicEventService {
             new UserMusicEventStore.EventDraft(
                 request.userId(),
                 eventType,
-                EVENT_WEIGHTS.get(eventType),
+                eventSignalWeights.weightFor(eventType),
                 sourceSpace,
                 normalizeOptional(request.sourcePlatform()),
                 normalizeOptional(request.playbackPlatformId()),
