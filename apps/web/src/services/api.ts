@@ -59,6 +59,8 @@ import type {
     SasrecAutoTrainAdminResponse,
     SasrecRegistryAdminResponse,
     SasrecUserModelStatusResponse,
+    PersonalizationProfileRecomputeResponse,
+    PersonalizationProfileResponse,
     EmsOverviewRequest,
     EmsOverviewResponse,
     EmsWorkspaceAnalysisRequest,
@@ -554,6 +556,33 @@ export const fetchSasrecUserStatusForAdmin = (userId: string, targetUserId: stri
         `/api/v1/recommendations/admin/sasrec/models/users/${encodeURIComponent(targetUserId)}/status?user_id=${encodeURIComponent(userId)}`,
         { signal, cache: 'no-store' },
     )
+
+export const fetchPersonalizationProfileForAdmin = (
+    userId: string,
+    targetUserId: string,
+    signal?: AbortSignal,
+) => {
+    const params = new URLSearchParams({ user_id: userId, target_user_id: targetUserId })
+    return requestJson<PersonalizationProfileResponse>(
+        `/api/v1/recommendations/admin/personalization-profile?${params.toString()}`,
+        { signal, cache: 'no-store' },
+    )
+}
+
+export const recomputePersonalizationProfileForAdmin = (
+    userId: string,
+    targetUserId: string,
+    eventLimit?: number,
+) => {
+    const params = new URLSearchParams({ user_id: userId, target_user_id: targetUserId })
+    if (eventLimit != null) {
+        params.set('event_limit', String(eventLimit))
+    }
+    return requestJson<PersonalizationProfileRecomputeResponse>(
+        `/api/v1/recommendations/admin/personalization-profile/recompute?${params.toString()}`,
+        { method: 'POST' },
+    )
+}
 
 export const lookupMusicBrainzRecordingsForAdmin = (
     userId: string,

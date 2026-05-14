@@ -1511,6 +1511,45 @@ export interface SasrecUserModelStatusResponse {
     events_since_last_train: number | null
 }
 
+export interface PersonalizationProfileArtistAffinity {
+    artist_name: string
+    score: number
+    signal_count: number
+}
+
+export interface PersonalizationProfilePlatformAffinity {
+    platform: string
+    score: number
+    signal_count: number
+}
+
+export interface PersonalizationProfileItem {
+    profile_id: number
+    user_id: string
+    top_artists: PersonalizationProfileArtistAffinity[]
+    top_source_platforms: PersonalizationProfilePlatformAffinity[]
+    event_count_at_update: number
+    last_event_at: string | null
+    recomputed_at: string
+}
+
+export interface PersonalizationProfileResponse {
+    service: string
+    status: string
+    generated_at: string
+    profile: PersonalizationProfileItem
+}
+
+export interface PersonalizationProfileRecomputeResponse {
+    service: string
+    status: string
+    generated_at: string
+    events_scanned: number
+    signal_count: number
+    event_limit: number
+    profile: PersonalizationProfileItem
+}
+
 export interface SasrecAutoTrainAdminResponse {
     service: string
     status: string

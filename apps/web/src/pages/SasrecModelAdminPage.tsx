@@ -7,11 +7,14 @@ import {
     autoTrainSasrecForAdmin,
     disableSasrecModelForAdmin,
     fetchLatestSasrecModelForAdmin,
+    fetchPersonalizationProfileForAdmin,
     fetchSasrecUserStatusForAdmin,
     promoteSasrecModelForAdmin,
+    recomputePersonalizationProfileForAdmin,
     rollbackSasrecModelForAdmin,
 } from '@/services/api'
 import type {
+    PersonalizationProfileItem,
     SasrecAutoTrainAdminResponse,
     SasrecRegistryAdminResponse,
     SasrecUserModelStatusResponse,
@@ -52,6 +55,10 @@ const SasrecModelAdminPage = () => {
     const [userLookupResult, setUserLookupResult] = useState<SasrecUserModelStatusResponse | null>(null)
     const [userLookupLoading, setUserLookupLoading] = useState(false)
     const [userLookupError, setUserLookupError] = useState<string | null>(null)
+    const [personalizationProfile, setPersonalizationProfile] = useState<PersonalizationProfileItem | null>(null)
+    const [personalizationBusy, setPersonalizationBusy] = useState(false)
+    const [personalizationError, setPersonalizationError] = useState<string | null>(null)
+    const [personalizationNotice, setPersonalizationNotice] = useState<string | null>(null)
 
     const isAdmin = session?.email.toLowerCase() === ADMIN_EMAIL
 
@@ -151,16 +158,49 @@ const SasrecModelAdminPage = () => {
         if (!session || !userLookupInput.trim()) {
             return
         }
+        const targetUserId = userLookupInput.trim()
         setUserLookupLoading(true)
         setUserLookupError(null)
+        setPersonalizationError(null)
+        setPersonalizationNotice(null)
         try {
-            const response = await fetchSasrecUserStatusForAdmin(session.userId, userLookupInput.trim())
+            const response = await fetchSasrecUserStatusForAdmin(session.userId, targetUserId)
             setUserLookupResult(response)
         } catch (err) {
             setUserLookupResult(null)
             setUserLookupError(err instanceof Error ? err.message : '사용자 모델 상태를 불러오지 못했습니다.')
         } finally {
             setUserLookupLoading(false)
+        }
+        try {
+            const profileResp = await fetchPersonalizationProfileForAdmin(session.userId, targetUserId)
+            setPersonalizationProfile(profileResp.profile)
+        } catch {
+            // Profile may not exist yet — silently leave it unset so the user can recompute.
+            setPersonalizationProfile(null)
+        }
+    }
+
+    const handleRecomputeProfile = async () => {
+        if (!session || !userLookupInput.trim()) {
+            return
+        }
+        const targetUserId = userLookupInput.trim()
+        setPersonalizationBusy(true)
+        setPersonalizationError(null)
+        setPersonalizationNotice(null)
+        try {
+            const response = await recomputePersonalizationProfileForAdmin(session.userId, targetUserId)
+            setPersonalizationProfile(response.profile)
+            setPersonalizationNotice(
+                `scanned ${response.events_scanned} events, ${response.signal_count} signals applied (limit ${response.event_limit}).`,
+            )
+        } catch (err) {
+            setPersonalizationError(
+                err instanceof Error ? err.message : '개인화 프로필을 재계산하지 못했습니다.',
+            )
+        } finally {
+            setPersonalizationBusy(false)
         }
     }
 
@@ -519,6 +559,15 @@ const SasrecModelAdminPage = () => {
                         }}
                     />
                 )}
+                {userLookupResult && (
+                    <PersonalizationProfilePanel
+                        profile={personalizationProfile}
+                        busy={personalizationBusy}
+                        error={personalizationError}
+                        notice={personalizationNotice}
+                        onRecompute={() => void handleRecomputeProfile()}
+                    />
+                )}
             </section>
 
             <p className="text-xs text-hud-text-muted">
@@ -603,5 +652,98 @@ const MetricComparisonTable = ({
         </div>
     )
 }
+
+const PersonalizationProfilePanel = ({
+    profile,
+    busy,
+    error,
+    notice,
+    onRecompute,
+}: {
+    profile: PersonalizationProfileItem | null
+    busy: boolean
+    error: string | null
+    notice: string | null
+    onRecompute: () => void
+}) => (
+    <div className="mt-4 space-y-3 rounded-xl border border-hud-border-secondary bg-hud-bg-primary/60 p-4">
+        <div className="flex items-center justify-between gap-3">
+            <div>
+                <p className="text-[10px] uppercase tracking-[0.22em] text-hud-text-muted">
+                    Personalization Profile (Phase 5)
+                </p>
+                <p className="mt-1 text-xs text-hud-text-secondary">
+                    최근 user_music_event 가중치 집계로 top artist / source platform 신호를 만든다.
+                    전체 모델 재학습 없이 다음 추천 batch에 반영되는 fast-path 신호.
+                </p>
+            </div>
+            <Button type="button" variant="outline" onClick={onRecompute} disabled={busy}>
+                <RefreshCw size={14} className={busy ? 'animate-spin' : ''} />
+                재계산
+            </Button>
+        </div>
+        {error && (
+            <div className="rounded-lg border border-rose-300/30 bg-rose-500/10 p-3 text-xs text-rose-100">
+                {error}
+            </div>
+        )}
+        {notice && (
+            <div className="rounded-lg border border-emerald-300/30 bg-emerald-500/10 p-3 text-xs text-emerald-100">
+                {notice}
+            </div>
+        )}
+        {!profile ? (
+            <p className="text-xs text-hud-text-muted">
+                이 사용자의 프로필이 아직 없습니다. "재계산"으로 첫 프로필을 생성하세요.
+            </p>
+        ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-hud-text-muted">Top artists</p>
+                    {profile.top_artists.length === 0 ? (
+                        <p className="mt-1 text-xs text-hud-text-secondary">신호 없음</p>
+                    ) : (
+                        <ul className="mt-2 space-y-1">
+                            {profile.top_artists.map((artist) => (
+                                <li
+                                    key={artist.artist_name}
+                                    className="flex items-center justify-between rounded-md bg-hud-bg-secondary/40 px-2 py-1 text-xs"
+                                >
+                                    <span className="truncate text-hud-text-primary">{artist.artist_name}</span>
+                                    <span className="text-hud-text-secondary">
+                                        {artist.score.toFixed(2)} <span className="text-hud-text-muted">({artist.signal_count})</span>
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+                <div>
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-hud-text-muted">Top source platforms</p>
+                    {profile.top_source_platforms.length === 0 ? (
+                        <p className="mt-1 text-xs text-hud-text-secondary">신호 없음</p>
+                    ) : (
+                        <ul className="mt-2 space-y-1">
+                            {profile.top_source_platforms.map((platform) => (
+                                <li
+                                    key={platform.platform}
+                                    className="flex items-center justify-between rounded-md bg-hud-bg-secondary/40 px-2 py-1 text-xs"
+                                >
+                                    <span className="truncate text-hud-text-primary">{platform.platform}</span>
+                                    <span className="text-hud-text-secondary">
+                                        {platform.score.toFixed(2)} <span className="text-hud-text-muted">({platform.signal_count})</span>
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+                <div className="md:col-span-2 text-[11px] text-hud-text-muted">
+                    Signals: {profile.event_count_at_update} · last event {profile.last_event_at ? formatDateTime(profile.last_event_at) : '-'} · recomputed {formatDateTime(profile.recomputed_at)}
+                </div>
+            </div>
+        )}
+    </div>
+)
 
 export default SasrecModelAdminPage
