@@ -14,10 +14,12 @@ import PlaybackHarnessPage from './pages/PlaybackHarnessPage'
 import MetadataNormalizationAdminPage from './pages/MetadataNormalizationAdminPage'
 import PlaylistQualityAdminPage from './pages/PlaylistQualityAdminPage'
 import SasrecModelAdminPage from './pages/SasrecModelAdminPage'
+import SchedulingAdminPage from './pages/SchedulingAdminPage'
 import PmsPlaylistDetailPage from './pages/PmsPlaylistDetailPage'
 import PmsPage from './pages/PmsPage'
 import PlatformsPage from './pages/PlatformsPage'
 import TidalPlaylistPlaybackTestPage from './pages/TidalPlaylistPlaybackTestPage'
+import VisualizerPage from './pages/VisualizerPage'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
 import PlatformOAuthCallbackPage from './pages/platforms/PlatformOAuthCallbackPage'
@@ -38,9 +40,11 @@ function App() {
                     <Route path="recommendations/feature-coverage" element={<FeatureCoverageAdminPage />} />
                     <Route path="recommendations/sasrec-admin" element={<SasrecModelAdminPage />} />
                     <Route path="recommendations/metadata-admin" element={<MetadataNormalizationAdminPage />} />
+                    <Route path="admin/schedules" element={<SchedulingAdminPage />} />
                     <Route path="gms-playlists" element={<GmsPlaylistsPage />} />
                     <Route path="gms-preview" element={<GmsPreviewPage />} />
                     <Route path="playback-harness" element={<PlaybackHarnessPage />} />
+                    <Route path="playback/visualizer" element={<VisualizerPage />} />
                     <Route path="ems/search/playlists/:platformId/:externalPlaylistId" element={<EmsSearchPlaylistDetailPage />} />
                     <Route path="playlists/ems/:playlistId" element={<EmsPlaylistDetailPage />} />
                     <Route path="playlists/pms/:playlistId" element={<PmsPlaylistDetailPage />} />
