@@ -16,11 +16,12 @@ interface TidalAnalyserAdapterResult {
 interface AnalyserAttachment {
     analyser: AnalyserNode
     buffer: Uint8Array
+    audio: HTMLAudioElement
 }
 
 const ANALYSER_FFT_SIZE = 256
 const POLL_INTERVAL_MS = 200
-const ZERO_FRAME_LIMIT = 30
+const ZERO_FRAME_LIMIT = 60
 
 let sharedAudioContext: AudioContext | null = null
 const attachedElements = new WeakMap<HTMLAudioElement, AnalyserAttachment>()
@@ -42,22 +43,23 @@ function attachAnalyser(audio: HTMLAudioElement): AnalyserAttachment {
     }
     const context = ensureAudioContext()
     // CRITICAL: createMediaElementSource permanently reroutes the audio element's
-    // output into the graph. If the context is suspended at this moment, the audio
-    // is silenced until resume — and resume requires a user gesture. So we refuse
-    // to attach until the context is already running; the caller arranges that.
+    // output into the graph. Once called we own the routing forever. If we ever
+    // let the graph silence the audio (suspended context, terminal-node analyser,
+    // etc.) the user hears nothing. So the topology is parallel — source feeds
+    // destination directly AND taps into the analyser. Analyser is a side-branch
+    // observer and cannot stop audio reaching the speakers.
     if (context.state !== 'running') {
         throw new Error('AUDIO_CONTEXT_NOT_RUNNING')
     }
     const source = context.createMediaElementSource(audio)
     const analyser = context.createAnalyser()
     analyser.fftSize = ANALYSER_FFT_SIZE
+    source.connect(context.destination)
     source.connect(analyser)
-    // Keep audio audible: once a source goes through the graph, we must route it
-    // back to the destination or the speakers go silent.
-    analyser.connect(context.destination)
     const attachment: AnalyserAttachment = {
         analyser,
         buffer: new Uint8Array(analyser.frequencyBinCount),
+        audio,
     }
     attachedElements.set(audio, attachment)
     return attachment
@@ -67,9 +69,14 @@ function attachAnalyser(audio: HTMLAudioElement): AnalyserAttachment {
  * TIDAL `<audio>` element 에 Web Audio AnalyserNode 를 붙여 실시간 FFT 데이터를
  * `heightsAt(sample): number[]` 형태로 Visualizer 에 공급한다.
  *
- * CORS 처리는 silent fallback 을 피한다 — stream 이 tainted 라 AnalyserNode 가
- * 0 데이터만 반환하는 경우 (재생은 됨, FFT 만 silent) ZERO_FRAME_LIMIT 프레임 후
- * `error` 를 set 한다. 페이지가 그 사실을 운영자에게 안내한다.
+ * 토폴로지는 병렬 (source → destination + source → analyser). 따라서 analyser 가
+ * 어떤 상태로 가더라도 음향 출력은 영향을 받지 않는다. AudioContext 가 도중에
+ * suspended 로 빠지면 audio 자체가 silent 가 되는데, 이 경우 statechange 리스너가
+ * 즉시 resume 을 시도하고 실패하면 user gesture 로 재시도한다.
+ *
+ * Zero-frame 감지는 audio.paused === false + context.state === 'running' 가드가
+ * 통과한 상태에서만 카운트되므로, 버퍼링/일시정지 같은 정상 상황에서 false-positive
+ * 가 발생하지 않는다.
  */
 export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): TidalAnalyserAdapterResult {
     const { enabled, isPlaying } = input
@@ -94,6 +101,8 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
         let cancelled = false
         let timer: number | null = null
         let gestureHandler: (() => void) | null = null
+        let stateHandler: (() => void) | null = null
+        let observedContext: AudioContext | null = null
 
         const removeGestureHandler = () => {
             if (gestureHandler) {
@@ -101,6 +110,55 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
                 document.removeEventListener('keydown', gestureHandler, true)
                 gestureHandler = null
             }
+        }
+
+        const ensureGestureHandler = (onTrigger: () => void) => {
+            if (gestureHandler) {
+                return
+            }
+            gestureHandler = () => {
+                removeGestureHandler()
+                onTrigger()
+            }
+            document.addEventListener('pointerdown', gestureHandler, true)
+            document.addEventListener('keydown', gestureHandler, true)
+        }
+
+        const resumeOnGesture = (context: AudioContext) => {
+            ensureGestureHandler(() => {
+                context.resume().then(() => {
+                    if (cancelled) {
+                        return
+                    }
+                    // 이미 attach 되어 있으면 audio 가 graph 를 통해 다시 흐르므로 별도 작업 필요 없음
+                    if (!attachmentRef.current) {
+                        void tryAttach()
+                    } else {
+                        setError(null)
+                    }
+                }).catch(() => {
+                    // ignore — wait for the next gesture
+                })
+            })
+        }
+
+        const observeContextState = (context: AudioContext) => {
+            if (observedContext === context) {
+                return
+            }
+            observedContext = context
+            stateHandler = () => {
+                if (cancelled) {
+                    return
+                }
+                if (context.state === 'suspended' && attachmentRef.current) {
+                    setError('AudioContext 가 suspended 상태로 빠져 음향이 일시 정지됐습니다. 화면을 한 번 클릭하면 재개됩니다.')
+                    resumeOnGesture(context)
+                } else if (context.state === 'running') {
+                    setError((prev) => (prev && prev.startsWith('AudioContext') ? null : prev))
+                }
+            }
+            context.addEventListener('statechange', stateHandler)
         }
 
         const doAttach = (audio: HTMLAudioElement) => {
@@ -114,6 +172,7 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
                 setReady(true)
                 setError(null)
                 removeGestureHandler()
+                observeContextState(ensureAudioContext())
             } catch (ex) {
                 setError(ex instanceof Error ? ex.message : 'AnalyserNode 부착에 실패했습니다.')
                 setReady(false)
@@ -129,15 +188,13 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
                 timer = window.setTimeout(() => { void tryAttach() }, POLL_INTERVAL_MS)
                 return
             }
-            // Reusing a previous attachment is always safe — once a graph exists, the
-            // audio is already running through it and the context can't go back to a
-            // pre-graph state.
             const existing = attachedElements.get(audio)
             if (existing) {
                 doAttach(audio)
                 return
             }
             const context = ensureAudioContext()
+            observeContextState(context)
             if (context.state !== 'running') {
                 try {
                     await context.resume()
@@ -152,14 +209,7 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
                 doAttach(audio)
                 return
             }
-            // Still suspended — install a gesture listener to retry on the next click/keypress.
-            if (!gestureHandler) {
-                gestureHandler = () => {
-                    void tryAttach()
-                }
-                document.addEventListener('pointerdown', gestureHandler, true)
-                document.addEventListener('keydown', gestureHandler, true)
-            }
+            resumeOnGesture(context)
         }
         void tryAttach()
         return () => {
@@ -168,6 +218,9 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
                 window.clearTimeout(timer)
             }
             removeGestureHandler()
+            if (observedContext && stateHandler) {
+                observedContext.removeEventListener('statechange', stateHandler)
+            }
         }
     }, [enabled])
 
@@ -180,27 +233,32 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
             if (!attachment) {
                 return new Array(sample.count).fill(0.06)
             }
-            const { analyser, buffer } = attachment
+            const { analyser, buffer, audio } = attachment
             analyser.getByteFrequencyData(buffer)
 
-            let maxValue = 0
-            for (let j = 0; j < buffer.length; j++) {
-                if (buffer[j] > maxValue) {
-                    maxValue = buffer[j]
+            const context = sharedAudioContext
+            const audioActive = isPlayingRef.current && !audio.paused
+            const contextActive = context !== null && context.state === 'running'
+            if (audioActive && contextActive) {
+                let maxValue = 0
+                for (let j = 0; j < buffer.length; j++) {
+                    if (buffer[j] > maxValue) {
+                        maxValue = buffer[j]
+                    }
                 }
-            }
-            if (isPlayingRef.current) {
                 if (maxValue === 0) {
                     zeroFramesRef.current += 1
                     if (zeroFramesRef.current === ZERO_FRAME_LIMIT) {
                         // setError can run during render — defer to microtask so we don't break the raf loop
                         queueMicrotask(() => setError(
-                            'TIDAL 스트림이 AnalyserNode 에 0 데이터만 전달합니다 (CORS tainted 가능). 바는 procedural envelope 로 fallback 합니다.',
+                            'TIDAL 스트림이 AnalyserNode 에 0 데이터만 전달합니다 (CORS tainted 가능). 바는 procedural envelope 로 fallback 합니다. 음향은 영향 없음.',
                         ))
                     }
                 } else {
                     zeroFramesRef.current = 0
                 }
+            } else {
+                zeroFramesRef.current = 0
             }
 
             const out = new Array(sample.count)
