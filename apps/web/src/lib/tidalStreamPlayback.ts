@@ -29,6 +29,15 @@ export interface TidalPlayerCallbacks {
 }
 
 let audioElement: HTMLAudioElement | null = null
+
+/**
+ * Visualizer 같이 다른 모듈에서 HTMLAudioElement 에 직접 접근해야 할 때 사용한다.
+ * 재생 시작 전이면 null 일 수 있어 호출 측은 polling/listener 로 기다려야 한다.
+ *
+ * 주의: crossOrigin 속성을 변경하면 TIDAL CDN 의 CORS 설정에 따라 재생이 깨질 수 있으므로
+ * 이 모듈에서는 그대로 두고, Visualizer 쪽이 AnalyserNode 가 0 데이터를 받는 상황을 surface 한다.
+ */
+export const getTidalAudioElement = (): HTMLAudioElement | null => audioElement
 let hls: Hls | null = null
 let activeCallbacks: TidalPlayerCallbacks = {}
 let currentProductId: string | null = null

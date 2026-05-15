@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowLeft, Pause, Play, SkipBack, SkipForward } from 'lu
 import Button from '@/components/common/Button'
 import Visualizer, { type VisualizerMode } from '@/components/visualizer/Visualizer'
 import { useSpotifyAudioAnalysisAdapter } from '@/components/visualizer/useSpotifyAudioAnalysisAdapter'
+import { useTidalAnalyserAdapter } from '@/components/visualizer/useTidalAnalyserAdapter'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { usePlayback } from '@/contexts/PlaybackContext'
 import { formatDuration, resolveSpotifyTrackId } from '@/lib/musicPlayback'
@@ -39,6 +40,10 @@ const VisualizerPage = () => {
         userId: session?.userId ?? null,
         spotifyTrackId: currentItem?.sourcePlatform === 'spotify' ? spotifyTrackId : null,
         positionMs,
+    })
+    const tidalAdapter = useTidalAnalyserAdapter({
+        enabled: currentItem?.sourcePlatform === 'tidal',
+        isPlaying,
     })
 
     if (!currentItem) {
@@ -104,7 +109,13 @@ const VisualizerPage = () => {
                     playing={isPlaying}
                     mode={mode}
                     bars={VISUALIZER_BARS}
-                    heightsAt={mode === 'spotify' && spotifyAdapter.heightsAt ? spotifyAdapter.heightsAt : undefined}
+                    heightsAt={
+                        mode === 'spotify' && spotifyAdapter.heightsAt
+                            ? spotifyAdapter.heightsAt
+                            : mode === 'tidal' && tidalAdapter.heightsAt
+                                ? tidalAdapter.heightsAt
+                                : undefined
+                    }
                 />
 
                 <div className="w-full max-w-2xl">
@@ -150,11 +161,21 @@ const VisualizerPage = () => {
                         </p>
                     </div>
                 )}
+                {mode === 'tidal' && tidalAdapter.error && (
+                    <div className="flex max-w-2xl items-start gap-3 rounded-xl border border-amber-300/40 bg-amber-300/10 p-3 text-xs text-amber-100">
+                        <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                        <p>
+                            TIDAL AnalyserNode 어댑터가 작동하지 않아 procedural envelope로 fallback 중입니다.
+                            <br />
+                            <span className="text-amber-200/80">{tidalAdapter.error}</span>
+                        </p>
+                    </div>
+                )}
                 <p className="text-[11px] text-hud-text-muted">
                     {mode === 'spotify' && spotifyAdapter.ready
                         ? '실시간 신호: Spotify audio-analysis segment + beat 기반 bar 매핑.'
-                        : mode === 'tidal'
-                            ? 'TIDAL AnalyserNode 어댑터는 후속 commit에서 연결됩니다. 현재는 mode 기반 procedural envelope.'
+                        : mode === 'tidal' && tidalAdapter.ready
+                            ? '실시간 신호: TIDAL <audio> 요소에 부착한 WebAudio AnalyserNode FFT.'
                             : 'mode 기반 procedural envelope로 동작합니다.'}
                 </p>
             </section>
