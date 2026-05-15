@@ -36,26 +36,60 @@ function ensureAudioContext(): AudioContext {
     return sharedAudioContext
 }
 
+interface CapturableMediaElement extends HTMLAudioElement {
+    captureStream?: () => MediaStream
+    mozCaptureStream?: () => MediaStream
+}
+
+function captureStreamFor(audio: HTMLAudioElement): MediaStream | null {
+    const candidate = audio as CapturableMediaElement
+    if (typeof candidate.captureStream === 'function') {
+        try {
+            return candidate.captureStream()
+        } catch {
+            return null
+        }
+    }
+    if (typeof candidate.mozCaptureStream === 'function') {
+        try {
+            return candidate.mozCaptureStream()
+        } catch {
+            return null
+        }
+    }
+    return null
+}
+
 function attachAnalyser(audio: HTMLAudioElement): AnalyserAttachment {
     const existing = attachedElements.get(audio)
     if (existing) {
         return existing
     }
     const context = ensureAudioContext()
-    // CRITICAL: createMediaElementSource permanently reroutes the audio element's
-    // output into the graph. Once called we own the routing forever. If we ever
-    // let the graph silence the audio (suspended context, terminal-node analyser,
-    // etc.) the user hears nothing. So the topology is parallel — source feeds
-    // destination directly AND taps into the analyser. Analyser is a side-branch
-    // observer and cannot stop audio reaching the speakers.
     if (context.state !== 'running') {
         throw new Error('AUDIO_CONTEXT_NOT_RUNNING')
     }
-    const source = context.createMediaElementSource(audio)
+    // IMPORTANT: We deliberately use captureStream() instead of
+    // createMediaElementSource(). createMediaElementSource permanently reroutes
+    // the audio element's output into the Web Audio graph — if anything goes
+    // wrong in the graph (context suspended, page navigated away mid-playback,
+    // crossed-up state across providers) the user loses audio entirely. With
+    // captureStream we open a parallel observation stream that has no effect on
+    // playback routing, so the element keeps playing through its native pipeline
+    // even if the analyser fails or this hook unmounts.
+    const stream = captureStreamFor(audio)
+    if (!stream) {
+        throw new Error('CAPTURESTREAM_UNSUPPORTED')
+    }
+    const audioTracks = stream.getAudioTracks()
+    if (audioTracks.length === 0) {
+        throw new Error('CAPTURESTREAM_NO_AUDIO_TRACK')
+    }
+    const source = context.createMediaStreamSource(stream)
     const analyser = context.createAnalyser()
     analyser.fftSize = ANALYSER_FFT_SIZE
-    source.connect(context.destination)
     source.connect(analyser)
+    // analyser is a side-branch observer — no connection to destination.
     const attachment: AnalyserAttachment = {
         analyser,
         buffer: new Uint8Array(analyser.frequencyBinCount),
@@ -66,17 +100,17 @@ function attachAnalyser(audio: HTMLAudioElement): AnalyserAttachment {
 }
 
 /**
- * TIDAL `<audio>` element 에 Web Audio AnalyserNode 를 붙여 실시간 FFT 데이터를
- * `heightsAt(sample): number[]` 형태로 Visualizer 에 공급한다.
+ * TIDAL `<audio>` element 의 출력을 `audio.captureStream()` 으로 따와 `AnalyserNode` 로
+ * 흘려 보내고, 그 FFT 데이터를 Visualizer 의 `heightsAt` 에 공급한다.
  *
- * 토폴로지는 병렬 (source → destination + source → analyser). 따라서 analyser 가
- * 어떤 상태로 가더라도 음향 출력은 영향을 받지 않는다. AudioContext 가 도중에
- * suspended 로 빠지면 audio 자체가 silent 가 되는데, 이 경우 statechange 리스너가
- * 즉시 resume 을 시도하고 실패하면 user gesture 로 재시도한다.
+ * `createMediaElementSource` 를 쓰지 않는 이유: 한 번 호출되면 audio 출력이 영구히
+ * Web Audio graph 로 redirect 되어, 이후 (다른 페이지에서 같은 audio element 로 재생되든,
+ * AudioContext 가 suspended 로 빠지든) 음향이 silent 가 될 위험이 있다. captureStream 은
+ * 평행한 observation stream 이라 재생 path 를 절대 가로채지 않으므로, visualizer 가
+ * 실패하더라도 음향에 영향이 없다.
  *
- * Zero-frame 감지는 audio.paused === false + context.state === 'running' 가드가
- * 통과한 상태에서만 카운트되므로, 버퍼링/일시정지 같은 정상 상황에서 false-positive
- * 가 발생하지 않는다.
+ * captureStream 이 지원되지 않거나 (예: 일부 구버전 브라우저) audio track 이 비어 있으면
+ * error 를 설정하고 procedural envelope 로 fallback 한다.
  */
 export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): TidalAnalyserAdapterResult {
     const { enabled, isPlaying } = input
@@ -101,8 +135,6 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
         let cancelled = false
         let timer: number | null = null
         let gestureHandler: (() => void) | null = null
-        let stateHandler: (() => void) | null = null
-        let observedContext: AudioContext | null = null
 
         const removeGestureHandler = () => {
             if (gestureHandler) {
@@ -124,43 +156,6 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
             document.addEventListener('keydown', gestureHandler, true)
         }
 
-        const resumeOnGesture = (context: AudioContext) => {
-            ensureGestureHandler(() => {
-                context.resume().then(() => {
-                    if (cancelled) {
-                        return
-                    }
-                    // 이미 attach 되어 있으면 audio 가 graph 를 통해 다시 흐르므로 별도 작업 필요 없음
-                    if (!attachmentRef.current) {
-                        void tryAttach()
-                    } else {
-                        setError(null)
-                    }
-                }).catch(() => {
-                    // ignore — wait for the next gesture
-                })
-            })
-        }
-
-        const observeContextState = (context: AudioContext) => {
-            if (observedContext === context) {
-                return
-            }
-            observedContext = context
-            stateHandler = () => {
-                if (cancelled) {
-                    return
-                }
-                if (context.state === 'suspended' && attachmentRef.current) {
-                    setError('AudioContext 가 suspended 상태로 빠져 음향이 일시 정지됐습니다. 화면을 한 번 클릭하면 재개됩니다.')
-                    resumeOnGesture(context)
-                } else if (context.state === 'running') {
-                    setError((prev) => (prev && prev.startsWith('AudioContext') ? null : prev))
-                }
-            }
-            context.addEventListener('statechange', stateHandler)
-        }
-
         const doAttach = (audio: HTMLAudioElement) => {
             if (cancelled) {
                 return
@@ -172,9 +167,17 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
                 setReady(true)
                 setError(null)
                 removeGestureHandler()
-                observeContextState(ensureAudioContext())
             } catch (ex) {
-                setError(ex instanceof Error ? ex.message : 'AnalyserNode 부착에 실패했습니다.')
+                const message = ex instanceof Error ? ex.message : 'AnalyserNode 부착에 실패했습니다.'
+                if (message === 'CAPTURESTREAM_UNSUPPORTED') {
+                    setError('이 브라우저는 audio.captureStream() 을 지원하지 않습니다. 바는 procedural envelope 로 fallback 합니다. 음향은 영향 없음.')
+                } else if (message === 'CAPTURESTREAM_NO_AUDIO_TRACK') {
+                    setError('TIDAL 스트림이 아직 audio track 을 노출하지 않았습니다 (재생 시작 전이거나 일시정지). 재생을 다시 시작해 보세요.')
+                } else if (message === 'AUDIO_CONTEXT_NOT_RUNNING') {
+                    // gesture handler will retry — no error message needed yet
+                } else {
+                    setError(message)
+                }
                 setReady(false)
             }
         }
@@ -190,11 +193,13 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
             }
             const existing = attachedElements.get(audio)
             if (existing) {
-                doAttach(audio)
+                attachmentRef.current = existing
+                zeroFramesRef.current = 0
+                setReady(true)
+                setError(null)
                 return
             }
             const context = ensureAudioContext()
-            observeContextState(context)
             if (context.state !== 'running') {
                 try {
                     await context.resume()
@@ -209,7 +214,15 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
                 doAttach(audio)
                 return
             }
-            resumeOnGesture(context)
+            ensureGestureHandler(() => {
+                context.resume().then(() => {
+                    if (!cancelled) {
+                        void tryAttach()
+                    }
+                }).catch(() => {
+                    // ignore — wait for the next gesture
+                })
+            })
         }
         void tryAttach()
         return () => {
@@ -218,9 +231,6 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
                 window.clearTimeout(timer)
             }
             removeGestureHandler()
-            if (observedContext && stateHandler) {
-                observedContext.removeEventListener('statechange', stateHandler)
-            }
         }
     }, [enabled])
 
@@ -249,9 +259,8 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
                 if (maxValue === 0) {
                     zeroFramesRef.current += 1
                     if (zeroFramesRef.current === ZERO_FRAME_LIMIT) {
-                        // setError can run during render — defer to microtask so we don't break the raf loop
                         queueMicrotask(() => setError(
-                            'TIDAL 스트림이 AnalyserNode 에 0 데이터만 전달합니다 (CORS tainted 가능). 바는 procedural envelope 로 fallback 합니다. 음향은 영향 없음.',
+                            'TIDAL captureStream 에서 0 데이터만 전달됩니다 (CORS tainted 가능). 바는 procedural envelope 로 fallback 합니다. 음향은 영향 없음.',
                         ))
                     }
                 } else {
@@ -278,7 +287,6 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
         }
     }, [ready])
 
-    // when error fires, the page may want to fall back to procedural — null out heightsAt
     const exposedHeightsAt = error ? null : heightsAt
 
     return {
