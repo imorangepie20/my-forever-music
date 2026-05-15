@@ -41,12 +41,19 @@ function attachAnalyser(audio: HTMLAudioElement): AnalyserAttachment {
         return existing
     }
     const context = ensureAudioContext()
+    // CRITICAL: createMediaElementSource permanently reroutes the audio element's
+    // output into the graph. If the context is suspended at this moment, the audio
+    // is silenced until resume — and resume requires a user gesture. So we refuse
+    // to attach until the context is already running; the caller arranges that.
+    if (context.state !== 'running') {
+        throw new Error('AUDIO_CONTEXT_NOT_RUNNING')
+    }
     const source = context.createMediaElementSource(audio)
     const analyser = context.createAnalyser()
     analyser.fftSize = ANALYSER_FFT_SIZE
     source.connect(analyser)
-    // Keep audio audible: AnalyserNode does not pass signal to destination by default
-    // when it's the terminal node, so we route through it.
+    // Keep audio audible: once a source goes through the graph, we must route it
+    // back to the destination or the speakers go silent.
     analyser.connect(context.destination)
     const attachment: AnalyserAttachment = {
         analyser,
@@ -86,14 +93,18 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
         }
         let cancelled = false
         let timer: number | null = null
+        let gestureHandler: (() => void) | null = null
 
-        const tryAttach = () => {
-            if (cancelled) {
-                return
+        const removeGestureHandler = () => {
+            if (gestureHandler) {
+                document.removeEventListener('pointerdown', gestureHandler, true)
+                document.removeEventListener('keydown', gestureHandler, true)
+                gestureHandler = null
             }
-            const audio = getTidalAudioElement()
-            if (!audio) {
-                timer = window.setTimeout(tryAttach, POLL_INTERVAL_MS)
+        }
+
+        const doAttach = (audio: HTMLAudioElement) => {
+            if (cancelled) {
                 return
             }
             try {
@@ -102,20 +113,61 @@ export function useTidalAnalyserAdapter(input: TidalAnalyserAdapterInput): Tidal
                 zeroFramesRef.current = 0
                 setReady(true)
                 setError(null)
-                if (sharedAudioContext && sharedAudioContext.state === 'suspended') {
-                    void sharedAudioContext.resume()
-                }
+                removeGestureHandler()
             } catch (ex) {
                 setError(ex instanceof Error ? ex.message : 'AnalyserNode 부착에 실패했습니다.')
                 setReady(false)
             }
         }
-        tryAttach()
+
+        const tryAttach = async () => {
+            if (cancelled) {
+                return
+            }
+            const audio = getTidalAudioElement()
+            if (!audio) {
+                timer = window.setTimeout(() => { void tryAttach() }, POLL_INTERVAL_MS)
+                return
+            }
+            // Reusing a previous attachment is always safe — once a graph exists, the
+            // audio is already running through it and the context can't go back to a
+            // pre-graph state.
+            const existing = attachedElements.get(audio)
+            if (existing) {
+                doAttach(audio)
+                return
+            }
+            const context = ensureAudioContext()
+            if (context.state !== 'running') {
+                try {
+                    await context.resume()
+                } catch {
+                    // resume requires a user gesture in most browsers; fall through.
+                }
+            }
+            if (cancelled) {
+                return
+            }
+            if (context.state === 'running') {
+                doAttach(audio)
+                return
+            }
+            // Still suspended — install a gesture listener to retry on the next click/keypress.
+            if (!gestureHandler) {
+                gestureHandler = () => {
+                    void tryAttach()
+                }
+                document.addEventListener('pointerdown', gestureHandler, true)
+                document.addEventListener('keydown', gestureHandler, true)
+            }
+        }
+        void tryAttach()
         return () => {
             cancelled = true
             if (timer != null) {
                 window.clearTimeout(timer)
             }
+            removeGestureHandler()
         }
     }, [enabled])
 
