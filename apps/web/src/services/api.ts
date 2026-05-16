@@ -80,7 +80,6 @@ import type {
     UserMusicEventResponse,
     PmsWorkspaceBootstrapResponse,
     PmsPlaylistDetailResponse,
-    PmsTrackAudioFeaturesResponse,
     PmsPlaylistImportBootstrapResponse,
     PmsPlaylistImportRequest,
     PmsPlaylistImportResponse,
@@ -376,16 +375,6 @@ export const fetchPmsPlaylistDetail = (
 ) =>
     requestJson<PmsPlaylistDetailResponse>(
         `/api/v1/pms/playlists/${encodeURIComponent(playlistId)}?user_id=${encodeURIComponent(userId)}`,
-        { signal },
-    )
-
-export const fetchPmsTrackAudioFeatures = (
-    userId: string,
-    audioFeatureTrackId: string,
-    signal?: AbortSignal,
-) =>
-    requestJson<PmsTrackAudioFeaturesResponse>(
-        `/api/v1/pms/tracks/${encodeURIComponent(audioFeatureTrackId)}/audio-features?user_id=${encodeURIComponent(userId)}`,
         { signal },
     )
 

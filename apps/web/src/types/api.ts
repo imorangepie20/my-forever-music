@@ -675,26 +675,6 @@ export interface PmsPlaylistDetailResponse {
     tracks: PmsPlaylistDetailTrack[]
 }
 
-export interface PmsTrackAudioFeaturesResponse {
-    audio_feature_track_id: string | null
-    audio_feature_source: string
-    audio_features_filled: boolean
-    duration_ms: number | null
-    musical_key: number | null
-    mode: number | null
-    time_signature: number | null
-    acousticness: number | null
-    danceability: number | null
-    energy: number | null
-    instrumentalness: number | null
-    liveness: number | null
-    loudness: number | null
-    speechiness: number | null
-    tempo: number | null
-    valence: number | null
-    resolved_at: string | null
-}
-
 export interface PmsPlaylistImportBootstrapResponse {
     service: string
     status: string

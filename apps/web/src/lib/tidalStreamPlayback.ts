@@ -28,13 +28,8 @@ export interface TidalPlayerCallbacks {
     onError?: (message: string) => void
 }
 
-// `audioElement` 는 DOM 미부착 detached element 로 만들고 `crossOrigin` 속성을 의도적으로
-// 설정하지 않는다. TIDAL CDN 의 CORS 설정에 따라 crossOrigin 을 켜면 재생 자체가 깨질 수
-// 있고, 끄면 cross-origin 응답이 tainted 로 처리되어 Web Audio 측에 silent zero 가 흐른다.
-// 두 결과 중 재생을 우선해야 하므로 본 모듈은 후자를 택한다. 이 결정과 Visualizer 가 본
-// element 에 Web Audio attach 를 하지 않는 이유는 docs/architecture/PLAYBACK_VISUALIZER_DESIGN.md
-// §2.7 에 정리되어 있다. (외부 모듈로 element 를 노출하면 metadata-procedural 원칙이 깨지므로
-// `getTidalAudioElement` export 는 제거했다.)
+// `audioElement` 는 DOM 미부착 detached element 이며 `crossOrigin` 속성은 의도적으로
+// 설정하지 않는다. TIDAL CDN 의 CORS 설정상 crossOrigin 을 켜면 재생 자체가 깨질 수 있다.
 let audioElement: HTMLAudioElement | null = null
 let hls: Hls | null = null
 let activeCallbacks: TidalPlayerCallbacks = {}

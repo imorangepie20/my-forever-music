@@ -3,7 +3,6 @@ import {
     ExternalLink,
     ListMusic,
     Loader2,
-    Maximize2,
     Pause,
     Play,
     Repeat,
@@ -15,7 +14,6 @@ import {
     X,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import MusicArtwork from '@/components/music/MusicArtwork'
 import { usePlayback } from '@/contexts/PlaybackContext'
@@ -91,8 +89,6 @@ const ControlButton = ({ children, label, active = false, disabled = false, prim
 )
 
 const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
-    const navigate = useNavigate()
-    const openVisualizer = () => navigate('/playback/visualizer')
     const {
         currentItem,
         queue,
@@ -242,15 +238,10 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                     </div>
 
                     <div className="flex items-center justify-end gap-2">
-                        <button
-                            type="button"
-                            onClick={openVisualizer}
-                            aria-label="Visualizer 열기"
-                            className="inline-flex h-11 items-center gap-2 rounded-lg border border-hud-border-secondary bg-white/[0.03] px-3 text-sm text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
-                        >
+                        <div className="inline-flex h-11 items-center gap-2 rounded-lg border border-hud-border-secondary bg-white/[0.03] px-3 text-sm text-hud-text-secondary">
                             <ListMusic size={16} className="text-hud-accent-primary" />
                             <span className="font-semibold text-hud-text-primary">{queue.length > 0 ? `${currentIndex + 1}/${queue.length}` : '0/0'}</span>
-                        </button>
+                        </div>
                         <div className="hidden items-center gap-2 rounded-lg border border-hud-border-secondary bg-white/[0.03] px-3 py-2 xl:flex">
                             <Volume2 size={17} className="text-hud-text-secondary" />
                             <input
@@ -264,15 +255,6 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                                 aria-label="Playback volume"
                             />
                         </div>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={openVisualizer}
-                            aria-label="Visualizer 상세보기"
-                            className="h-11 w-11 px-0"
-                        >
-                            <Maximize2 size={18} />
-                        </Button>
                         {currentItem.externalUrl && (
                             <Button
                                 type="button"

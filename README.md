@@ -137,9 +137,6 @@ my-forever-music/
 - `apps/web`의 `/ems/acquisition-admin`은 scheduler 운영 상태를 surface함. 각 run 카드에 `scheduled`/`manual` trigger 배지와 message/last_error가 표시되고, 별도 Scheduler 패널이 최근 기록의 scheduled vs manual 횟수, skipped scheduled 횟수, 마지막 scheduled 실행 시각 + 메시지를 한눈에 보여줌. scheduled 기록이 0이면 `app.ems.acquisition.user-id` 누락/disabled 여부 확인 가이드를 노출함
 - `services/api`는 `GET /api/v1/ems/acquisition/source-quality?days=N` 엔드포인트로 최근 N일(기본 14일) 동안 source별 signal 수, 평균 confidence, 마지막 signal 시각을 집계해 반환함. `/ems/acquisition-admin`의 Source quality 표가 lookback 입력과 함께 노출되어 운영자가 어떤 RSS source가 활발하고 어떤 source가 산출이 막혔는지 한눈에 판단함
 - `apps/web`의 `/ems/acquisition-admin`은 완료된 최근 runs를 합산해 skip ratio (skipped articles + skipped seeds / total attempts)를 계산해 별도 Skip drift 패널로 표시함. 임계치(warn ≥50%, critical ≥80%)에 따라 패널 색이 amber/rose로 바뀌고 source 품질·AI cutoff·dedupe 기준 점검 가이드를 노출함
-- `apps/web`는 `/playback/visualizer` 페이지로 막대형 audio visualizer를 노출함. PlaybackDock의 queue 칩과 새 Maximize 버튼이 같은 페이지로 이동하고, `usePlayback().currentItem.sourcePlatform`을 기준으로 spotify/tidal/idle mode를 자동 결정함
-- Spotify 트랙 재생 중에는 `useSpotifyAudioAnalysisAdapter` 훅이 `/v1/audio-analysis/{trackId}`를 가져와 현재 `positionMs`의 segment pitches × loudness × beat envelope를 합성한 `heightsAt`을 Visualizer에 주입함. analysis 응답이 없거나 endpoint 권한이 막혀 있으면 procedural envelope로 fallback 하고 페이지에 amber warning + 원인 메시지를 노출함 (silent fallback 없이 사용자에게 어떤 신호를 보고 있는지 분명히 함)
-- TIDAL 트랙 재생 중에는 `useTidalAnalyserAdapter` 훅이 `tidalStreamPlayback.getTidalAudioElement()` 로 받은 `<audio>` 요소의 `captureStream()` 으로 audio track 을 별도 stream 으로 따와서 `AnalyserNode`(FFT 256)에 연결함. audio 의 실제 재생 path 는 절대 가로채지 않으므로, visualizer 가 실패하거나 페이지를 떠나도 음향 출력은 영향이 없음 (이전에는 `createMediaElementSource` 가 audio output 을 영구히 graph 로 redirect 해서 PMS/EMS 재생까지 silent 가 되는 회귀가 있었음). zero-frame 감지는 `audio.paused=false` + `context.state=running` 가드를 통과한 경우만 카운트해 false-positive 를 막음
 - `services/api`는 `GET /api/v1/ems/acquisition/source-presets`와 `source_preset` 실행 옵션을 제공함. 기본 configured source 외에 `editorial-expanded` preset이 더 많은 editorial RSS source와 큰 run limit을 묶어 EMS pool 확대 실행에 사용됨
 - `apps/web`의 `/ems/acquisition-admin`은 source preset 선택과 collection target(Sources/Articles/Signals/Seed queries/Track cap) 계산을 제공해 운영자가 수집량 목표를 보고 실행값을 조정할 수 있음
 - `services/api`는 관리자 전용 `/recommendations/feature-coverage`로 PMS user library (audio feature/ISRC/playback target 보유율), EMS collected pool (source platform별 audio/ISRC/canonical link), learning signal (user event/recommendation snapshot 수) 커버리지를 한 화면에서 확인하게 함. EMS repository 없는 프로필에서는 degraded warning을 노출해 저장소 부재를 숨기지 않음
@@ -172,8 +169,6 @@ my-forever-music/
 - 사이트 내부 음악 감상 행동 이벤트 저장
 - EMS 외부 플레이리스트 수집, GMS 추천 통과, 사용자 평가의 PMS 환류
 - 페이지 이동 간 유지되는 공통 음악 플레이어의 행동 이벤트 저장
-- `/playback/visualizer` 페이지의 데이터 소스/금지 API/회귀 방어 규약은 [`docs/architecture/PLAYBACK_VISUALIZER_DESIGN.md`](docs/architecture/PLAYBACK_VISUALIZER_DESIGN.md) 에 외부 표준 근거와 함께 정리됨 — 메인 재생 element에 Web Audio attach 금지, 1차는 metadata procedural envelope만
-- `apps/web`의 `/playback/visualizer`는 Phase 1 (옵션 A) baseline으로 동작함. `GET /api/v1/pms/tracks/{audioFeatureTrackId}/audio-features` 로 받은 PMS audio_feature(tempo/energy/valence)를 procedural envelope의 BPM·진폭 modulator로 사용하고, 보강 안 된 트랙은 mode preset으로 fallback. Web Audio API 호출 0회
 
 ## 1차 마감 작업
 
