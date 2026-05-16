@@ -38,7 +38,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class TidalPlaybackStreamController {
 
     private static final String TIDAL_PLATFORM_ID = "tidal";
-    private static final List<String> LEGACY_STREAMING_SCOPES = List.of("r_usr", "w_usr", "w_sub");
+    // Scopes required for legacy v1 /tracks/{id}/playbackinfo streaming. `r_stream` is the
+    // one that gates streaming access; without it TIDAL returns 403 even if r_usr/w_usr/w_sub
+    // are all present. Update `app.platform.oauth.tidal.scopes` together with this list.
+    private static final List<String> LEGACY_STREAMING_SCOPES = List.of("r_usr", "w_usr", "w_sub", "r_stream");
 
     private final PlatformCredentialService platformCredentialService;
     private final PlatformOAuthProperties platformOAuthProperties;
@@ -157,10 +160,20 @@ public class TidalPlaybackStreamController {
                 : objectMapper.readTree(response.body());
 
             if (response.statusCode() == 401 || response.statusCode() == 403) {
+                boolean streamingScopeReady = hasAllScopes(credential, LEGACY_STREAMING_SCOPES);
+                String hint = streamingScopeReady
+                    ? "Token has the required streaming scopes; TIDAL still refused — likely track-level restriction (region/license) or partner approval issue."
+                    : "Token is missing `r_stream` (required for v1 playbackinfo). Disconnect TIDAL and reconnect to grant the new scope set.";
                 throw new PlatformReconnectRequiredException(
                     TIDAL_PLATFORM_ID,
-                    "TIDAL playbackinfo access was denied (%s). scopes=%s legacy_streaming_scopes=%s"
-                        .formatted(response.statusCode(), scopeList(credential), hasAllScopes(credential, LEGACY_STREAMING_SCOPES))
+                    "TIDAL playbackinfo access was denied (%s). scopes=%s streaming_scopes_present=%s detail=%s. %s"
+                        .formatted(
+                            response.statusCode(),
+                            scopeList(credential),
+                            streamingScopeReady,
+                            firstNonBlank(safeErrorMessage(body), "(no body)"),
+                            hint
+                        )
                 );
             }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {

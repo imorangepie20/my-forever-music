@@ -131,12 +131,10 @@ public class PlatformOAuthProperties {
         private String legacyApiBaseUri = "https://api.tidal.com/v1";
         private String countryCode = "US";
         private List<String> scopes = List.of(
-            "user.read",
-            "collection.read",
-            "playlists.read",
-            "playback",
-            "entitlements.read",
-            "search.read"
+            "r_usr",
+            "w_usr",
+            "w_sub",
+            "r_stream"
         );
 
         public boolean isEnabled() {

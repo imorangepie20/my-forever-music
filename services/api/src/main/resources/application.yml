@@ -58,7 +58,7 @@ app:
     discovery:
       enabled: ${EMS_DISCOVERY_ENABLED:true}
       user-id: ${EMS_DISCOVERY_USER_ID:}
-      refresh-interval-ms: ${EMS_DISCOVERY_REFRESH_INTERVAL_MS:21600000}
+      refresh-interval-ms: ${EMS_DISCOVERY_REFRESH_INTERVAL_MS:86400000}
       initial-delay-ms: ${EMS_DISCOVERY_INITIAL_DELAY_MS:0}
       per-query-limit: ${EMS_DISCOVERY_PER_QUERY_LIMIT:5}
       display-limit: ${EMS_DISCOVERY_DISPLAY_LIMIT:12}
@@ -67,7 +67,7 @@ app:
     acquisition:
       enabled: ${EMS_ACQUISITION_ENABLED:true}
       user-id: ${EMS_ACQUISITION_USER_ID:${EMS_DISCOVERY_USER_ID:}}
-      refresh-interval-ms: ${EMS_ACQUISITION_REFRESH_INTERVAL_MS:21600000}
+      refresh-interval-ms: ${EMS_ACQUISITION_REFRESH_INTERVAL_MS:86400000}
       initial-delay-ms: ${EMS_ACQUISITION_INITIAL_DELAY_MS:60000}
       max-articles-per-source: ${EMS_ACQUISITION_MAX_ARTICLES_PER_SOURCE:20}
       max-signals-per-run: ${EMS_ACQUISITION_MAX_SIGNALS_PER_RUN:40}
@@ -265,7 +265,7 @@ app:
         api-base-uri: ${TIDAL_API_BASE_URI:https://openapi.tidal.com/v2}
         legacy-api-base-uri: ${TIDAL_LEGACY_API_BASE_URI:https://api.tidal.com/v1}
         country-code: ${TIDAL_COUNTRY_CODE:US}
-        scopes: ${TIDAL_SCOPES:user.read,collection.read,playlists.read,playback,entitlements.read,search.read}
+        scopes: ${TIDAL_SCOPES:r_usr,w_usr,w_sub,r_stream}
 
 logging:
   level:
