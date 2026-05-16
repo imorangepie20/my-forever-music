@@ -105,8 +105,7 @@ const ParticleDriftVisualizer = ({ analyser, accentHex, isPlaying }: VisualizerA
                 }
             }
 
-            ctx.fillStyle = 'rgba(0,0,0,0.18)'
-            ctx.fillRect(0, 0, width, height)
+            ctx.clearRect(0, 0, width, height)
 
             const remaining: Particle[] = []
             for (const particle of particlesRef.current) {

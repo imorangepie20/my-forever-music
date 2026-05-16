@@ -39,7 +39,7 @@ const RadialBloomVisualizer = ({ analyser, accentHex, isPlaying }: VisualizerAni
             const rect = canvas.getBoundingClientRect()
             canvas.width = Math.max(1, Math.floor(rect.width * dpr))
             canvas.height = Math.max(1, Math.floor(rect.height * dpr))
-            ctx.scale(dpr, dpr)
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
         }
         resize()
         window.addEventListener('resize', resize)
