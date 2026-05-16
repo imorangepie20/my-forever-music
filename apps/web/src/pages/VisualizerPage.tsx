@@ -12,7 +12,7 @@ import { resolvePlaybackPlatformId } from '@/lib/musicPlayback'
 import { getTidalAudioElement } from '@/lib/tidalStreamPlayback'
 
 const isAnimationId = (value: string | null): value is AnimationId =>
-    value === 'bars' || value === 'radial' || value === 'particle'
+    value === 'bars' || value === 'radial'
 
 const showVisualizerDiagnostics = import.meta.env.DEV
 

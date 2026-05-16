@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import BarsVisualizer from './animations/BarsVisualizer'
-import ParticleDriftVisualizer from './animations/ParticleDriftVisualizer'
 import RadialBloomVisualizer from './animations/RadialBloomVisualizer'
 import type { VisualizerAnimationProps } from './animations/types'
 
-export type AnimationId = 'bars' | 'radial' | 'particle'
+export type AnimationId = 'bars' | 'radial'
 
-const ANIMATIONS: AnimationId[] = ['bars', 'radial', 'particle']
+const ANIMATIONS: AnimationId[] = ['bars', 'radial']
 
 interface EqOverlayProps extends VisualizerAnimationProps {
     trackKey: string
@@ -36,10 +35,7 @@ const EqOverlay = ({ trackKey, forcedAnimation, ...animationProps }: EqOverlayPr
             </div>
         )
     }
-    if (active === 'radial') {
-        return <RadialBloomVisualizer {...animationProps} />
-    }
-    return <ParticleDriftVisualizer {...animationProps} />
+    return <RadialBloomVisualizer {...animationProps} />
 }
 
 export default EqOverlay
