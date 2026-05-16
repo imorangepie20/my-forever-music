@@ -2,10 +2,35 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { VisualizerAnimationProps } from './types'
 
 const BAR_COUNT = 64
+const MIN_VISIBLE_HEIGHT = 8
+const MAX_VISIBLE_HEIGHT = 96
+const HEIGHT_BOOST = 2.15
+const RESPONSE_CURVE = 0.82
+const HIGH_FREQUENCY_GAIN = 0.9
+const ATTACK_SMOOTHING = 0.55
+const RELEASE_SMOOTHING = 0.22
+
+const resolveLogBandRange = (index: number, binCount: number): [number, number] => {
+    if (binCount <= 2) {
+        return [0, binCount]
+    }
+
+    const minBin = 1
+    const maxBin = binCount - 1
+    const minLog = Math.log(minBin)
+    const maxLog = Math.log(maxBin)
+    const startRatio = index / BAR_COUNT
+    const endRatio = (index + 1) / BAR_COUNT
+    const start = Math.max(minBin, Math.floor(Math.exp(minLog + (maxLog - minLog) * startRatio)))
+    const end = Math.min(binCount, Math.max(start + 1, Math.ceil(Math.exp(minLog + (maxLog - minLog) * endRatio))))
+
+    return [start, end]
+}
 
 const BarsVisualizer = ({ analyser, accentHex, isPlaying }: VisualizerAnimationProps) => {
     const barRefs = useRef<Array<HTMLSpanElement | null>>([])
     const dataRef = useRef<Uint8Array>(new Uint8Array(analyser.binCount))
+    const smoothedHeightsRef = useRef<number[]>(Array.from({ length: BAR_COUNT }, () => 0))
 
     const bars = useMemo(() => Array.from({ length: BAR_COUNT }, (_, index) => index), [])
 
@@ -26,20 +51,25 @@ const BarsVisualizer = ({ analyser, accentHex, isPlaying }: VisualizerAnimationP
             const buffer = dataRef.current
             analyser.read(buffer)
 
-            const bucketSize = Math.max(1, Math.floor(buffer.length / BAR_COUNT))
             let maxValue = -1
             let maxIndex = 0
             const heights: number[] = new Array(BAR_COUNT)
 
             for (let i = 0; i < BAR_COUNT; i += 1) {
                 let sum = 0
-                const start = i * bucketSize
-                const end = Math.min(buffer.length, start + bucketSize)
+                const [start, end] = resolveLogBandRange(i, buffer.length)
                 for (let j = start; j < end; j += 1) {
                     sum += buffer[j]
                 }
-                const avg = sum / Math.max(1, end - start) / 255
-                heights[i] = avg
+                const bandPosition = i / Math.max(1, BAR_COUNT - 1)
+                const bandGain = 1 + bandPosition * HIGH_FREQUENCY_GAIN
+                const avg = (sum / Math.max(1, end - start) / 255) * bandGain
+                const visualHeight = Math.pow(1 - Math.exp(-avg * HEIGHT_BOOST), RESPONSE_CURVE)
+                const previousHeight = smoothedHeightsRef.current[i] ?? 0
+                const smoothing = visualHeight > previousHeight ? ATTACK_SMOOTHING : RELEASE_SMOOTHING
+                const smoothedHeight = previousHeight + (visualHeight - previousHeight) * smoothing
+                smoothedHeightsRef.current[i] = smoothedHeight
+                heights[i] = smoothedHeight
                 if (avg > maxValue) {
                     maxValue = avg
                     maxIndex = i
@@ -51,7 +81,7 @@ const BarsVisualizer = ({ analyser, accentHex, isPlaying }: VisualizerAnimationP
                 if (!element) {
                     continue
                 }
-                const heightPct = Math.max(6, heights[i] * 100)
+                const heightPct = Math.max(MIN_VISIBLE_HEIGHT, heights[i] * MAX_VISIBLE_HEIGHT)
                 element.style.height = `${heightPct}%`
                 const isHot = i % 7 === 0 || i === maxIndex
                 element.style.background = isHot ? accentHex : 'rgba(255,255,255,0.78)'
@@ -80,7 +110,7 @@ const BarsVisualizer = ({ analyser, accentHex, isPlaying }: VisualizerAnimationP
 
     return (
         <div
-            className="pointer-events-none flex h-32 w-full max-w-3xl items-end justify-center gap-[3px] px-2"
+            className="pointer-events-none flex h-40 w-full max-w-6xl items-end justify-center gap-[2px] px-6 sm:gap-[3px] md:gap-1"
             data-state={isPlaying ? 'playing' : 'paused'}
         >
             {bars.map((index) => (
@@ -89,7 +119,7 @@ const BarsVisualizer = ({ analyser, accentHex, isPlaying }: VisualizerAnimationP
                     ref={(node) => {
                         barRefs.current[index] = node
                     }}
-                    className="block w-[5px] rounded-t-[2px] transition-[background-color] duration-300"
+                    className="block min-w-[2px] max-w-[14px] flex-1 rounded-t-[2px] transition-[background-color] duration-300"
                     style={{ height: '6%', background: 'rgba(255,255,255,0.78)' }}
                 />
             ))}
