@@ -14,6 +14,8 @@ import { getTidalAudioElement } from '@/lib/tidalStreamPlayback'
 const isAnimationId = (value: string | null): value is AnimationId =>
     value === 'bars' || value === 'radial' || value === 'particle'
 
+const showVisualizerDiagnostics = import.meta.env.DEV
+
 const VisualizerPage = () => {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
@@ -46,6 +48,9 @@ const VisualizerPage = () => {
     const [diagnostics, setDiagnostics] = useState({ avg: 0, peak: 0 })
 
     useEffect(() => {
+        if (!showVisualizerDiagnostics) {
+            return
+        }
         if (diagnosticsBufferRef.current.length !== analyser.binCount) {
             diagnosticsBufferRef.current = new Uint8Array(analyser.binCount)
         }
@@ -90,12 +95,14 @@ const VisualizerPage = () => {
                     </button>
                     <span className="flex items-center gap-3 text-[11px] uppercase tracking-[0.32em] text-white/40">
                         <span>
-                            TIDAL · Visual EQ · {analyser.mode}
+                            TIDAL · Visual EQ{showVisualizerDiagnostics ? ` · ${analyser.mode}` : ''}
                         </span>
-                        <span className="rounded-full border border-white/15 bg-black/40 px-2 py-0.5 font-mono normal-case tracking-normal text-white/70">
-                            avg {diagnostics.avg} · peak {diagnostics.peak}
-                            {analyser.reason ? ` · ${analyser.reason}` : ''}
-                        </span>
+                        {showVisualizerDiagnostics && (
+                            <span className="rounded-full border border-white/15 bg-black/40 px-2 py-0.5 font-mono normal-case tracking-normal text-white/70">
+                                avg {diagnostics.avg} · peak {diagnostics.peak}
+                                {analyser.reason ? ` · ${analyser.reason}` : ''}
+                            </span>
+                        )}
                     </span>
                 </header>
                 <section className="relative flex flex-1 items-center justify-center">

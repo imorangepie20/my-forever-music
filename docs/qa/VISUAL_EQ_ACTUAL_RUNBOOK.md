@@ -29,7 +29,7 @@ http://localhost:5173
 
 5. 플레이어 dock 의 확장 버튼을 눌러 `/visualizer` 로 이동한다.
 
-6. 화면 우상단 진단 값을 확인한다.
+6. dev 서버에서는 화면 우상단 진단 값을 확인한다. production build 에서는 이 진단 배지가 숨겨진다.
 
 ```text
 TIDAL · Visual EQ · pcm
