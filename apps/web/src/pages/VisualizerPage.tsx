@@ -1,9 +1,13 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import Button from '@/components/common/Button'
 import Visualizer, { type VisualizerMode } from '@/components/visualizer/Visualizer'
+import { makeHeightsAt } from '@/components/visualizer/proceduralEnvelope'
+import { useTrackAudioFeatures } from '@/components/visualizer/useTrackAudioFeatures'
+import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { usePlayback } from '@/contexts/PlaybackContext'
-import { formatDuration } from '@/lib/musicPlayback'
+import { formatDuration, resolveSpotifyTrackId } from '@/lib/musicPlayback'
 
 const VISUALIZER_BARS = 64
 
@@ -20,6 +24,7 @@ const resolveMode = (sourcePlatform: string | undefined | null): VisualizerMode 
 
 const VisualizerPage = () => {
     const navigate = useNavigate()
+    const { session } = useAuthSession()
     const {
         currentItem,
         isPlaying,
@@ -31,6 +36,14 @@ const VisualizerPage = () => {
         skipNext,
         skipPrevious,
     } = usePlayback()
+
+    const audioFeatureTrackId = currentItem ? resolveSpotifyTrackId(currentItem) : null
+    const { features, filled } = useTrackAudioFeatures({
+        userId: session?.userId ?? null,
+        audioFeatureTrackId,
+    })
+
+    const heightsAt = useMemo(() => makeHeightsAt(filled ? features : null), [features, filled])
 
     if (!currentItem) {
         return (
@@ -58,6 +71,10 @@ const VisualizerPage = () => {
             void resume()
         }
     }
+
+    const signalLabel = filled && features
+        ? `신호: BPM/energy envelope (tempo=${features.tempo?.toFixed(0) ?? '–'}, energy=${features.energy?.toFixed(2) ?? '–'})`
+        : '신호: mode preset (audio_feature 미보강)'
 
     return (
         <main className="space-y-6">
@@ -91,7 +108,7 @@ const VisualizerPage = () => {
                     </div>
                 )}
 
-                <Visualizer playing={isPlaying} mode={mode} bars={VISUALIZER_BARS} />
+                <Visualizer playing={isPlaying} mode={mode} bars={VISUALIZER_BARS} heightsAt={heightsAt} />
 
                 <div className="w-full max-w-2xl">
                     <div className="flex items-center justify-between text-xs text-hud-text-muted">
@@ -126,9 +143,7 @@ const VisualizerPage = () => {
                     </Button>
                 </div>
 
-                <p className="text-[11px] text-hud-text-muted">
-                    신호: mode preset (BPM/energy 보강 envelope는 후속 PR)
-                </p>
+                <p className="text-[11px] text-hud-text-muted">{signalLabel}</p>
             </section>
         </main>
     )

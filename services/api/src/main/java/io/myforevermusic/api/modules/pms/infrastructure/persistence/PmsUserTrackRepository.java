@@ -1,11 +1,23 @@
 package io.myforevermusic.api.modules.pms.infrastructure.persistence;
 
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface PmsUserTrackRepository extends JpaRepository<PmsUserTrackEntity, String> {
+
+    @Query("""
+        select track
+        from PmsUserTrackEntity track
+        where track.audioFeatures.audioFeatureTrackId = :audioFeatureTrackId
+        order by track.audioFeatures.audioFeaturesFilled desc, track.trackId asc
+        """)
+    Optional<PmsUserTrackEntity> findFirstByAudioFeatureTrackId(
+        @Param("audioFeatureTrackId") String audioFeatureTrackId
+    );
+
 
     @Modifying
     @Query("""

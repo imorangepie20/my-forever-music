@@ -31,6 +31,7 @@ import type {
     EmsCollectionSearchRequest,
     EmsCollectionSearchResponse,
     EmsCollectionPlaylistBrowseResponse,
+    EmsCollectionPlaylistSectionsResponse,
     EmsCollectionPlaylistDetailResponse,
     EmsCollectionTrackBrowseResponse,
     EmsCollectionSearchPlaylistTracksResponse,
@@ -79,6 +80,7 @@ import type {
     UserMusicEventResponse,
     PmsWorkspaceBootstrapResponse,
     PmsPlaylistDetailResponse,
+    PmsTrackAudioFeaturesResponse,
     PmsPlaylistImportBootstrapResponse,
     PmsPlaylistImportRequest,
     PmsPlaylistImportResponse,
@@ -86,6 +88,7 @@ import type {
     PmsPersonalPlaylistCommandResponse,
     PmsPersonalPlaylistCreateRequest,
     PmsPersonalPlaylistTrackSaveRequest,
+    SchedulingAdminResponse,
     SystemInfoResponse,
 } from '@/types/api'
 
@@ -176,6 +179,12 @@ export const getAiDocsUrl = () =>
 
 export const fetchSystemInfo = (signal?: AbortSignal) =>
     requestJson<SystemInfoResponse>('/api/v1/system/info', { signal })
+
+export const fetchSchedulingAdminStatus = (userId: string, signal?: AbortSignal) =>
+    requestJson<SchedulingAdminResponse>(
+        `/api/v1/system/admin/schedules?user_id=${encodeURIComponent(userId)}`,
+        { signal, cache: 'no-store' },
+    )
 
 export const registerAccount = (payload: AuthRegistrationRequest) =>
     requestJson<AuthRegistrationResponse>('/api/v1/auth/register', {
@@ -367,6 +376,16 @@ export const fetchPmsPlaylistDetail = (
 ) =>
     requestJson<PmsPlaylistDetailResponse>(
         `/api/v1/pms/playlists/${encodeURIComponent(playlistId)}?user_id=${encodeURIComponent(userId)}`,
+        { signal },
+    )
+
+export const fetchPmsTrackAudioFeatures = (
+    userId: string,
+    audioFeatureTrackId: string,
+    signal?: AbortSignal,
+) =>
+    requestJson<PmsTrackAudioFeaturesResponse>(
+        `/api/v1/pms/tracks/${encodeURIComponent(audioFeatureTrackId)}/audio-features?user_id=${encodeURIComponent(userId)}`,
         { signal },
     )
 
@@ -790,6 +809,29 @@ export const fetchEmsCollectedPlaylists = (platformId: string = 'spotify', signa
         `/api/v1/ems/collection/playlists?platform_id=${encodeURIComponent(platformId)}&limit=${encodeURIComponent(String(limit))}&random=true`,
         { signal },
     )
+
+export const fetchEmsPlaylistSections = ({
+    userId,
+    platformIds = [],
+    limit = 6,
+    signal,
+}: {
+    userId?: string | null
+    platformIds?: string[]
+    limit?: number
+    signal?: AbortSignal
+}) => {
+    const params = new URLSearchParams()
+    if (userId) {
+        params.set('user_id', userId)
+    }
+    platformIds.forEach((platformId) => params.append('platform_id', platformId))
+    params.set('limit', String(limit))
+    return requestJson<EmsCollectionPlaylistSectionsResponse>(
+        `/api/v1/ems/collection/playlists/sections?${params.toString()}`,
+        { signal },
+    )
+}
 
 export const fetchEmsCollectedPlaylistDetail = (playlistId: number, signal?: AbortSignal) => {
     return requestJson<EmsCollectionPlaylistDetailResponse>(

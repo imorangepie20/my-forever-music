@@ -22,6 +22,35 @@ export interface SystemInfoResponse {
     timestamp: string
 }
 
+export interface SchedulingAdminScheduleItem {
+    id: string
+    domain: string
+    name: string
+    mode: string
+    enabled: boolean
+    configured: boolean
+    status: 'active' | 'blocked' | 'disabled' | string
+    fixed_delay_ms: number | null
+    initial_delay_ms: number | null
+    cadence_label: string
+    purpose: string
+    management_path: string
+    last_status: string | null
+    last_message: string | null
+    last_started_at: string | null
+    last_completed_at: string | null
+    config_keys: string[]
+    notes: string[]
+}
+
+export interface SchedulingAdminResponse {
+    service: string
+    status: string
+    generated_at: string
+    schedules: SchedulingAdminScheduleItem[]
+    recommendations: string[]
+}
+
 export interface AuthRegistrationRequest {
     display_name: string
     email: string
@@ -644,6 +673,26 @@ export interface PmsPlaylistDetailResponse {
         last_synced_at: string | null
     }
     tracks: PmsPlaylistDetailTrack[]
+}
+
+export interface PmsTrackAudioFeaturesResponse {
+    audio_feature_track_id: string | null
+    audio_feature_source: string
+    audio_features_filled: boolean
+    duration_ms: number | null
+    musical_key: number | null
+    mode: number | null
+    time_signature: number | null
+    acousticness: number | null
+    danceability: number | null
+    energy: number | null
+    instrumentalness: number | null
+    liveness: number | null
+    loudness: number | null
+    speechiness: number | null
+    tempo: number | null
+    valence: number | null
+    resolved_at: string | null
 }
 
 export interface PmsPlaylistImportBootstrapResponse {
@@ -1667,6 +1716,33 @@ export interface EmsCollectionPlaylistBrowseResponse {
     generated_at: string
     platform_id: string
     playlists: EmsCollectionPlaylistItem[]
+}
+
+export interface EmsCollectionPlaylistSectionItem {
+    playlist: EmsCollectionPlaylistItem
+    match_signals: string[]
+}
+
+export interface EmsCollectionPlaylistSection {
+    section_id: string
+    title: string
+    subtitle: string
+    category_type: string
+    category_label: string
+    display_style: 'hero' | 'mosaic' | 'rail' | 'compact' | string
+    title_source: string
+    playlists: EmsCollectionPlaylistSectionItem[]
+}
+
+export interface EmsCollectionPlaylistSectionsResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string | null
+    platform_ids: string[]
+    title_model: string
+    personalized: boolean
+    sections: EmsCollectionPlaylistSection[]
 }
 
 export interface EmsCollectionPlaylistDetailResponse {
