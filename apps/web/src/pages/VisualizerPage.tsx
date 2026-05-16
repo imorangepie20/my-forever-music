@@ -1,12 +1,9 @@
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Pause, Play, SkipBack, SkipForward } from 'lucide-react'
+import { ArrowLeft, Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import Button from '@/components/common/Button'
 import Visualizer, { type VisualizerMode } from '@/components/visualizer/Visualizer'
-import { useSpotifyAudioAnalysisAdapter } from '@/components/visualizer/useSpotifyAudioAnalysisAdapter'
-import { useTidalAnalyserAdapter } from '@/components/visualizer/useTidalAnalyserAdapter'
-import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { usePlayback } from '@/contexts/PlaybackContext'
-import { formatDuration, resolveSpotifyTrackId } from '@/lib/musicPlayback'
+import { formatDuration } from '@/lib/musicPlayback'
 
 const VISUALIZER_BARS = 64
 
@@ -23,7 +20,6 @@ const resolveMode = (sourcePlatform: string | undefined | null): VisualizerMode 
 
 const VisualizerPage = () => {
     const navigate = useNavigate()
-    const { session } = useAuthSession()
     const {
         currentItem,
         isPlaying,
@@ -35,16 +31,6 @@ const VisualizerPage = () => {
         skipNext,
         skipPrevious,
     } = usePlayback()
-    const spotifyTrackId = currentItem ? resolveSpotifyTrackId(currentItem) : null
-    const spotifyAdapter = useSpotifyAudioAnalysisAdapter({
-        userId: session?.userId ?? null,
-        spotifyTrackId: currentItem?.sourcePlatform === 'spotify' ? spotifyTrackId : null,
-        positionMs,
-    })
-    const tidalAdapter = useTidalAnalyserAdapter({
-        enabled: currentItem?.sourcePlatform === 'tidal',
-        isPlaying,
-    })
 
     if (!currentItem) {
         return (
@@ -105,18 +91,7 @@ const VisualizerPage = () => {
                     </div>
                 )}
 
-                <Visualizer
-                    playing={isPlaying}
-                    mode={mode}
-                    bars={VISUALIZER_BARS}
-                    heightsAt={
-                        mode === 'spotify' && spotifyAdapter.heightsAt
-                            ? spotifyAdapter.heightsAt
-                            : mode === 'tidal' && tidalAdapter.heightsAt
-                                ? tidalAdapter.heightsAt
-                                : undefined
-                    }
-                />
+                <Visualizer playing={isPlaying} mode={mode} bars={VISUALIZER_BARS} />
 
                 <div className="w-full max-w-2xl">
                     <div className="flex items-center justify-between text-xs text-hud-text-muted">
@@ -151,32 +126,8 @@ const VisualizerPage = () => {
                     </Button>
                 </div>
 
-                {mode === 'spotify' && spotifyAdapter.error && (
-                    <div className="flex max-w-2xl items-start gap-3 rounded-xl border border-amber-300/40 bg-amber-300/10 p-3 text-xs text-amber-100">
-                        <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                        <p>
-                            Spotify audio-analysis 어댑터가 작동하지 않아 procedural envelope로 fallback 중입니다.
-                            <br />
-                            <span className="text-amber-200/80">{spotifyAdapter.error}</span>
-                        </p>
-                    </div>
-                )}
-                {mode === 'tidal' && tidalAdapter.error && (
-                    <div className="flex max-w-2xl items-start gap-3 rounded-xl border border-amber-300/40 bg-amber-300/10 p-3 text-xs text-amber-100">
-                        <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                        <p>
-                            TIDAL AnalyserNode 어댑터가 작동하지 않아 procedural envelope로 fallback 중입니다.
-                            <br />
-                            <span className="text-amber-200/80">{tidalAdapter.error}</span>
-                        </p>
-                    </div>
-                )}
                 <p className="text-[11px] text-hud-text-muted">
-                    {mode === 'spotify' && spotifyAdapter.ready
-                        ? '실시간 신호: Spotify audio-analysis segment + beat 기반 bar 매핑.'
-                        : mode === 'tidal' && tidalAdapter.ready
-                            ? '실시간 신호: TIDAL <audio> 요소에 부착한 WebAudio AnalyserNode FFT.'
-                            : 'mode 기반 procedural envelope로 동작합니다.'}
+                    신호: mode preset (BPM/energy 보강 envelope는 후속 PR)
                 </p>
             </section>
         </main>
