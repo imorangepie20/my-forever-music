@@ -5,6 +5,10 @@ import { RecommendationWorkspaceProvider } from './contexts/RecommendationWorksp
 import './index.css'
 import App from './App.tsx'
 
+if (import.meta.env.DEV) {
+    void import('./lib/visualizerProbe')
+}
+
 createRoot(document.getElementById('root')!).render(
     <AuthSessionProvider>
         <PlaybackProvider>

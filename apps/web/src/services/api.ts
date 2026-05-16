@@ -167,6 +167,17 @@ async function requestJson<T>(path: string, init?: RequestInit) {
     return (await response.json()) as T
 }
 
+async function requestArrayBuffer(path: string, init?: RequestInit) {
+    const response = await fetch(buildApiUrl(path), init)
+
+    if (!response.ok) {
+        const payload = await readErrorPayload(response)
+        throw new ApiError(payload.message, response.status, payload.code)
+    }
+
+    return response.arrayBuffer()
+}
+
 export const getApiConnectionLabel = () =>
     API_BASE_URL || 'same-origin (/api via Vite proxy)'
 
@@ -237,6 +248,17 @@ export const fetchTidalPlaybackStream = (
     requestJson<TidalPlaybackStreamResponse>(
         `/api/v1/platforms/playback/tidal/tracks/${encodeURIComponent(trackId)}/stream?user_id=${encodeURIComponent(userId)}&quality=${encodeURIComponent(quality)}`,
         { signal },
+    )
+
+export const fetchTidalPlaybackAnalysisAudio = (
+    userId: string,
+    trackId: string,
+    quality = 'HIGH',
+    signal?: AbortSignal,
+) =>
+    requestArrayBuffer(
+        `/api/v1/platforms/playback/tidal/tracks/${encodeURIComponent(trackId)}/analysis-audio?user_id=${encodeURIComponent(userId)}&quality=${encodeURIComponent(quality)}`,
+        { signal, cache: 'no-store' },
     )
 
 export const resolveTidalPlaybackTarget = (payload: TidalPlaybackTargetResolveRequest, signal?: AbortSignal) =>

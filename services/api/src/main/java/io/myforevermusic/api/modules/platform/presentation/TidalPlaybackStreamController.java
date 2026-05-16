@@ -25,6 +25,10 @@ import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -58,6 +62,7 @@ public class TidalPlaybackStreamController {
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(8))
+            .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
     }
 
@@ -115,6 +120,46 @@ public class TidalPlaybackStreamController {
             playbackInfo.durationSeconds(),
             playbackInfo.streamUrl()
         );
+    }
+
+    @Operation(summary = "Fetch a verified full-track TIDAL audio stream for visual analysis")
+    @GetMapping("/tracks/{track_id}/analysis-audio")
+    public ResponseEntity<byte[]> analysisAudio(
+        @RequestParam("user_id") @NotBlank String userId,
+        @PathVariable("track_id") @NotBlank String trackId,
+        @RequestParam(value = "quality", defaultValue = "HIGH") String quality
+    ) {
+        PlatformAccountCredential credential = resolveCredential(userId);
+        String countryCode = countryCodeForCredential(credential);
+        String requestedQuality = normalizeQuality(quality);
+        TidalPlaybackInfo playbackInfo = fetchPlaybackInfo(credential, trackId, countryCode, requestedQuality);
+
+        if (!"FULL".equalsIgnoreCase(playbackInfo.assetPresentation())) {
+            throw new PlatformReconnectRequiredException(
+                TIDAL_PLATFORM_ID,
+                "TIDAL returned %s manifest for visual analysis. track=%s country=%s quality=%s"
+                    .formatted(firstNonBlank(playbackInfo.assetPresentation(), "UNKNOWN"), trackId, countryCode, requestedQuality)
+            );
+        }
+        if (playbackInfo.streamUrl() == null || playbackInfo.streamUrl().isBlank()) {
+            throw new IllegalStateException(
+                "TIDAL did not return an analysis audio URL. track=%s country=%s quality=%s"
+                    .formatted(trackId, countryCode, requestedQuality)
+            );
+        }
+        if (isPlaylistManifest(playbackInfo)) {
+            throw new IllegalStateException(
+                "TIDAL returned an HLS/DASH manifest for visual analysis; use the HLS segment capture path instead. track=%s mime=%s"
+                    .formatted(trackId, playbackInfo.manifestMimeType())
+            );
+        }
+
+        byte[] audioBytes = fetchAnalysisAudioBytes(playbackInfo.streamUrl());
+        return ResponseEntity.ok()
+            .cacheControl(CacheControl.noStore())
+            .header(HttpHeaders.CONTENT_TYPE, firstNonBlank(playbackInfo.manifestMimeType(), MediaType.APPLICATION_OCTET_STREAM_VALUE))
+            .header("X-TIDAL-Requested-Quality", requestedQuality)
+            .body(audioBytes);
     }
 
     private PlatformAccountCredential resolveCredential(String userId) {
@@ -239,6 +284,41 @@ public class TidalPlaybackStreamController {
             }
         }
         return text(decodedJson, "url", null);
+    }
+
+    private byte[] fetchAnalysisAudioBytes(String streamUrl) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(streamUrl))
+                .timeout(Duration.ofSeconds(20))
+                .header("Accept", "audio/mp4,audio/*,*/*")
+                .GET()
+                .build();
+            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new IllegalStateException(
+                    "TIDAL visual analysis audio fetch failed (%s)."
+                        .formatted(response.statusCode())
+                );
+            }
+            if (response.body() == null || response.body().length == 0) {
+                throw new IllegalStateException("TIDAL visual analysis audio fetch returned an empty body.");
+            }
+            return response.body();
+        } catch (IOException exception) {
+            throw new IllegalStateException("TIDAL visual analysis audio fetch could not be read.", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("TIDAL visual analysis audio fetch was interrupted.", exception);
+        }
+    }
+
+    private boolean isPlaylistManifest(TidalPlaybackInfo playbackInfo) {
+        String mimeType = playbackInfo.manifestMimeType() == null ? "" : playbackInfo.manifestMimeType().toLowerCase();
+        String streamUrl = playbackInfo.streamUrl() == null ? "" : playbackInfo.streamUrl().toLowerCase();
+        return mimeType.contains("mpegurl")
+            || mimeType.contains("dash")
+            || streamUrl.contains(".m3u8")
+            || streamUrl.contains(".mpd");
     }
 
     private String countryCodeForCredential(PlatformAccountCredential credential) {

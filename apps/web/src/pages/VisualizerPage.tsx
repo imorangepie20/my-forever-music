@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import ControlsBar from '@/components/visualizer/ControlsBar'
@@ -42,6 +42,29 @@ const VisualizerPage = () => {
         return isAnimationId(raw) ? raw : null
     }, [searchParams])
 
+    const diagnosticsBufferRef = useRef<Uint8Array>(new Uint8Array(analyser.binCount))
+    const [diagnostics, setDiagnostics] = useState({ avg: 0, peak: 0 })
+
+    useEffect(() => {
+        if (diagnosticsBufferRef.current.length !== analyser.binCount) {
+            diagnosticsBufferRef.current = new Uint8Array(analyser.binCount)
+        }
+        const id = window.setInterval(() => {
+            const buf = diagnosticsBufferRef.current
+            analyser.read(buf)
+            let total = 0
+            let peak = 0
+            for (let i = 0; i < buf.length; i += 1) {
+                total += buf[i]
+                if (buf[i] > peak) {
+                    peak = buf[i]
+                }
+            }
+            setDiagnostics({ avg: Math.round(total / buf.length), peak })
+        }, 500)
+        return () => window.clearInterval(id)
+    }, [analyser])
+
     if (!currentItem) {
         return <Navigate to="/" replace />
     }
@@ -65,8 +88,14 @@ const VisualizerPage = () => {
                         <ArrowLeft size={16} />
                         <span>Back</span>
                     </button>
-                    <span className="text-[11px] uppercase tracking-[0.32em] text-white/40">
-                        TIDAL · Visual EQ {analyser.mode === 'fallback' ? '(procedural)' : ''}
+                    <span className="flex items-center gap-3 text-[11px] uppercase tracking-[0.32em] text-white/40">
+                        <span>
+                            TIDAL · Visual EQ · {analyser.mode}
+                        </span>
+                        <span className="rounded-full border border-white/15 bg-black/40 px-2 py-0.5 font-mono normal-case tracking-normal text-white/70">
+                            avg {diagnostics.avg} · peak {diagnostics.peak}
+                            {analyser.reason ? ` · ${analyser.reason}` : ''}
+                        </span>
                     </span>
                 </header>
                 <section className="relative flex flex-1 items-center justify-center">

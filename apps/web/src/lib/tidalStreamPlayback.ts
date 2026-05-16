@@ -1,5 +1,11 @@
 import Hls from 'hls.js'
 import { resolveSpotifyTrackId, resolveTidalTrackId, type PlaybackMediaItem } from '@/lib/musicPlayback'
+import {
+    attachTidalAudioCapture,
+    detachTidalAudioCapture,
+    notifyDirectTidalAudioSource,
+    notifyNativeHlsTidalAudioSource,
+} from '@/lib/tidalAudioCapture'
 import { fetchTidalPlaybackStream, resolveTidalPlaybackTarget } from '@/services/api'
 import type { TidalPlaybackStreamResponse } from '@/types/api'
 
@@ -61,10 +67,14 @@ const currentState = (): TidalPlaybackSnapshot['state'] => {
 
 export const getTidalDeviceId = () => TIDAL_STREAM_DEVICE_ID
 
-// Visualizer page taps the existing detached audio element via captureStream()
-// to feed an AnalyserNode. Returns null until the first TIDAL playback warms
-// the element up.
+// Visualizer uses this for playback timing only. Audio samples are captured
+// before SourceBuffer append in tidalAudioCapture because the media element is
+// cross-origin tainted by TIDAL HLS segments.
 export const getTidalAudioElement = (): HTMLAudioElement | null => audioElement
+
+// Development probe needs access to the live HLS instance for diagnostics.
+// Production capture is attached above through tidalAudioCapture.
+export const getTidalHlsInstance = (): Hls | null => hls
 
 export const getTidalCurrentSnapshot = (): TidalPlaybackSnapshot => {
     const durationMs = secondsToMs(audioElement?.duration ?? 0) || lastDurationMs
@@ -192,6 +202,7 @@ const attachAudioListeners = (audio: HTMLAudioElement) => {
 }
 
 const resetSource = () => {
+    detachTidalAudioCapture()
     if (hls) {
         hls.destroy()
         hls = null
@@ -227,6 +238,7 @@ const playHlsStream = async (audio: HTMLAudioElement, streamUrl: string) => {
             lowLatencyMode: false,
             backBufferLength: 90,
         })
+        attachTidalAudioCapture(hls)
 
         await new Promise<void>((resolve, reject) => {
             hls?.once(Hls.Events.MANIFEST_PARSED, () => resolve())
@@ -243,6 +255,7 @@ const playHlsStream = async (audio: HTMLAudioElement, streamUrl: string) => {
     }
 
     if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+        notifyNativeHlsTidalAudioSource()
         audio.src = streamUrl
         await audio.play()
         return
@@ -300,12 +313,28 @@ export const playTidalMediaItem = async (
 
         activeCallbacks.onTransition?.(tidalTrackId, getTidalCurrentSnapshot())
 
+        // eslint-disable-next-line no-console
+        console.log('[tidalStream] dispatch', {
+            productId: tidalTrackId,
+            manifestMime: stream.manifest_mime_type,
+            urlExt: stream.stream_url.split('?')[0].split('.').pop(),
+            codec: stream.codec,
+            quality: stream.audio_quality,
+            dispatch: isDashStream(stream) ? 'DASH(unsupported)' : isHlsStream(stream) ? 'HLS' : 'direct',
+        })
         if (isDashStream(stream)) {
             throw new Error(`TIDAL returned a DASH stream (${stream.manifest_mime_type ?? 'unknown'}), which is not supported by the direct browser player yet.`)
         }
         if (isHlsStream(stream)) {
             await playHlsStream(audio, stream.stream_url)
         } else {
+            notifyDirectTidalAudioSource(
+                stream.stream_url,
+                userId,
+                tidalTrackId,
+                stream.requested_quality ?? stream.audio_quality ?? 'HIGH',
+                0,
+            )
             await playDirectStream(audio, stream.stream_url)
         }
     } catch (error: unknown) {
