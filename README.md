@@ -172,6 +172,7 @@ my-forever-music/
 - 사이트 내부 음악 감상 행동 이벤트 저장
 - EMS 외부 플레이리스트 수집, GMS 추천 통과, 사용자 평가의 PMS 환류
 - 페이지 이동 간 유지되는 공통 음악 플레이어의 행동 이벤트 저장
+- `/playback/visualizer` 페이지의 데이터 소스/금지 API/회귀 방어 규약은 [`docs/architecture/PLAYBACK_VISUALIZER_DESIGN.md`](docs/architecture/PLAYBACK_VISUALIZER_DESIGN.md) 에 외부 표준 근거와 함께 정리됨 — 메인 재생 element에 Web Audio attach 금지, 1차는 metadata procedural envelope만
 
 ## 1차 마감 작업
 
