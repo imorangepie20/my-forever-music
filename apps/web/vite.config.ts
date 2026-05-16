@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => {
     const publicHost = env.VITE_PUBLIC_HOST?.trim() || 'imapplepie20.tplinkdns.com'
     const hmrProtocol = env.VITE_HMR_PROTOCOL?.trim() || undefined
     const hmrClientPort = env.VITE_HMR_CLIENT_PORT ? Number(env.VITE_HMR_CLIENT_PORT) : undefined
+    const hmrDisabled = process.env.PLAYWRIGHT_E2E === 'true'
 
     return {
         plugins: [react()],
@@ -34,7 +35,9 @@ export default defineConfig(({ mode }) => {
                 'imapplepie20.tplinkdns.com',
                 publicHost,
             ].filter(Boolean),
-            hmr: hmrProtocol || hmrClientPort
+            hmr: hmrDisabled
+                ? false
+                : hmrProtocol || hmrClientPort
                 ? {
                       host: publicHost,
                       protocol: hmrProtocol,

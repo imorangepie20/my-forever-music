@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "test:policy": "node scripts/project-policy-regression-harness.mjs",
     "test:playback": "node scripts/playback-regression-harness.mjs",
+    "test:e2e": "playwright test",
     "test:product-flow": "node scripts/product-flow-regression-harness.mjs",
     "test:regression": "npm run test:policy && npm run test:product-flow && npm run test:playback",
     "lint": "eslint .",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.60.0",
     "@types/node": "^25.0.8",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
