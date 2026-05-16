@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { VisualizerAnimationProps } from './types'
 
 const BAR_COUNT = 64
-const MIN_VISIBLE_HEIGHT = 8
+const MIN_VISIBLE_HEIGHT = 2
 const MAX_VISIBLE_HEIGHT = 100
-const PEAK_GAIN = 1
+const PEAK_GAIN = 0.8
 const RESPONSE_GAMMA = 0.95
 const NOISE_FLOOR = 0.04
-const HIGH_FREQUENCY_GAIN = 1.8
+const HIGH_FREQUENCY_GAIN = 2.6
 const ATTACK_SMOOTHING = 0.95
 const RELEASE_SMOOTHING = 0.32
 

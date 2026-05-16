@@ -3,9 +3,9 @@ import BarsVisualizer from './animations/BarsVisualizer'
 import RadialBloomVisualizer from './animations/RadialBloomVisualizer'
 import type { VisualizerAnimationProps } from './animations/types'
 
-export type AnimationId = 'bars' | 'radial'
+export type AnimationId = 'bars'
 
-const ANIMATIONS: AnimationId[] = ['bars', 'radial']
+const ANIMATIONS: AnimationId[] = ['bars']
 
 interface EqOverlayProps extends VisualizerAnimationProps {
     trackKey: string
