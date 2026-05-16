@@ -152,6 +152,7 @@ public class PmsPersonalPlaylistService {
 
         return new PmsPersonalPlaylistStore.PersonalTrackState(
             track.trackId(),
+            track.externalTrackId(),
             track.title(),
             track.artistName(),
             track.sourcePlatform(),
@@ -160,7 +161,13 @@ public class PmsPersonalPlaylistService {
             track.platformExternalUrl(),
             track.platformUri(),
             track.previewUrl(),
+            track.isrc(),
             audioFeatureTrackId,
+            track.spotifyUri(),
+            track.tidalTrackId(),
+            track.tidalUri(),
+            track.preferredPlaybackPlatform(),
+            track.playbackTargetStatus(),
             durationMs,
             null,
             normalizeSourceContext(sourceContext),

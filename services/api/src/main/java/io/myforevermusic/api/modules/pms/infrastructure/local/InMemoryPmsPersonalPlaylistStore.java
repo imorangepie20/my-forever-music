@@ -74,6 +74,7 @@ public class InMemoryPmsPersonalPlaylistStore implements PmsPersonalPlaylistStor
         List<PersonalTrackState> tracks = new ArrayList<>(playlist.tracks());
         PersonalTrackState track = new PersonalTrackState(
             draft.track().trackId(),
+            draft.track().externalTrackId(),
             draft.track().title(),
             draft.track().artistName(),
             draft.track().sourcePlatform(),
@@ -82,7 +83,13 @@ public class InMemoryPmsPersonalPlaylistStore implements PmsPersonalPlaylistStor
             draft.track().platformExternalUrl(),
             draft.track().platformUri(),
             draft.track().previewUrl(),
+            draft.track().isrc(),
             draft.track().spotifyTrackId(),
+            draft.track().spotifyUri(),
+            draft.track().tidalTrackId(),
+            draft.track().tidalUri(),
+            draft.track().preferredPlaybackPlatform(),
+            draft.track().playbackTargetStatus(),
             draft.track().durationMs(),
             tracks.size() + 1,
             draft.sourceContext(),

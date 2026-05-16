@@ -450,17 +450,32 @@ public class GmsPlaylistPreviewService {
             if (existingTrackIds.contains(trackId)) {
                 continue;
             }
+            String sourcePlatform = emsTrack.getSourcePlatform();
+            String externalTrackId = firstNonBlank(emsTrack.getExternalTrackId(), trackId);
+            String platformUri = platformUriFor(sourcePlatform, externalTrackId, emsTrack.getSpotifyUri());
+            String spotifyTrackId = "spotify".equalsIgnoreCase(sourcePlatform) ? externalTrackId : null;
+            String spotifyUri = "spotify".equalsIgnoreCase(sourcePlatform) ? platformUri : null;
+            String tidalTrackId = "tidal".equalsIgnoreCase(sourcePlatform) ? externalTrackId : null;
+            String tidalUri = "tidal".equalsIgnoreCase(sourcePlatform) ? platformUri : null;
+            String preferredPlaybackPlatform = nativePlaybackPlatform(sourcePlatform);
             PmsPersonalPlaylistStore.PersonalTrackState trackState = new PmsPersonalPlaylistStore.PersonalTrackState(
                 trackId,
+                externalTrackId,
                 emsTrack.getTitle(),
                 emsTrack.getArtistName(),
-                emsTrack.getSourcePlatform(),
+                sourcePlatform,
                 emsTrack.getAlbumTitle(),
                 emsTrack.getAlbumImageUrl(),
                 emsTrack.getPlatformExternalUrl(),
-                emsTrack.getSpotifyUri(),
+                platformUri,
                 emsTrack.getPreviewUrl(),
-                "spotify".equalsIgnoreCase(emsTrack.getSourcePlatform()) ? emsTrack.getExternalTrackId() : null,
+                emsTrack.getIsrc(),
+                spotifyTrackId,
+                spotifyUri,
+                tidalTrackId,
+                tidalUri,
+                preferredPlaybackPlatform,
+                preferredPlaybackPlatform == null ? "unresolved" : "native",
                 emsTrack.getDurationMs(),
                 i,
                 "gms-playlist-import",
@@ -564,4 +579,33 @@ public class GmsPlaylistPreviewService {
         Long emsPlaylistId,
         Instant dismissedAt
     ) {}
+
+    private String nativePlaybackPlatform(String sourcePlatform) {
+        if ("spotify".equalsIgnoreCase(sourcePlatform)) {
+            return "spotify";
+        }
+        if ("tidal".equalsIgnoreCase(sourcePlatform)) {
+            return "tidal";
+        }
+        return null;
+    }
+
+    private String platformUriFor(String sourcePlatform, String externalTrackId, String spotifyUri) {
+        if ("spotify".equalsIgnoreCase(sourcePlatform)) {
+            return firstNonBlank(spotifyUri, externalTrackId == null ? null : "spotify:track:%s".formatted(externalTrackId));
+        }
+        if ("tidal".equalsIgnoreCase(sourcePlatform) && externalTrackId != null && !externalTrackId.isBlank()) {
+            return "tidal:track:%s".formatted(externalTrackId);
+        }
+        return null;
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
 }

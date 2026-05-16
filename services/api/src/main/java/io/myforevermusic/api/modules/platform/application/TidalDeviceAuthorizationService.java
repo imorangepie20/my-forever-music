@@ -365,9 +365,10 @@ public class TidalDeviceAuthorizationService {
 
     private List<String> requestedScopes() {
         List<String> scopes = tidalProperties().getScopes();
-        // Fallback covers the case where config is unset/empty. `r_stream` is required for
-        // legacy v1 /tracks/{id}/playbackinfo. Without it TIDAL returns 403 on streaming.
-        return scopes == null || scopes.isEmpty() ? List.of("r_usr", "w_usr", "w_sub", "r_stream") : scopes;
+        // Fallback covers the case where config is unset/empty.
+        return scopes == null || scopes.isEmpty()
+            ? List.of("r_usr", "w_usr", "w_sub", "r_stream", "playback", "entitlements.read")
+            : scopes;
     }
 
     private JsonNode parseJson(String body) throws IOException {

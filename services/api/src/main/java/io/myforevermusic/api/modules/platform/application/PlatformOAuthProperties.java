@@ -134,7 +134,9 @@ public class PlatformOAuthProperties {
             "r_usr",
             "w_usr",
             "w_sub",
-            "r_stream"
+            "r_stream",
+            "playback",
+            "entitlements.read"
         );
 
         public boolean isEnabled() {

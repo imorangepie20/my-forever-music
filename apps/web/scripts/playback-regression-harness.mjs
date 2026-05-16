@@ -255,6 +255,24 @@ check(
 )
 
 check(
+    'PlaybackContext cancels stale playlist start requests',
+    /playbackRequestIdRef/.test(files.playbackContext) &&
+        /const isActiveRequest = \(\) => playbackRequestIdRef\.current === playbackRequestId/.test(files.playbackContext) &&
+        /resetPlaybackSurface\(\)/.test(files.playbackContext) &&
+        /if \(!isActiveRequest\(\)\) \{[\s\S]{0,80}return[\s\S]{0,80}\}/.test(files.playbackContext),
+    'Starting a new playlist must reset player state and prevent older async provider work from overwriting the new queue.',
+)
+
+check(
+    'Playback provider state callbacks ignore stale queue events',
+    /resolvePlaybackPlatformId\(activeItem, session\?\.preferredPlatformId\) !== 'spotify'/.test(files.playbackContext) &&
+        /spotifyTrackId && nextIndex < 0/.test(files.playbackContext) &&
+        /resolvePlaybackPlatformId\(activeItem, session\?\.preferredPlatformId\) !== 'tidal'/.test(files.playbackContext) &&
+        /snapshot\.productId && nextIndex < 0/.test(files.playbackContext),
+    'Late Spotify/TIDAL state callbacks from the previous playlist must not revive old playback state after a fresh queue starts.',
+)
+
+check(
     'GMS playlist preview starts a fresh focused playback queue',
     /playQueueRef\.current\(playbackItems, 0\)/.test(files.gmsPlaylistsPage) &&
         /playQueue\(previewPlaybackItems, 0\)/.test(files.gmsPlaylistsPage) &&

@@ -113,6 +113,7 @@ class PmsPersonalPlaylistControllerWebMvcTest {
             List.of(
                 new PmsPersonalPlaylistStore.PersonalTrackState(
                     "track-001",
+                    "spotify-track-001",
                     "Midnight Receiver",
                     "Neon Bloom",
                     "spotify",
@@ -121,7 +122,13 @@ class PmsPersonalPlaylistControllerWebMvcTest {
                     "https://open.spotify.com/track/spotify-track-001",
                     "spotify:track:spotify-track-001",
                     null,
+                    null,
                     "spotify-track-001",
+                    "spotify:track:spotify-track-001",
+                    null,
+                    null,
+                    "spotify",
+                    "native",
                     218000,
                     1,
                     "gms-preview",

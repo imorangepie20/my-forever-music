@@ -1,6 +1,7 @@
 package io.myforevermusic.api.modules.pms.infrastructure.persistence;
 
 import io.myforevermusic.api.modules.pms.application.PmsPersonalPlaylistStore;
+import io.myforevermusic.api.modules.pms.application.PmsUserLibraryStore;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -57,7 +58,7 @@ public class JpaPmsPersonalPlaylistStore implements PmsPersonalPlaylistStore {
             .findByUserIdAndPlaylistId(draft.userId(), draft.playlistId())
             .orElseThrow(() -> new IllegalArgumentException("Target personal playlist was not found."));
         PmsUserTrackEntity track = userTrackRepository.findById(draft.track().trackId())
-            .orElseThrow(() -> new IllegalArgumentException("PMS library track was not found."));
+            .orElseGet(() -> userTrackRepository.save(new PmsUserTrackEntity(toLibraryTrackState(draft.track()))));
 
         Optional<PmsPersonalPlaylistTrackEntity> existingLink = playlistTrackRepository
             .findByPlaylist_PersonalPlaylistIdAndTrack_TrackId(playlist.getPersonalPlaylistId(), track.getTrackId());
@@ -105,6 +106,7 @@ public class JpaPmsPersonalPlaylistStore implements PmsPersonalPlaylistStore {
 
         return new PersonalTrackState(
             track.getTrackId(),
+            track.getExternalTrackId(),
             track.getTitle(),
             track.getArtistName(),
             track.getSourcePlatform(),
@@ -113,11 +115,74 @@ public class JpaPmsPersonalPlaylistStore implements PmsPersonalPlaylistStore {
             track.getPlatformExternalUrl(),
             track.getPlatformUri(),
             track.getPreviewUrl(),
+            track.getIsrc(),
             features == null ? null : features.getAudioFeatureTrackId(),
+            track.getSpotifyUri(),
+            track.getTidalTrackId(),
+            track.getTidalUri(),
+            track.getPreferredPlaybackPlatform(),
+            track.getPlaybackTargetStatus(),
             features == null ? null : features.getDurationMs(),
             link.getSortOrder(),
             link.getSourceContext(),
             link.getAddedAt()
         );
+    }
+
+    private PmsUserLibraryStore.LibraryTrackState toLibraryTrackState(PersonalTrackState track) {
+        return new PmsUserLibraryStore.LibraryTrackState(
+            track.trackId(),
+            firstNonBlank(track.externalTrackId(), track.spotifyTrackId(), track.tidalTrackId(), track.trackId()),
+            track.title(),
+            track.artistName(),
+            track.sourcePlatform(),
+            null,
+            track.albumTitle(),
+            track.albumImageUrl(),
+            track.platformExternalUrl(),
+            track.platformUri(),
+            track.previewUrl(),
+            track.isrc(),
+            track.spotifyTrackId(),
+            track.spotifyUri(),
+            track.tidalTrackId(),
+            track.tidalUri(),
+            track.preferredPlaybackPlatform(),
+            track.playbackTargetStatus(),
+            track.sortOrder() == null ? 0 : track.sortOrder(),
+            false,
+            new PmsTrackAudioFeatures(
+                track.spotifyTrackId(),
+                "pms-personal-playlist",
+                false,
+                null,
+                null,
+                track.spotifyUri(),
+                "audio_features",
+                track.durationMs(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+            )
+        );
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 }

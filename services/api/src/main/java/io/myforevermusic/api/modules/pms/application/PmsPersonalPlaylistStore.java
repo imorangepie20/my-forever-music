@@ -47,6 +47,7 @@ public interface PmsPersonalPlaylistStore {
 
     record PersonalTrackState(
         String trackId,
+        String externalTrackId,
         String title,
         String artistName,
         String sourcePlatform,
@@ -55,7 +56,13 @@ public interface PmsPersonalPlaylistStore {
         String platformExternalUrl,
         String platformUri,
         String previewUrl,
+        String isrc,
         String spotifyTrackId,
+        String spotifyUri,
+        String tidalTrackId,
+        String tidalUri,
+        String preferredPlaybackPlatform,
+        String playbackTargetStatus,
         Integer durationMs,
         Integer sortOrder,
         String sourceContext,

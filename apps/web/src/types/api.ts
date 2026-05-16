@@ -761,6 +761,7 @@ export interface PmsPlaylistImportResponse {
 
 export interface PmsPersonalPlaylistTrack {
     track_id: string
+    external_track_id: string | null
     title: string
     artist_name: string
     source_platform: string
@@ -771,6 +772,11 @@ export interface PmsPersonalPlaylistTrack {
     platform_uri: string | null
     preview_url: string | null
     spotify_track_id: string | null
+    spotify_uri?: string | null
+    tidal_track_id?: string | null
+    tidal_uri?: string | null
+    preferred_playback_platform?: string | null
+    playback_target_status?: string | null
     audio_feature_track_id?: string | null
     duration_ms: number | null
     sort_order: number
