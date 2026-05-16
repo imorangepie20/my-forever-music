@@ -3,12 +3,13 @@ import type { VisualizerAnimationProps } from './types'
 
 const BAR_COUNT = 64
 const MIN_VISIBLE_HEIGHT = 8
-const MAX_VISIBLE_HEIGHT = 96
-const HEIGHT_BOOST = 2.15
-const RESPONSE_CURVE = 0.82
-const HIGH_FREQUENCY_GAIN = 0.9
-const ATTACK_SMOOTHING = 0.55
-const RELEASE_SMOOTHING = 0.22
+const MAX_VISIBLE_HEIGHT = 100
+const PEAK_GAIN = 1
+const RESPONSE_GAMMA = 0.95
+const NOISE_FLOOR = 0.04
+const HIGH_FREQUENCY_GAIN = 1.8
+const ATTACK_SMOOTHING = 0.95
+const RELEASE_SMOOTHING = 0.32
 
 const resolveLogBandRange = (index: number, binCount: number): [number, number] => {
     if (binCount <= 2) {
@@ -64,7 +65,8 @@ const BarsVisualizer = ({ analyser, accentHex, isPlaying }: VisualizerAnimationP
                 const bandPosition = i / Math.max(1, BAR_COUNT - 1)
                 const bandGain = 1 + bandPosition * HIGH_FREQUENCY_GAIN
                 const avg = (sum / Math.max(1, end - start) / 255) * bandGain
-                const visualHeight = Math.pow(1 - Math.exp(-avg * HEIGHT_BOOST), RESPONSE_CURVE)
+                const gated = Math.max(0, avg - NOISE_FLOOR) / (1 - NOISE_FLOOR)
+                const visualHeight = Math.min(1, Math.pow(gated, RESPONSE_GAMMA) * PEAK_GAIN)
                 const previousHeight = smoothedHeightsRef.current[i] ?? 0
                 const smoothing = visualHeight > previousHeight ? ATTACK_SMOOTHING : RELEASE_SMOOTHING
                 const smoothedHeight = previousHeight + (visualHeight - previousHeight) * smoothing
@@ -110,7 +112,7 @@ const BarsVisualizer = ({ analyser, accentHex, isPlaying }: VisualizerAnimationP
 
     return (
         <div
-            className="pointer-events-none flex h-40 w-full max-w-6xl items-end justify-center gap-[2px] px-6 sm:gap-[3px] md:gap-1"
+            className="pointer-events-none flex h-60 w-full max-w-6xl items-end justify-center gap-[2px] px-6 sm:gap-[3px] md:gap-1"
             data-state={isPlaying ? 'playing' : 'paused'}
         >
             {bars.map((index) => (
