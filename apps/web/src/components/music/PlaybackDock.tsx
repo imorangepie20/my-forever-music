@@ -3,6 +3,7 @@ import {
     ExternalLink,
     ListMusic,
     Loader2,
+    Maximize2,
     Pause,
     Play,
     Repeat,
@@ -14,6 +15,7 @@ import {
     X,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import MusicArtwork from '@/components/music/MusicArtwork'
 import { usePlayback } from '@/contexts/PlaybackContext'
@@ -113,6 +115,7 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
         cycleRepeatMode,
         clearItem,
     } = usePlayback()
+    const navigate = useNavigate()
 
     if (!currentItem) {
         return null
@@ -255,6 +258,18 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                                 aria-label="Playback volume"
                             />
                         </div>
+                        {playbackPlatformId === 'tidal' && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => navigate('/visualizer')}
+                                aria-label="Open visualizer"
+                                title="Open visualizer"
+                                className="h-11 w-11 px-0"
+                            >
+                                <Maximize2 size={18} />
+                            </Button>
+                        )}
                         {currentItem.externalUrl && (
                             <Button
                                 type="button"

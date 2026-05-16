@@ -215,6 +215,7 @@ docs/
 - `services/api`는 EMS pool admin 경로에 `POST .../entries/{entryId}/retry`, `DELETE .../pool/runs/{runId}` 엔드포인트를 제공해 stuck entry/run을 운영 가시성 안에서 복구함
 - `apps/web`는 EMS/PMS playlist 재생 시 DB detail track을 읽어 queue로 넘기고, TIDAL 모드에서는 track별 TIDAL target resolve 후 재생함
 - `apps/web` 공통 player는 새 재생 시작 전 기존 player state를 초기화하고, provider resolve/stream 준비 중 spinner와 상태 메시지를 표시함
+- `apps/web`는 TIDAL 재생 중 `PlaybackDock` 확장 버튼으로 `/visualizer` 풀스크린 Visual EQ 페이지에 진입할 수 있음. 실제 TIDAL 오디오 신호를 `captureStream` → `AnalyserNode`로 분기해 FFT를 시각화하고, 미지원/zero-data 환경에서는 procedural fallback으로 자동 전환함. 비주얼라이저는 `bars`/`radial`/`particle` 3종 풀에서 트랙별로 랜덤 선택되며 `?animation=` 쿼리로 강제 가능함. 설계 문서는 [docs/architecture/VISUAL_EQ_PLAYER_DESIGN.md](architecture/VISUAL_EQ_PLAYER_DESIGN.md)
 - `GET /api/v1/pms/workspace/bootstrap`는 optional `playlist_id` 기준으로 현재 음악 컨텍스트를 다시 투영함
 - `POST /api/v1/gms/recommendations/preview`는 가능하면 synthetic item 대신 `PMS user library`의 실제 playable track으로 재매핑함
 - `POST /api/v1/gms/recommendations/feedback`는 GMS 추천 후보에 대한 like/dislike/save/skip 평가를 저장함

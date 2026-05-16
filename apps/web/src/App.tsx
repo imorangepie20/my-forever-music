@@ -19,6 +19,7 @@ import PmsPlaylistDetailPage from './pages/PmsPlaylistDetailPage'
 import PmsPage from './pages/PmsPage'
 import PlatformsPage from './pages/PlatformsPage'
 import TidalPlaylistPlaybackTestPage from './pages/TidalPlaylistPlaybackTestPage'
+import VisualizerPage from './pages/VisualizerPage'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
 import PlatformOAuthCallbackPage from './pages/platforms/PlatformOAuthCallbackPage'
@@ -52,6 +53,7 @@ function App() {
                 <Route path="signup" element={<Register />} />
                 <Route path="register" element={<Register />} />
                 <Route path="tidal-playlist-test" element={<TidalPlaylistPlaybackTestPage />} />
+                <Route path="visualizer" element={<VisualizerPage />} />
                 <Route path="*" element={<NotFoundPage />} />
             </Routes>
         </BrowserRouter>

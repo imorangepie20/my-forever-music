@@ -61,6 +61,11 @@ const currentState = (): TidalPlaybackSnapshot['state'] => {
 
 export const getTidalDeviceId = () => TIDAL_STREAM_DEVICE_ID
 
+// Visualizer page taps the existing detached audio element via captureStream()
+// to feed an AnalyserNode. Returns null until the first TIDAL playback warms
+// the element up.
+export const getTidalAudioElement = (): HTMLAudioElement | null => audioElement
+
 export const getTidalCurrentSnapshot = (): TidalPlaybackSnapshot => {
     const durationMs = secondsToMs(audioElement?.duration ?? 0) || lastDurationMs
     return {
