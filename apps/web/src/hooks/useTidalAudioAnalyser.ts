@@ -17,6 +17,22 @@ export interface TidalAudioAnalyserHandle {
 const FFT_SIZE = 256
 const BIN_COUNT = FFT_SIZE / 2
 
+// Read offset relative to `audio.currentTime`. Positive value pulls the
+// visualization back in time (delays it relative to what the browser reports
+// as current playback). Use to align with OS audio output buffer (Bluetooth
+// headphones ~150ms, wired ~20-40ms). Tune live in devtools via
+// `window.__visualizerOffsetMs = 120` etc.
+let visualizerOffsetMs = 0
+if (typeof window !== 'undefined') {
+    Object.defineProperty(window, '__visualizerOffsetMs', {
+        configurable: true,
+        get: () => visualizerOffsetMs,
+        set: (value: number) => {
+            visualizerOffsetMs = Number.isFinite(value) ? value : 0
+        },
+    })
+}
+
 const supportsAudioContext = () =>
     typeof window !== 'undefined'
         && (typeof window.AudioContext !== 'undefined'
@@ -242,7 +258,9 @@ export function useTidalAudioAnalyser(
                 return
             }
 
-            const samples = ringRef.current.readWindow(audioElementRef.current?.currentTime ?? Number.NaN, FFT_SIZE)
+            const currentTime = audioElementRef.current?.currentTime ?? Number.NaN
+            const adjustedTime = Number.isFinite(currentTime) ? currentTime - visualizerOffsetMs / 1000 : Number.NaN
+            const samples = ringRef.current.readWindow(adjustedTime, FFT_SIZE)
             if (!samples) {
                 zero(target)
                 return
