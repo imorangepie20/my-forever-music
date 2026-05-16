@@ -32,6 +32,21 @@ public interface EmsCollectedPlaylistTrackRepository extends JpaRepository<EmsCo
         """)
     long countAudioFeatureFilledTracksByPlaylistId(@Param("playlistId") Long playlistId);
 
+    @Query("""
+        select link.playlist.id as playlistId,
+               count(link.id) as trackCount,
+               sum(case when link.track.audioFeatures.audioFeaturesFilled = true then 1 else 0 end) as filledTrackCount,
+               avg(case when link.track.audioFeatures.audioFeaturesFilled = true then link.track.audioFeatures.energy else null end) as averageEnergy,
+               avg(case when link.track.audioFeatures.audioFeaturesFilled = true then link.track.audioFeatures.valence else null end) as averageValence,
+               avg(case when link.track.audioFeatures.audioFeaturesFilled = true then link.track.audioFeatures.danceability else null end) as averageDanceability,
+               avg(case when link.track.audioFeatures.audioFeaturesFilled = true then link.track.audioFeatures.acousticness else null end) as averageAcousticness,
+               avg(case when link.track.audioFeatures.audioFeaturesFilled = true then link.track.audioFeatures.speechiness else null end) as averageSpeechiness
+        from EmsCollectedPlaylistTrackEntity link
+        where link.playlist.id in :playlistIds
+        group by link.playlist.id
+        """)
+    List<PlaylistAudioStatsProjection> findAudioStatsByPlaylistIds(@Param("playlistIds") List<Long> playlistIds);
+
     @Modifying
     @Query(value = """
         insert into ems_collected_playlist_track (
@@ -51,4 +66,15 @@ public interface EmsCollectedPlaylistTrackRepository extends JpaRepository<EmsCo
         @Param("trackId") Long trackId,
         @Param("sortOrder") int sortOrder
     );
+
+    interface PlaylistAudioStatsProjection {
+        Long getPlaylistId();
+        long getTrackCount();
+        Long getFilledTrackCount();
+        Double getAverageEnergy();
+        Double getAverageValence();
+        Double getAverageDanceability();
+        Double getAverageAcousticness();
+        Double getAverageSpeechiness();
+    }
 }

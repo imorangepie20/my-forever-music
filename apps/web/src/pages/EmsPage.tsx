@@ -1,8 +1,9 @@
 import { startTransition, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ListMusic, RefreshCw, Search } from 'lucide-react'
+import { ExternalLink, ListMusic, Play, RefreshCw, Search, Sparkles, Tags } from 'lucide-react'
 import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
+import MusicArtwork from '@/components/music/MusicArtwork'
 import PlaylistFeatureCard from '@/components/music/PlaylistFeatureCard'
 import TrackFeatureCard from '@/components/music/TrackFeatureCard'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
@@ -18,11 +19,13 @@ import {
 import {
     ApiError,
     fetchEmsCollectedPlaylistDetail,
-    fetchEmsCollectedPlaylists,
+    fetchEmsPlaylistSections,
     searchEmsCollection,
 } from '@/services/api'
 import type {
     EmsCollectionPlaylistItem,
+    EmsCollectionPlaylistSection,
+    EmsCollectionPlaylistSectionItem,
     EmsCollectionSearchPlaylistItem,
     EmsCollectionSearchResponse,
 } from '@/types/api'
@@ -76,8 +79,8 @@ const EmsPage = () => {
     const [searchResult, setSearchResult] = useState<EmsCollectionSearchResponse | null>(null)
     const [isSearching, setIsSearching] = useState(false)
     const [searchError, setSearchError] = useState<string | null>(null)
-    const [publicPlaylistsByPlatform, setPublicPlaylistsByPlatform] =
-        useState<Record<DiscoveryPlatformId, EmsCollectionPlaylistItem[]>>({})
+    const [playlistSections, setPlaylistSections] = useState<EmsCollectionPlaylistSection[]>([])
+    const [isPlaylistPersonalized, setIsPlaylistPersonalized] = useState(false)
     const [isLoadingCollection, setIsLoadingCollection] = useState(false)
     const [preparingPlaylistId, setPreparingPlaylistId] = useState<number | null>(null)
     const [collectionError, setCollectionError] = useState<string | null>(null)
@@ -88,15 +91,16 @@ const EmsPage = () => {
         setIsLoadingCollection(true)
         setCollectionError(null)
 
-        Promise.all(
-            defaultDiscoveryPlatformIds.map(async (providerId) => {
-                const response = await fetchEmsCollectedPlaylists(providerId, controller.signal, 12)
-                return [providerId, response.playlists] as const
-            }),
-        )
-            .then((entries) => {
+        fetchEmsPlaylistSections({
+            userId: activeUserId,
+            platformIds: defaultDiscoveryPlatformIds,
+            limit: 6,
+            signal: controller.signal,
+        })
+            .then((response) => {
                 startTransition(() => {
-                    setPublicPlaylistsByPlatform(Object.fromEntries(entries))
+                    setPlaylistSections(response.sections)
+                    setIsPlaylistPersonalized(response.personalized)
                 })
             })
             .catch((err: unknown) => {
@@ -112,7 +116,7 @@ const EmsPage = () => {
             })
 
         return () => controller.abort()
-    }, [])
+    }, [activeUserId])
 
     useEffect(() => {
         setSearchQuery(urlQuery)
@@ -174,7 +178,6 @@ const EmsPage = () => {
         }
     }, [activeSearchPlatformId, activeUserId, urlQuery])
 
-    const publicPoolPlaylists = defaultDiscoveryPlatformIds.flatMap((providerId) => publicPlaylistsByPlatform[providerId] ?? [])
     const playlistPageCount = pageCountFor(searchResult?.playlists.length ?? 0)
     const trackPageCount = pageCountFor(searchResult?.tracks.length ?? 0)
     const safePlaylistPage = Math.min(playlistPage, playlistPageCount)
@@ -362,8 +365,8 @@ const EmsPage = () => {
             </HudCard>
 
             <HudCard
-                title="EMS Public Playlist Pool"
-                subtitle="Stored public playlists rotated from the EMS database"
+                title="EMS Curated Playlist Atlas"
+                subtitle="Personalized genre, mood, quality, and fresh sections generated from the EMS pool"
                 action={
                     isLoadingCollection ? (
                         <span className="inline-flex items-center gap-2 text-xs text-hud-text-muted">
@@ -380,23 +383,20 @@ const EmsPage = () => {
                         </div>
                     )}
 
-                    {publicPoolPlaylists.length > 0 ? (
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                            {publicPoolPlaylists.map((playlist) => (
-                                <PlaylistFeatureCard
-                                    key={playlist.id}
-                                    title={playlist.title}
-                                    sourcePlatform={playlist.source_platform}
-                                    curator={playlist.curator}
-                                    trackCount={playlist.track_count}
-                                    description={playlist.description}
-                                    supportingText={`${playlist.audio_feature_coverage.filled_track_count}/${playlist.audio_feature_coverage.track_count} audio features · ${formatPercent(playlist.audio_feature_coverage.coverage_ratio)}`}
-                                    imageUrl={playlist.cover_image_url}
-                                    actionLabel="Pool Candidate"
-                                    detailPath={buildEmsPlaylistDetailPath(playlist.id)}
-                                    isPlayLoading={preparingPlaylistId === playlist.id}
-                                    onPlay={() => void handlePlayEmsPlaylist(playlist)}
-                                    onOpenExternal={() => openExternal(playlist.platform_external_url)}
+                    {playlistSections.length > 0 ? (
+                        <div className="space-y-6">
+                            <div className="flex flex-wrap gap-3">
+                                <span className="inline-flex items-center gap-2 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 px-4 py-3 text-xs uppercase tracking-[0.18em] text-hud-text-muted">
+                                    <Sparkles size={14} />
+                                    {isPlaylistPersonalized ? 'Personalized' : 'General EMS'}
+                                </span>
+                            </div>
+                            {playlistSections.map((section) => (
+                                <EmsPlaylistSectionView
+                                    key={section.section_id}
+                                    section={section}
+                                    preparingPlaylistId={preparingPlaylistId}
+                                    onPlay={handlePlayEmsPlaylist}
                                 />
                             ))}
                         </div>
@@ -434,5 +434,213 @@ const ResultPager = ({
         </Button>
     </div>
 )
+
+const playlistSupportingText = (item: EmsCollectionPlaylistSectionItem) => {
+    const coverage = item.playlist.audio_feature_coverage
+    const coverageText = `${coverage.filled_track_count}/${coverage.track_count} audio features · ${formatPercent(coverage.coverage_ratio)}`
+    const signals = item.match_signals.slice(0, 2).join(' · ')
+    return signals ? `${signals} · ${coverageText}` : coverageText
+}
+
+const EmsPlaylistSectionView = ({
+    section,
+    preparingPlaylistId,
+    onPlay,
+}: {
+    section: EmsCollectionPlaylistSection
+    preparingPlaylistId: number | null
+    onPlay: (playlist: EmsCollectionPlaylistItem) => Promise<void>
+}) => {
+    const cards = section.playlists
+    if (cards.length === 0) {
+        return null
+    }
+
+    return (
+        <section className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                        <Tags size={15} />
+                        {section.category_type} · {section.category_label}
+                    </div>
+                    <h2 className="mt-2 text-2xl font-semibold text-hud-text-primary">{section.title}</h2>
+                    <p className="mt-1 text-sm leading-6 text-hud-text-secondary">{section.subtitle}</p>
+                </div>
+                <span className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 px-3 py-2 text-xs uppercase tracking-[0.18em] text-hud-text-muted">
+                    {section.display_style}
+                </span>
+            </div>
+
+            {section.display_style === 'hero' && (
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+                    <PlaylistFeatureCard
+                        title={cards[0].playlist.title}
+                        sourcePlatform={cards[0].playlist.source_platform}
+                        curator={cards[0].playlist.curator}
+                        trackCount={cards[0].playlist.track_count}
+                        description={cards[0].playlist.description}
+                        supportingText={playlistSupportingText(cards[0])}
+                        imageUrl={cards[0].playlist.cover_image_url}
+                        actionLabel="Open Playlist"
+                        detailPath={buildEmsPlaylistDetailPath(cards[0].playlist.id)}
+                        isPlayLoading={preparingPlaylistId === cards[0].playlist.id}
+                        onPlay={() => void onPlay(cards[0].playlist)}
+                        onOpenExternal={() => openExternal(cards[0].playlist.platform_external_url)}
+                    />
+                    <div className="grid gap-4">
+                        {cards.slice(1).map((item) => (
+                            <PlaylistFeatureCard
+                                key={item.playlist.id}
+                                title={item.playlist.title}
+                                sourcePlatform={item.playlist.source_platform}
+                                curator={item.playlist.curator}
+                                trackCount={item.playlist.track_count}
+                                description={item.playlist.description}
+                                supportingText={playlistSupportingText(item)}
+                                imageUrl={item.playlist.cover_image_url}
+                                actionLabel="Open Playlist"
+                                detailPath={buildEmsPlaylistDetailPath(item.playlist.id)}
+                                isPlayLoading={preparingPlaylistId === item.playlist.id}
+                                onPlay={() => void onPlay(item.playlist)}
+                                onOpenExternal={() => openExternal(item.playlist.platform_external_url)}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {section.display_style === 'rail' && (
+                <div className="flex gap-4 overflow-x-auto pb-2">
+                    {cards.map((item) => (
+                        <div key={item.playlist.id} className="min-w-[320px] max-w-[440px] flex-1">
+                            <PlaylistFeatureCard
+                                title={item.playlist.title}
+                                sourcePlatform={item.playlist.source_platform}
+                                curator={item.playlist.curator}
+                                trackCount={item.playlist.track_count}
+                                description={item.playlist.description}
+                                supportingText={playlistSupportingText(item)}
+                                imageUrl={item.playlist.cover_image_url}
+                                actionLabel="Open Playlist"
+                                detailPath={buildEmsPlaylistDetailPath(item.playlist.id)}
+                                isPlayLoading={preparingPlaylistId === item.playlist.id}
+                                onPlay={() => void onPlay(item.playlist)}
+                                onOpenExternal={() => openExternal(item.playlist.platform_external_url)}
+                            />
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {section.display_style === 'compact' && (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {cards.map((item) => (
+                        <CompactPlaylistRow
+                            key={item.playlist.id}
+                            item={item}
+                            isPlayLoading={preparingPlaylistId === item.playlist.id}
+                            onPlay={() => void onPlay(item.playlist)}
+                        />
+                    ))}
+                </div>
+            )}
+
+            {section.display_style !== 'hero' && section.display_style !== 'rail' && section.display_style !== 'compact' && (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {cards.map((item) => (
+                        <PlaylistFeatureCard
+                            key={item.playlist.id}
+                            title={item.playlist.title}
+                            sourcePlatform={item.playlist.source_platform}
+                            curator={item.playlist.curator}
+                            trackCount={item.playlist.track_count}
+                            description={item.playlist.description}
+                            supportingText={playlistSupportingText(item)}
+                            imageUrl={item.playlist.cover_image_url}
+                            actionLabel="Open Playlist"
+                            detailPath={buildEmsPlaylistDetailPath(item.playlist.id)}
+                            isPlayLoading={preparingPlaylistId === item.playlist.id}
+                            onPlay={() => void onPlay(item.playlist)}
+                            onOpenExternal={() => openExternal(item.playlist.platform_external_url)}
+                        />
+                    ))}
+                </div>
+            )}
+        </section>
+    )
+}
+
+const CompactPlaylistRow = ({
+    item,
+    isPlayLoading,
+    onPlay,
+}: {
+    item: EmsCollectionPlaylistSectionItem
+    isPlayLoading: boolean
+    onPlay: () => void
+}) => {
+    const navigate = useNavigate()
+    const playlist = item.playlist
+    return (
+        <div
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate(buildEmsPlaylistDetailPath(playlist.id))}
+            onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    navigate(buildEmsPlaylistDetailPath(playlist.id))
+                }
+            }}
+            className="grid cursor-pointer grid-cols-[76px_minmax(0,1fr)] gap-3 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-3 transition-hud hover:border-hud-border-primary"
+        >
+            <div className="h-[76px] overflow-hidden rounded-xl">
+                <MusicArtwork imageUrl={playlist.cover_image_url} seed={`${playlist.source_platform}-${playlist.title}`} label={playlist.title} />
+            </div>
+            <div className="min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-hud-text-primary">{playlist.title}</p>
+                        <p className="mt-1 truncate text-xs text-hud-text-secondary">{playlist.curator}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-hud-border-secondary px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-hud-text-muted">
+                        {playlist.source_platform}
+                    </span>
+                </div>
+                <p className="mt-2 truncate text-xs uppercase tracking-[0.16em] text-hud-accent-primary">
+                    {playlistSupportingText(item)}
+                </p>
+                <div className="mt-3 flex gap-2">
+                    <button
+                        type="button"
+                        disabled={isPlayLoading}
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            onPlay()
+                        }}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border border-hud-border-secondary text-hud-text-primary transition-hud hover:border-hud-border-primary disabled:opacity-50"
+                        aria-label={`Play ${playlist.title}`}
+                    >
+                        {isPlayLoading ? <RefreshCw size={15} className="animate-spin" /> : <Play size={15} />}
+                    </button>
+                    {playlist.platform_external_url && (
+                        <button
+                            type="button"
+                            onClick={(event) => {
+                                event.stopPropagation()
+                                openExternal(playlist.platform_external_url)
+                            }}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-hud-border-secondary text-hud-text-primary transition-hud hover:border-hud-border-primary"
+                            aria-label={`Open ${playlist.title}`}
+                        >
+                            <ExternalLink size={15} />
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
 
 export default EmsPage

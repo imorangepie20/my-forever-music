@@ -3,6 +3,7 @@ import {
     Activity,
     BadgeCheck,
     BarChart3,
+    CalendarClock,
     ChevronLeft,
     ChevronRight,
     Compass,
@@ -85,6 +86,12 @@ const menuItems: MenuItem[] = [
 ]
 
 const adminMenuItems: MenuItem[] = [
+    {
+        label: 'Schedules',
+        description: 'Scheduler cadence and health',
+        icon: <CalendarClock size={20} />,
+        path: '/admin/schedules',
+    },
     {
         label: 'EMS Acquire',
         description: 'Editorial source collection runs',

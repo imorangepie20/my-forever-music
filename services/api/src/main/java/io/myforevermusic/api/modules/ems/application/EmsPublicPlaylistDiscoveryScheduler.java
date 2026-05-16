@@ -29,7 +29,7 @@ public class EmsPublicPlaylistDiscoveryScheduler {
 
     @Scheduled(
         initialDelayString = "${app.ems.discovery.initial-delay-ms:0}",
-        fixedDelayString = "${app.ems.discovery.refresh-interval-ms:21600000}"
+        fixedDelayString = "${app.ems.discovery.refresh-interval-ms:86400000}"
     )
     public void collectPublicPlaylists() {
         runDiscovery(

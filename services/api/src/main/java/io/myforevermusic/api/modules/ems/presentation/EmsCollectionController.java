@@ -7,6 +7,11 @@ import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsAud
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsAudioFeatureCoverage;
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPlaylistTracksPreview;
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPreviewResult;
+import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService;
+import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.EmsPlaylistCurationResult;
+import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.EmsPlaylistSection;
+import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.EmsPlaylistSectionItem;
+import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.PlaylistAudioStats;
 import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService;
 import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService.EmsPoolEntrySnapshot;
 import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService.EmsPoolRunDetailSnapshot;
@@ -19,6 +24,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,15 +40,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class EmsCollectionController {
 
     private final EmsCollectionService emsCollectionService;
+    private final EmsPlaylistCurationService emsPlaylistCurationService;
     private final EmsPublicPlaylistDiscoveryScheduler emsPublicPlaylistDiscoveryScheduler;
     private final EmsPoolIngestService emsPoolIngestService;
 
     public EmsCollectionController(
         EmsCollectionService emsCollectionService,
+        EmsPlaylistCurationService emsPlaylistCurationService,
         EmsPublicPlaylistDiscoveryScheduler emsPublicPlaylistDiscoveryScheduler,
         EmsPoolIngestService emsPoolIngestService
     ) {
         this.emsCollectionService = emsCollectionService;
+        this.emsPlaylistCurationService = emsPlaylistCurationService;
         this.emsPublicPlaylistDiscoveryScheduler = emsPublicPlaylistDiscoveryScheduler;
         this.emsPoolIngestService = emsPoolIngestService;
     }
@@ -233,6 +242,30 @@ public class EmsCollectionController {
         return EmsDiscoveryRunResponse.from("api", run);
     }
 
+    @Operation(summary = "Browse collected EMS playlists as personalized genre and mood sections")
+    @GetMapping("/playlists/sections")
+    public EmsCollectionPlaylistSectionsResponse browsePlaylistSections(
+        @RequestParam(value = "user_id", required = false) String userId,
+        @RequestParam(value = "platform_id", required = false) List<String> platformIds,
+        @RequestParam(value = "limit", defaultValue = "6") int limit
+    ) {
+        EmsPlaylistCurationResult result = emsPlaylistCurationService.getPlaylistSections(
+            userId,
+            normalizePlatformIds(platformIds),
+            limit
+        );
+        return new EmsCollectionPlaylistSectionsResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            result.userId(),
+            result.platformIds(),
+            result.titleModel(),
+            result.personalized(),
+            result.sections().stream().map(this::toPlaylistSection).toList()
+        );
+    }
+
     @Operation(summary = "Browse collected EMS playlists for display")
     @GetMapping("/playlists")
     public EmsCollectionPlaylistBrowseResponse browsePlaylists(
@@ -307,6 +340,26 @@ public class EmsCollectionController {
         );
     }
 
+    private EmsCollectionPlaylistSection toPlaylistSection(EmsPlaylistSection section) {
+        return new EmsCollectionPlaylistSection(
+            section.sectionId(),
+            section.title(),
+            section.subtitle(),
+            section.categoryType(),
+            section.categoryLabel(),
+            section.displayStyle(),
+            section.titleSource(),
+            section.playlists().stream().map(this::toPlaylistSectionItem).toList()
+        );
+    }
+
+    private EmsCollectionPlaylistSectionItem toPlaylistSectionItem(EmsPlaylistSectionItem item) {
+        return new EmsCollectionPlaylistSectionItem(
+            toPlaylistItem(item.playlist(), item.audioStats()),
+            item.matchSignals()
+        );
+    }
+
     private EmsCollectionPlaylistItem toPlaylistItem(EmsCollectedPlaylistEntity playlist) {
         EmsAudioFeatureCoverage coverage = emsCollectionService.getAudioFeatureCoverage(playlist.getId());
         return new EmsCollectionPlaylistItem(
@@ -324,6 +377,22 @@ public class EmsCollectionController {
         );
     }
 
+    private EmsCollectionPlaylistItem toPlaylistItem(EmsCollectedPlaylistEntity playlist, PlaylistAudioStats audioStats) {
+        return new EmsCollectionPlaylistItem(
+            playlist.getId(), playlist.getExternalPlaylistId(), playlist.getTitle(),
+            playlist.getSourcePlatform(), playlist.getCurator(), playlist.getDescription(),
+            playlist.getCoverImageUrl(), playlist.getPlatformExternalUrl(), playlist.getSpotifyUri(), spotifyUriFor(playlist.getSourcePlatform(), playlist.getSpotifyUri()),
+            playlist.getTrackCount(), playlist.getCollectionSource(), playlist.getSearchQuery(),
+            playlist.getCollectedAt(),
+            new EmsAudioFeatureCoverageItem(
+                audioStats.trackCount(),
+                audioStats.filledTrackCount(),
+                audioStats.pendingTrackCount(),
+                audioStats.coverageRatio()
+            )
+        );
+    }
+
     private static EmsCollectionTrackItem toTrackItem(EmsCollectedTrackEntity track) {
         return new EmsCollectionTrackItem(
             track.getId(), track.getExternalTrackId(), track.getTitle(),
@@ -336,6 +405,17 @@ public class EmsCollectionController {
 
     private static String spotifyUriFor(String sourcePlatform, String platformUri) {
         return "spotify".equals(sourcePlatform) ? platformUri : null;
+    }
+
+    private static List<String> normalizePlatformIds(List<String> platformIds) {
+        if (platformIds == null) {
+            return List.of();
+        }
+        return platformIds.stream()
+            .flatMap(value -> Arrays.stream(value.split(",")))
+            .map(String::trim)
+            .filter(value -> !value.isBlank())
+            .toList();
     }
 
     private static EmsTrackAudioFeatureItem toAudioFeatureItem(EmsCollectedTrackEntity track) {
@@ -613,6 +693,36 @@ public class EmsCollectionController {
         String service, String status, Instant generatedAt,
         String platformId,
         List<EmsCollectionPlaylistItem> playlists
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsCollectionPlaylistSectionsResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        String userId,
+        List<String> platformIds,
+        String titleModel,
+        boolean personalized,
+        List<EmsCollectionPlaylistSection> sections
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsCollectionPlaylistSection(
+        String sectionId,
+        String title,
+        String subtitle,
+        String categoryType,
+        String categoryLabel,
+        String displayStyle,
+        String titleSource,
+        List<EmsCollectionPlaylistSectionItem> playlists
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsCollectionPlaylistSectionItem(
+        EmsCollectionPlaylistItem playlist,
+        List<String> matchSignals
     ) {}
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)

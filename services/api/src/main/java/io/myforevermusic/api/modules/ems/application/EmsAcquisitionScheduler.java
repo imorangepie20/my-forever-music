@@ -20,7 +20,7 @@ public class EmsAcquisitionScheduler {
 
     @Scheduled(
         initialDelayString = "${app.ems.acquisition.initial-delay-ms:60000}",
-        fixedDelayString = "${app.ems.acquisition.refresh-interval-ms:21600000}"
+        fixedDelayString = "${app.ems.acquisition.refresh-interval-ms:86400000}"
     )
     public void collectEditorialSignals() {
         if (!running.compareAndSet(false, true)) {

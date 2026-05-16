@@ -14,6 +14,11 @@ import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCol
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPlaylistTracksPreview;
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchPreviewResult;
 import io.myforevermusic.api.modules.ems.application.EmsCollectionService.EmsCollectionSearchTrackPreview;
+import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService;
+import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.EmsPlaylistCurationResult;
+import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.EmsPlaylistSection;
+import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.EmsPlaylistSectionItem;
+import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.PlaylistAudioStats;
 import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler.EmsPublicPlaylistDiscoveryFailure;
@@ -40,6 +45,9 @@ class EmsCollectionControllerWebMvcTest {
 
     @MockBean
     private EmsCollectionService emsCollectionService;
+
+    @MockBean
+    private EmsPlaylistCurationService emsPlaylistCurationService;
 
     @MockBean
     private EmsPublicPlaylistDiscoveryScheduler emsPublicPlaylistDiscoveryScheduler;
@@ -203,6 +211,60 @@ class EmsCollectionControllerWebMvcTest {
             .andExpect(jsonPath("$.tracks[0].platform_uri").value("tidal:track:track-001"));
 
         verify(emsCollectionService).getTracksForPlaylist(77L);
+    }
+
+    @Test
+    void shouldReturnCuratedPlaylistSections() throws Exception {
+        EmsCollectedPlaylistEntity playlist = new EmsCollectedPlaylistEntity(
+            "playlist-ems-001",
+            "K-Pop Night Drive",
+            "tidal",
+            "TIDAL editors",
+            "NewJeans and late night city pop",
+            null,
+            "https://tidal.com/browse/playlist/playlist-ems-001",
+            null,
+            25,
+            "acquisition_pool",
+            "newjeans",
+            Instant.parse("2026-05-10T00:00:00Z")
+        );
+        ReflectionTestUtils.setField(playlist, "id", 91L);
+
+        when(emsPlaylistCurationService.getPlaylistSections("user-001", List.of("tidal", "spotify"), 4))
+            .thenReturn(new EmsPlaylistCurationResult(
+                "user-001",
+                List.of("tidal", "spotify"),
+                EmsPlaylistCurationService.TITLE_MODEL,
+                true,
+                List.of(new EmsPlaylistSection(
+                    "personalized-signal",
+                    "NewJeans 근처에서 확장하는 EMS",
+                    "최근 PMS 행동 신호와 EMS 공개 풀을 겹쳐서 고른 후보",
+                    "personalized",
+                    "NewJeans",
+                    "hero",
+                    EmsPlaylistCurationService.TITLE_MODEL,
+                    List.of(new EmsPlaylistSectionItem(
+                        playlist,
+                        new PlaylistAudioStats(24, 18, 0.75, 0.42, 0.6, 0.7, 0.2, 0.1),
+                        List.of("artist NewJeans", "source tidal")
+                    ))
+                ))
+            ));
+
+        mockMvc.perform(get("/api/v1/ems/collection/playlists/sections")
+                .param("user_id", "user-001")
+                .param("platform_id", "tidal,spotify")
+                .param("limit", "4"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.title_model").value(EmsPlaylistCurationService.TITLE_MODEL))
+            .andExpect(jsonPath("$.personalized").value(true))
+            .andExpect(jsonPath("$.sections[0].category_type").value("personalized"))
+            .andExpect(jsonPath("$.sections[0].display_style").value("hero"))
+            .andExpect(jsonPath("$.sections[0].playlists[0].playlist.title").value("K-Pop Night Drive"))
+            .andExpect(jsonPath("$.sections[0].playlists[0].playlist.audio_feature_coverage.coverage_ratio").value(0.75))
+            .andExpect(jsonPath("$.sections[0].playlists[0].match_signals[0]").value("artist NewJeans"));
     }
 
     @Test
