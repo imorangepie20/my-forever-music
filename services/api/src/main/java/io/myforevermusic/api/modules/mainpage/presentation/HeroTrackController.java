@@ -1,6 +1,7 @@
 package io.myforevermusic.api.modules.mainpage.presentation;
 
 import io.myforevermusic.api.modules.mainpage.application.HeroTrackService;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/main-page")
 public class HeroTrackController {
+
+    private static final int DEFAULT_HERO_LIST_LIMIT = 5;
 
     private final HeroTrackService heroTrackService;
 
@@ -26,5 +29,18 @@ public class HeroTrackController {
         return response
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/hero-tracks")
+    public ResponseEntity<HeroTrackListResponse> getHeroTracks(
+        @RequestParam(value = "user_id", required = false) String userId,
+        @RequestParam(value = "limit", required = false) Integer limit
+    ) {
+        int effectiveLimit = limit == null || limit <= 0 ? DEFAULT_HERO_LIST_LIMIT : limit;
+        List<HeroTrackResponse> tracks = heroTrackService.resolveList(userId, effectiveLimit);
+        if (tracks.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(new HeroTrackListResponse(tracks));
     }
 }

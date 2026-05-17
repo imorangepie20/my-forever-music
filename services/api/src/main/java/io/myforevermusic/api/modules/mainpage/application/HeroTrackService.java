@@ -4,11 +4,17 @@ import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollected
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackRepository;
 import io.myforevermusic.api.modules.mainpage.presentation.HeroTrackResponse;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationSnapshotStore;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Random;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 /**
@@ -22,8 +28,11 @@ public class HeroTrackService {
 
     private static final Logger log = LoggerFactory.getLogger(HeroTrackService.class);
     private static final int GMS_LOOKUP_LIMIT = 20;
+    private static final int EMS_RANDOM_POOL_SIZE = 60;
+    private static final int MAX_LIST_LIMIT = 12;
     private static final String EMS_ACQUISITION_POOL = "acquisition_pool";
     private static final String DEFAULT_SOURCE_LABEL = "Editorial Pick";
+    private static final String GMS_SOURCE_LABEL = "Recommended for you";
 
     private final RecommendationSnapshotStore recommendationSnapshotStore;
     private final EmsCollectedTrackRepository emsCollectedTrackRepository;
@@ -37,38 +46,60 @@ public class HeroTrackService {
     }
 
     public Optional<HeroTrackResponse> resolve(String userId) {
-        if (userId != null && !userId.isBlank()) {
-            Optional<HeroTrackResponse> gmsPick = resolveFromGms(userId);
-            if (gmsPick.isPresent()) {
-                return gmsPick;
-            }
-        }
-
-        Optional<HeroTrackResponse> editorialPick = emsCollectedTrackRepository
-            .findFirstByCollectionSourceAndPreviewUrlIsNotNullOrderByCollectedAtDesc(EMS_ACQUISITION_POOL)
-            .map(track -> toResponse(track, "Editorial Pick"));
-        if (editorialPick.isPresent()) {
-            return editorialPick;
-        }
-
-        return emsCollectedTrackRepository
-            .findFirstByPreviewUrlIsNotNullOrderByCollectedAtDesc()
-            .map(track -> toResponse(track, DEFAULT_SOURCE_LABEL));
+        List<HeroTrackResponse> list = resolveList(userId, 1);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
-    private Optional<HeroTrackResponse> resolveFromGms(String userId) {
+    public List<HeroTrackResponse> resolveList(String userId, int limit) {
+        int effectiveLimit = Math.min(MAX_LIST_LIMIT, Math.max(1, limit));
+        List<HeroTrackResponse> picked = new ArrayList<>();
+        Set<String> seenKeys = new HashSet<>();
+
+        if (userId != null && !userId.isBlank()) {
+            collectFromGms(userId, effectiveLimit, picked, seenKeys);
+        }
+        if (picked.size() < effectiveLimit) {
+            collectFromEms(
+                emsCollectedTrackRepository.findRecentByCollectionSourceWithPreview(
+                    EMS_ACQUISITION_POOL,
+                    PageRequest.of(0, EMS_RANDOM_POOL_SIZE)
+                ),
+                DEFAULT_SOURCE_LABEL,
+                effectiveLimit,
+                picked,
+                seenKeys
+            );
+        }
+        if (picked.size() < effectiveLimit) {
+            collectFromEms(
+                emsCollectedTrackRepository.findRecentWithPreview(PageRequest.of(0, EMS_RANDOM_POOL_SIZE)),
+                DEFAULT_SOURCE_LABEL,
+                effectiveLimit,
+                picked,
+                seenKeys
+            );
+        }
+        return picked;
+    }
+
+    private void collectFromGms(
+        String userId,
+        int limit,
+        List<HeroTrackResponse> picked,
+        Set<String> seenKeys
+    ) {
         List<RecommendationSnapshotStore.StoredSnapshot> snapshots;
         try {
             snapshots = recommendationSnapshotStore.findRecentByUserId(userId, GMS_LOOKUP_LIMIT);
         } catch (RuntimeException exception) {
             log.warn("Hero track GMS lookup failed for user {}: {}", userId, exception.getMessage());
-            return Optional.empty();
+            return;
         }
         if (snapshots == null || snapshots.isEmpty()) {
-            return Optional.empty();
+            return;
         }
 
-        return snapshots.stream()
+        snapshots.stream()
             .filter(snapshot -> snapshot.candidateTrackId() != null && !snapshot.candidateTrackId().isBlank())
             .filter(snapshot -> snapshot.sourcePlatform() != null && !snapshot.sourcePlatform().isBlank())
             .sorted(Comparator
@@ -77,13 +108,53 @@ public class HeroTrackService {
                 .thenComparing(Comparator
                     .comparing(RecommendationSnapshotStore.StoredSnapshot::createdAt,
                         Comparator.nullsLast(Comparator.reverseOrder()))))
-            .map(snapshot -> emsCollectedTrackRepository
-                .findBySourcePlatformAndExternalTrackId(snapshot.sourcePlatform(), snapshot.candidateTrackId())
-                .filter(track -> hasUsablePreview(track))
-                .map(track -> toResponse(track, "Recommended for you")))
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .findFirst();
+            .forEach(snapshot -> {
+                if (picked.size() >= limit) {
+                    return;
+                }
+                emsCollectedTrackRepository
+                    .findBySourcePlatformAndExternalTrackId(snapshot.sourcePlatform(), snapshot.candidateTrackId())
+                    .filter(this::hasUsablePreview)
+                    .ifPresent(track -> {
+                        String key = trackKey(track);
+                        if (seenKeys.add(key)) {
+                            picked.add(toResponse(track, GMS_SOURCE_LABEL));
+                        }
+                    });
+            });
+    }
+
+    private void collectFromEms(
+        List<EmsCollectedTrackEntity> pool,
+        String sourceLabel,
+        int limit,
+        List<HeroTrackResponse> picked,
+        Set<String> seenKeys
+    ) {
+        if (pool == null || pool.isEmpty()) {
+            return;
+        }
+        List<EmsCollectedTrackEntity> shuffled = new ArrayList<>(pool);
+        Collections.shuffle(shuffled, new Random());
+        for (EmsCollectedTrackEntity track : shuffled) {
+            if (picked.size() >= limit) {
+                break;
+            }
+            if (!hasUsablePreview(track)) {
+                continue;
+            }
+            String key = trackKey(track);
+            if (seenKeys.add(key)) {
+                picked.add(toResponse(track, sourceLabel));
+            }
+        }
+    }
+
+    private String trackKey(EmsCollectedTrackEntity track) {
+        return "%s::%s".formatted(
+            track.getSourcePlatform() == null ? "" : track.getSourcePlatform(),
+            track.getExternalTrackId() == null ? "" : track.getExternalTrackId()
+        );
     }
 
     private boolean hasUsablePreview(EmsCollectedTrackEntity track) {

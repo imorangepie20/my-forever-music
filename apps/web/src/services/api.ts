@@ -76,6 +76,7 @@ import type {
     GmsRecommendationPreviewResponse,
     GmsRecommendationFeedbackRequest,
     GmsRecommendationFeedbackResponse,
+    HeroTrackListResponse,
     HeroTrackResponse,
     UserMusicEventRequest,
     UserMusicEventResponse,
@@ -212,6 +213,33 @@ export const fetchHeroTrack = async (
         throw new ApiError(payload.message, response.status, payload.code)
     }
     return (await response.json()) as HeroTrackResponse
+}
+
+export const fetchHeroTracks = async (
+    userId: string | null | undefined,
+    limit: number,
+    signal?: AbortSignal,
+): Promise<HeroTrackResponse[]> => {
+    const params = new URLSearchParams()
+    if (userId && userId.trim()) {
+        params.set('user_id', userId.trim())
+    }
+    params.set('limit', String(Math.max(1, limit)))
+    const headers = new Headers({ Accept: 'application/json' })
+    const response = await fetch(buildApiUrl(`/api/v1/main-page/hero-tracks?${params.toString()}`), {
+        signal,
+        headers,
+        cache: 'no-store',
+    })
+    if (response.status === 204) {
+        return []
+    }
+    if (!response.ok) {
+        const payload = await readErrorPayload(response)
+        throw new ApiError(payload.message, response.status, payload.code)
+    }
+    const payload = (await response.json()) as HeroTrackListResponse
+    return payload.tracks ?? []
 }
 
 export const fetchSchedulingAdminStatus = (userId: string, signal?: AbortSignal) =>

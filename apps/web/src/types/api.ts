@@ -1916,6 +1916,10 @@ export interface HeroTrackResponse {
     source_label: string | null
 }
 
+export interface HeroTrackListResponse {
+    tracks: HeroTrackResponse[]
+}
+
 export interface GmsRecommendationFeedbackResponse {
     service: string
     status: string

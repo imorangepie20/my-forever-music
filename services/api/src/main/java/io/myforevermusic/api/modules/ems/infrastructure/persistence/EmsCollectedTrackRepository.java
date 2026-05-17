@@ -3,6 +3,7 @@ package io.myforevermusic.api.modules.ems.infrastructure.persistence;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -42,6 +43,28 @@ public interface EmsCollectedTrackRepository extends JpaRepository<EmsCollectedT
     );
 
     Optional<EmsCollectedTrackEntity> findFirstByPreviewUrlIsNotNullOrderByCollectedAtDesc();
+
+    @Query("""
+        select track
+        from EmsCollectedTrackEntity track
+        where track.collectionSource = :collectionSource
+          and track.previewUrl is not null
+          and track.previewUrl <> ''
+        order by track.collectedAt desc
+        """)
+    List<EmsCollectedTrackEntity> findRecentByCollectionSourceWithPreview(
+        @Param("collectionSource") String collectionSource,
+        Pageable pageable
+    );
+
+    @Query("""
+        select track
+        from EmsCollectedTrackEntity track
+        where track.previewUrl is not null
+          and track.previewUrl <> ''
+        order by track.collectedAt desc
+        """)
+    List<EmsCollectedTrackEntity> findRecentWithPreview(Pageable pageable);
 
     @Modifying
     @Query("update EmsCollectedTrackEntity track set track.isrc = :isrc where track.id = :id and (track.isrc is null or track.isrc = '')")

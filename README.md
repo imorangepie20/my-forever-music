@@ -89,7 +89,7 @@ my-forever-music/
 - `apps/web`의 `EMS` 화면은 provider 검색, 검색 playlist track detail/playback, EMS DB 공개 playlist pool을 한 화면 흐름으로 제공
 - `apps/web` 공통 플레이어는 새 재생 시작 전 초기화한 뒤 TIDAL resolve/stream 준비 상태를 spinner와 메시지로 표시
 - `apps/web`는 TIDAL 재생 중일 때 `PlaybackDock` 의 확장 버튼으로 `/visualizer` 풀스크린 Visual EQ 플레이어 진입. 실제 오디오 신호 기반 FFT(`captureStream` → `AnalyserNode`) 비주얼라이저 3종(`bars`/`radial`/`particle`) 을 트랙별 랜덤 선택해 표시하며, `captureStream` 미지원/zero data 환경에서는 procedural fallback 으로 자동 전환
-- `apps/web` 메인 페이지 상단 `HeroEqBanner` 가 `/api/v1/main-page/hero-track` 에서 받은 추천 트랙의 Spotify 미리듣기를 무음 자동재생 + ▶ 클릭 unmute 흐름으로 노출. preview 종료 후 로그인 사용자는 `PlaybackContext.playItem` 으로 dock 전체 재생, 비로그인은 `/signin` 으로 유도
+- `apps/web` 메인 페이지 상단 `HeroEqBanner` 가 `/api/v1/main-page/hero-tracks?limit=5` 에서 5곡 큐를 받아 30초 preview 를 3초 간격으로 순서대로 재생함. 무음 자동재생 + ▶ unmute, 5곡 종료 후 "Replay all", 사용자가 "전체 듣기" 누르면 회전 정지 + dock 으로 현재 트랙 전체 재생. 단일 트랙용 `GET /api/v1/main-page/hero-track` 도 backward-compat 유지
 - `apps/desktop`는 향후 Windows 앱 개발을 위한 예약 구조 생성 완료
 - `services/api`는 `GET /api/v1/platforms/catalog` 엔드포인트로 플랫폼 역할과 온보딩 흐름 제공
 - 플랫폼 카탈로그에는 `TIDAL`, `YouTube Music`, `Apple Music`, `Last.fm`까지 포함되며, 확장 순서는 `Spotify -> TIDAL -> YouTube Music`, Apple Music은 개발자 계정 준비 전까지 보류로 고정됨
