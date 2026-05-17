@@ -28,29 +28,25 @@ const MelonChartRow = ({ track, compact = false }: MelonChartRowProps) => {
         setError(null)
         try {
             const resolved = await resolveMelonHotTrack(track.rank, session.userId)
-            if (!resolved.resolved || !resolved.source_platform) {
-                setError('Streaming match not found')
-                return
-            }
-            const externalTrackId = resolved.source_platform === 'tidal'
+            const matchedPlatform = resolved.resolved ? resolved.source_platform : null
+            const matchedExternalTrackId = matchedPlatform === 'tidal'
                 ? resolved.tidal_track_id
-                : resolved.spotify_track_id
-            if (!externalTrackId) {
-                setError('Streaming match not found')
-                return
-            }
+                : matchedPlatform === 'spotify'
+                    ? resolved.spotify_track_id
+                    : null
+            const useYouTubeFallback = !matchedPlatform || !matchedExternalTrackId
             await playback.playItem({
-                id: externalTrackId,
+                id: matchedExternalTrackId ?? `melon-${track.rank}`,
                 kind: 'track',
                 title: resolved.resolved_title ?? track.title,
                 subtitle: resolved.resolved_album_title
                     ? `${resolved.resolved_artist_name ?? track.artist_name} · ${resolved.resolved_album_title}`
                     : resolved.resolved_artist_name ?? track.artist_name,
-                sourcePlatform: resolved.source_platform,
-                playbackPlatformId: resolved.source_platform,
+                sourcePlatform: useYouTubeFallback ? 'youtube' : matchedPlatform,
+                playbackPlatformId: useYouTubeFallback ? 'youtube' : matchedPlatform,
                 spotifyTrackId: resolved.spotify_track_id,
                 tidalTrackId: resolved.tidal_track_id,
-                externalTrackId,
+                externalTrackId: matchedExternalTrackId,
                 platformUri: resolved.tidal_uri,
                 imageUrl: resolved.image_url ?? track.image_url,
                 albumTitle: resolved.resolved_album_title,

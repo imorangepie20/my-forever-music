@@ -1087,6 +1087,28 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
                 if (!isActiveRequest()) {
                     return
                 }
+                if (playbackPlatformId !== 'youtube') {
+                    try {
+                        setNotice('Trying YouTube fallback...')
+                        const fallbackStarted = await playYouTubeQueueFromIndex(userId, pendingItems, safeStartIndex, isActiveRequest)
+                        if (fallbackStarted && isActiveRequest()) {
+                            recordPlaybackEvent('play_started', fallbackStarted.item, {
+                                durationMs: fallbackStarted.item.durationMs ?? 0,
+                                positionMs: 0,
+                            })
+                            return
+                        }
+                    } catch (youtubeError: unknown) {
+                        if (!isActiveRequest()) {
+                            return
+                        }
+                        const message = youtubeError instanceof Error ? youtubeError.message : 'YouTube fallback failed.'
+                        setError(message)
+                        setNotice(null)
+                        setIsPlaying(false)
+                        return
+                    }
+                }
                 const message = playbackError instanceof Error ? playbackError.message : 'Playback failed.'
                 setError(message)
                 setNotice(null)
