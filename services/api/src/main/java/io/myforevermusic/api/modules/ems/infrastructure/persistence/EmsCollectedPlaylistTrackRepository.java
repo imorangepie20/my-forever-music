@@ -67,6 +67,10 @@ public interface EmsCollectedPlaylistTrackRepository extends JpaRepository<EmsCo
         @Param("sortOrder") int sortOrder
     );
 
+    @Modifying
+    @Query("delete from EmsCollectedPlaylistTrackEntity link where link.playlist.id = :playlistId")
+    int deleteByPlaylistId(@Param("playlistId") Long playlistId);
+
     interface PlaylistAudioStatsProjection {
         Long getPlaylistId();
         long getTrackCount();

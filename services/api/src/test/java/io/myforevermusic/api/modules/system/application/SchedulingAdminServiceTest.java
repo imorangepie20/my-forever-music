@@ -28,6 +28,7 @@ class SchedulingAdminServiceTest {
             authAccountStore,
             environment,
             Optional.empty(),
+            Optional.empty(),
             Optional.empty()
         );
 
@@ -38,6 +39,7 @@ class SchedulingAdminServiceTest {
             .containsExactly(
                 "ems-acquisition",
                 "ems-public-discovery",
+                "ems-flo-special",
                 "ems-pool-worker",
                 "sasrec-auto-train",
                 "metadata-apply-accepted-isrcs"
@@ -63,6 +65,13 @@ class SchedulingAdminServiceTest {
                 assertThat(schedule.fixedDelayMs()).isEqualTo(10_000L);
                 assertThat(schedule.cadenceLabel()).isEqualTo("every 10 seconds");
             });
+        assertThat(report.schedules()).filteredOn(schedule -> schedule.id().equals("ems-flo-special"))
+            .singleElement()
+            .satisfies(schedule -> {
+                assertThat(schedule.status()).isEqualTo("active");
+                assertThat(schedule.fixedDelayMs()).isEqualTo(86_400_000L);
+                assertThat(schedule.cadenceLabel()).isEqualTo("daily");
+            });
     }
 
     @Test
@@ -76,6 +85,7 @@ class SchedulingAdminServiceTest {
         SchedulingAdminService service = new SchedulingAdminService(
             authAccountStore,
             environment,
+            Optional.empty(),
             Optional.empty(),
             Optional.empty()
         );
@@ -99,6 +109,7 @@ class SchedulingAdminServiceTest {
         SchedulingAdminService service = new SchedulingAdminService(
             authAccountStore,
             new MockEnvironment(),
+            Optional.empty(),
             Optional.empty(),
             Optional.empty()
         );

@@ -23,6 +23,8 @@ import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler.EmsPublicPlaylistDiscoveryFailure;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler.EmsPublicPlaylistDiscoveryRun;
+import io.myforevermusic.api.modules.ems.application.FloSpecialCurationScheduler;
+import io.myforevermusic.api.modules.ems.application.FloSpecialProperties;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedPlaylistEntity;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackEntity;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsTrackAudioFeatures;
@@ -54,6 +56,12 @@ class EmsCollectionControllerWebMvcTest {
 
     @MockBean
     private EmsPoolIngestService emsPoolIngestService;
+
+    @MockBean
+    private FloSpecialCurationScheduler floSpecialCurationScheduler;
+
+    @MockBean
+    private FloSpecialProperties floSpecialProperties;
 
     @Test
     void shouldReturnEmsSearchResultsStoredInSearchPool() throws Exception {
@@ -265,6 +273,37 @@ class EmsCollectionControllerWebMvcTest {
             .andExpect(jsonPath("$.sections[0].playlists[0].playlist.title").value("K-Pop Night Drive"))
             .andExpect(jsonPath("$.sections[0].playlists[0].playlist.audio_feature_coverage.coverage_ratio").value(0.75))
             .andExpect(jsonPath("$.sections[0].playlists[0].match_signals[0]").value("artist NewJeans"));
+    }
+
+    @Test
+    void shouldReturnStoredFloSpecialPlaylistsByTopic() throws Exception {
+        EmsCollectedPlaylistEntity playlist = new EmsCollectedPlaylistEntity(
+            "1777671282043761",
+            "FLO Playlist",
+            "flo",
+            "FLO Special",
+            "오늘의 FLO",
+            "https://cdn.music-flo.com/playlist.jpg",
+            "https://www.music-flo.com/detail/playlist/1777671282043761",
+            null,
+            15,
+            EmsCollectionService.FLO_SPECIAL_SOURCE,
+            "오늘의 FLO",
+            Instant.parse("2026-05-10T00:00:00Z")
+        );
+        ReflectionTestUtils.setField(playlist, "id", 101L);
+
+        when(floSpecialProperties.getDisplayLimit()).thenReturn(120);
+        when(emsCollectionService.getFloSpecialPlaylists(120)).thenReturn(List.of(playlist));
+        when(emsCollectionService.getAudioFeatureCoverage(101L)).thenReturn(new EmsAudioFeatureCoverage(15, 0, 15, 0.0));
+
+        mockMvc.perform(get("/api/v1/ems/collection/flo-special"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.collection_source").value(EmsCollectionService.FLO_SPECIAL_SOURCE))
+            .andExpect(jsonPath("$.sections[0].title").value("오늘의 FLO"))
+            .andExpect(jsonPath("$.sections[0].playlists[0].id").value(101))
+            .andExpect(jsonPath("$.sections[0].playlists[0].source_platform").value("flo"))
+            .andExpect(jsonPath("$.sections[0].playlists[0].track_count").value(15));
     }
 
     @Test

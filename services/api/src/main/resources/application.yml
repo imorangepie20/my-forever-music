@@ -64,6 +64,11 @@ app:
       display-limit: ${EMS_DISCOVERY_DISPLAY_LIMIT:12}
       platforms: ${EMS_DISCOVERY_PLATFORMS:tidal,spotify}
       seed-queries: ${EMS_DISCOVERY_SEED_QUERIES:tidal:THE_HITS,tidal:POPULAR_MIXES,tidal:POPULAR_PLAYLISTS,tidal:FROM_OUR_EDITORS,spotify:featured-playlists,spotify:category:toplists}
+    flo-special:
+      enabled: ${EMS_FLO_SPECIAL_ENABLED:true}
+      refresh-interval-ms: ${EMS_FLO_SPECIAL_REFRESH_INTERVAL_MS:86400000}
+      initial-delay-ms: ${EMS_FLO_SPECIAL_INITIAL_DELAY_MS:120000}
+      display-limit: ${EMS_FLO_SPECIAL_DISPLAY_LIMIT:120}
     acquisition:
       enabled: ${EMS_ACQUISITION_ENABLED:true}
       user-id: ${EMS_ACQUISITION_USER_ID:${EMS_DISCOVERY_USER_ID:}}

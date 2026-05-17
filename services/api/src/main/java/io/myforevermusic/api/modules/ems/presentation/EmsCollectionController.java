@@ -18,14 +18,20 @@ import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService.EmsPoo
 import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService.EmsPoolRunSnapshot;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler.EmsPublicPlaylistDiscoveryRun;
+import io.myforevermusic.api.modules.ems.application.FloSpecialCurationScheduler;
+import io.myforevermusic.api.modules.ems.application.FloSpecialCurationScheduler.FloSpecialUpdateRun;
+import io.myforevermusic.api.modules.ems.application.FloSpecialProperties;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedPlaylistEntity;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackEntity;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,17 +49,23 @@ public class EmsCollectionController {
     private final EmsPlaylistCurationService emsPlaylistCurationService;
     private final EmsPublicPlaylistDiscoveryScheduler emsPublicPlaylistDiscoveryScheduler;
     private final EmsPoolIngestService emsPoolIngestService;
+    private final FloSpecialCurationScheduler floSpecialCurationScheduler;
+    private final FloSpecialProperties floSpecialProperties;
 
     public EmsCollectionController(
         EmsCollectionService emsCollectionService,
         EmsPlaylistCurationService emsPlaylistCurationService,
         EmsPublicPlaylistDiscoveryScheduler emsPublicPlaylistDiscoveryScheduler,
-        EmsPoolIngestService emsPoolIngestService
+        EmsPoolIngestService emsPoolIngestService,
+        FloSpecialCurationScheduler floSpecialCurationScheduler,
+        FloSpecialProperties floSpecialProperties
     ) {
         this.emsCollectionService = emsCollectionService;
         this.emsPlaylistCurationService = emsPlaylistCurationService;
         this.emsPublicPlaylistDiscoveryScheduler = emsPublicPlaylistDiscoveryScheduler;
         this.emsPoolIngestService = emsPoolIngestService;
+        this.floSpecialCurationScheduler = floSpecialCurationScheduler;
+        this.floSpecialProperties = floSpecialProperties;
     }
 
     @Operation(summary = "Search a provider for public playlists and store results in the EMS search pool")
@@ -266,6 +278,63 @@ public class EmsCollectionController {
         );
     }
 
+    @Operation(summary = "Browse stored FLO special playlist curations for the EMS page")
+    @GetMapping("/flo-special")
+    public EmsFloSpecialResponse browseFloSpecial(
+        @RequestParam(value = "limit", required = false) Integer limit
+    ) {
+        int displayLimit = limit == null ? floSpecialProperties.getDisplayLimit() : limit;
+        Map<String, List<EmsCollectedPlaylistEntity>> playlistsBySection = new LinkedHashMap<>();
+        for (EmsCollectedPlaylistEntity playlist : emsCollectionService.getFloSpecialPlaylists(displayLimit)) {
+            String sectionTitle = firstNonBlank(playlist.getSearchQuery(), "FLO Special");
+            playlistsBySection.computeIfAbsent(sectionTitle, ignored -> new ArrayList<>()).add(playlist);
+        }
+
+        return new EmsFloSpecialResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            "flo",
+            EmsCollectionService.FLO_SPECIAL_SOURCE,
+            playlistsBySection.entrySet().stream()
+                .map(entry -> new EmsFloSpecialSection(
+                    "CURATION",
+                    entry.getKey(),
+                    entry.getValue().stream().map(this::toPlaylistItem).toList()
+                ))
+                .toList(),
+            toFloSpecialRunItem(floSpecialCurationScheduler.lastRun())
+        );
+    }
+
+    @Operation(summary = "Refresh FLO special playlists into EMS immediately")
+    @PostMapping("/flo-special/refresh")
+    public EmsFloSpecialRefreshResponse refreshFloSpecial() {
+        return EmsFloSpecialRefreshResponse.from("api", floSpecialCurationScheduler.refreshNow());
+    }
+
+    @Operation(summary = "Get latest FLO special refresh status")
+    @GetMapping("/flo-special/status")
+    public EmsFloSpecialRefreshResponse getFloSpecialStatus() {
+        FloSpecialUpdateRun run = floSpecialCurationScheduler.lastRun();
+        if (run == null) {
+            return new EmsFloSpecialRefreshResponse(
+                "api",
+                "not_run",
+                Instant.now(),
+                null,
+                null,
+                null,
+                0,
+                0,
+                0,
+                List.of(),
+                "FLO special refresh has not run in this API process."
+            );
+        }
+        return EmsFloSpecialRefreshResponse.from("api", run);
+    }
+
     @Operation(summary = "Browse collected EMS playlists for display")
     @GetMapping("/playlists")
     public EmsCollectionPlaylistBrowseResponse browsePlaylists(
@@ -377,6 +446,29 @@ public class EmsCollectionController {
         );
     }
 
+    private static EmsFloSpecialRunItem toFloSpecialRunItem(FloSpecialUpdateRun run) {
+        if (run == null) {
+            return null;
+        }
+        return new EmsFloSpecialRunItem(
+            run.trigger(),
+            run.status(),
+            run.startedAt(),
+            run.completedAt(),
+            run.sectionCount(),
+            run.collectedPlaylistCount(),
+            run.collectedTrackCount(),
+            run.failures().stream()
+                .map(failure -> new EmsFloSpecialFailureItem(
+                    failure.sectionTitle(),
+                    failure.externalPlaylistId(),
+                    failure.message()
+                ))
+                .toList(),
+            run.message()
+        );
+    }
+
     private EmsCollectionPlaylistItem toPlaylistItem(EmsCollectedPlaylistEntity playlist, PlaylistAudioStats audioStats) {
         return new EmsCollectionPlaylistItem(
             playlist.getId(), playlist.getExternalPlaylistId(), playlist.getTitle(),
@@ -405,6 +497,10 @@ public class EmsCollectionController {
 
     private static String spotifyUriFor(String sourcePlatform, String platformUri) {
         return "spotify".equals(sourcePlatform) ? platformUri : null;
+    }
+
+    private static String firstNonBlank(String first, String second) {
+        return first != null && !first.isBlank() ? first : second;
     }
 
     private static List<String> normalizePlatformIds(List<String> platformIds) {
@@ -705,6 +801,81 @@ public class EmsCollectionController {
         String titleModel,
         boolean personalized,
         List<EmsCollectionPlaylistSection> sections
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsFloSpecialResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        String sourcePlatform,
+        String collectionSource,
+        List<EmsFloSpecialSection> sections,
+        EmsFloSpecialRunItem lastRun
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsFloSpecialRefreshResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        String trigger,
+        Instant startedAt,
+        Instant completedAt,
+        int sectionCount,
+        int collectedPlaylistCount,
+        int collectedTrackCount,
+        List<EmsFloSpecialFailureItem> failures,
+        String message
+    ) {
+        static EmsFloSpecialRefreshResponse from(String service, FloSpecialUpdateRun run) {
+            return new EmsFloSpecialRefreshResponse(
+                service,
+                run.status(),
+                Instant.now(),
+                run.trigger(),
+                run.startedAt(),
+                run.completedAt(),
+                run.sectionCount(),
+                run.collectedPlaylistCount(),
+                run.collectedTrackCount(),
+                run.failures().stream()
+                    .map(failure -> new EmsFloSpecialFailureItem(
+                        failure.sectionTitle(),
+                        failure.externalPlaylistId(),
+                        failure.message()
+                    ))
+                    .toList(),
+                run.message()
+            );
+        }
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsFloSpecialRunItem(
+        String trigger,
+        String status,
+        Instant startedAt,
+        Instant completedAt,
+        int sectionCount,
+        int collectedPlaylistCount,
+        int collectedTrackCount,
+        List<EmsFloSpecialFailureItem> failures,
+        String message
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsFloSpecialFailureItem(
+        String sectionTitle,
+        String externalPlaylistId,
+        String message
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsFloSpecialSection(
+        String sourceType,
+        String title,
+        List<EmsCollectionPlaylistItem> playlists
     ) {}
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)

@@ -6,6 +6,8 @@ import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAc
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionRunSnapshot;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler.EmsPublicPlaylistDiscoveryRun;
+import io.myforevermusic.api.modules.ems.application.FloSpecialCurationScheduler;
+import io.myforevermusic.api.modules.ems.application.FloSpecialCurationScheduler.FloSpecialUpdateRun;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,17 +27,20 @@ public class SchedulingAdminService {
     private final Environment environment;
     private final Optional<EmsAcquisitionService> acquisitionService;
     private final Optional<EmsPublicPlaylistDiscoveryScheduler> discoveryScheduler;
+    private final Optional<FloSpecialCurationScheduler> floSpecialScheduler;
 
     public SchedulingAdminService(
         AuthAccountStore authAccountStore,
         Environment environment,
         Optional<EmsAcquisitionService> acquisitionService,
-        Optional<EmsPublicPlaylistDiscoveryScheduler> discoveryScheduler
+        Optional<EmsPublicPlaylistDiscoveryScheduler> discoveryScheduler,
+        Optional<FloSpecialCurationScheduler> floSpecialScheduler
     ) {
         this.authAccountStore = authAccountStore;
         this.environment = environment;
         this.acquisitionService = acquisitionService;
         this.discoveryScheduler = discoveryScheduler;
+        this.floSpecialScheduler = floSpecialScheduler;
     }
 
     public SchedulingAdminReport summarize(String adminUserId) {
@@ -43,6 +48,7 @@ public class SchedulingAdminService {
         List<ScheduledServiceStatus> schedules = List.of(
             emsAcquisition(),
             emsPublicDiscovery(),
+            emsFloSpecial(),
             emsPoolWorker(),
             sasrecAutoTrain(),
             metadataApplyAcceptedIsrcs()
@@ -56,6 +62,7 @@ public class SchedulingAdminService {
             schedules,
             List.of(
                 "EMS playlist curation is computed at read time; daily updates should refresh acquisition and discovery data.",
+                "FLO Special updates run daily by default and do not require a user credential.",
                 "EMS pool ingest worker should stay near real-time because it only drains queued searches.",
                 "SASRec and metadata schedulers remain opt-in until their admin properties are configured."
             )
@@ -144,6 +151,44 @@ public class SchedulingAdminService {
                 "app.ems.discovery.seed-queries"
             ),
             notes
+        );
+    }
+
+    private ScheduledServiceStatus emsFloSpecial() {
+        boolean enabled = booleanProperty("app.ems.flo-special.enabled", true);
+        long fixedDelayMs = longProperty("app.ems.flo-special.refresh-interval-ms", ONE_DAY_MS);
+        long initialDelayMs = longProperty("app.ems.flo-special.initial-delay-ms", 120_000L);
+        FloSpecialUpdateRun lastRun = floSpecialScheduler
+            .map(FloSpecialCurationScheduler::lastRun)
+            .orElse(null);
+
+        return new ScheduledServiceStatus(
+            "ems-flo-special",
+            "EMS",
+            "EMS FLO Special",
+            "scheduled",
+            enabled,
+            true,
+            enabled ? "active" : "disabled",
+            fixedDelayMs,
+            initialDelayMs,
+            cadenceLabel(fixedDelayMs),
+            "Visit FLO special curations and persist playlist topics, playlists, and tracks into EMS.",
+            "/ems",
+            lastRun == null ? null : lastRun.status(),
+            lastRun == null ? null : lastRun.message(),
+            lastRun == null ? null : lastRun.startedAt(),
+            lastRun == null ? null : lastRun.completedAt(),
+            List.of(
+                "app.ems.flo-special.enabled",
+                "app.ems.flo-special.refresh-interval-ms",
+                "app.ems.flo-special.initial-delay-ms",
+                "app.ems.flo-special.display-limit"
+            ),
+            List.of(
+                "Default cadence is daily.",
+                "FLO playlists are stored as EMS source_platform=flo and playback resolves at play time through the user's selected provider."
+            )
         );
     }
 

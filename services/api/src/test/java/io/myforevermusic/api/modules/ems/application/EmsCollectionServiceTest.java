@@ -76,6 +76,9 @@ class EmsCollectionServiceTest {
     private EmsPoolEntryRepository poolEntryRepository;
 
     @Mock
+    private FloSpecialCurationService floSpecialCurationService;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @Test
@@ -232,6 +235,67 @@ class EmsCollectionServiceTest {
             .containsExactly("tidal-track-001");
         verify(playlistTrackRepository).upsertPlaylistTrackLink(7L, 8L, 0);
         verifyNoInteractions(reccoBeatsAudioFeaturesClient);
+    }
+
+    @Test
+    void shouldCollectFloChannelTopicAsPlaylistWithTracks() {
+        FloSpecialCurationService.FloSpecialPlaylist channel =
+            new FloSpecialCurationService.FloSpecialPlaylist(
+                "56903",
+                "NOW THAT 해외 록/메탈",
+                "CHNL",
+                "https://cdn.music-flo.com/channel.jpg",
+                List.of("https://cdn.music-flo.com/channel.jpg"),
+                "https://www.music-flo.com/detail/channel/56903"
+            );
+        FloSpecialCurationService.FloSpecialSection section =
+            new FloSpecialCurationService.FloSpecialSection(
+                "CURATION3",
+                "11781",
+                "놓치면 아쉬운 주간 하이라이트",
+                List.of(channel)
+            );
+        FloSpecialCurationService.FloSpecialTrack track =
+            new FloSpecialCurationService.FloSpecialTrack(
+                "588352795",
+                "Can’t Miss You",
+                "Sublime",
+                "Can’t Miss You",
+                "https://cdn.music-flo.com/album.jpg",
+                "https://www.music-flo.com/detail/track/588352795",
+                152000,
+                "20260515"
+            );
+        EmsCollectedTrackEntity trackEntity = collectedTrack("588352795", "flo", "Can’t Miss You", "Sublime", null);
+        ReflectionTestUtils.setField(trackEntity, "id", 18L);
+
+        when(floSpecialCurationService.getSpecial(null))
+            .thenReturn(new FloSpecialCurationService.FloSpecialCuration(List.of(section)));
+        when(floSpecialCurationService.getTracks(channel))
+            .thenReturn(new FloSpecialCurationService.FloSpecialPlaylistTracks("56903", 1, List.of(track)));
+        when(playlistRepository.findBySourcePlatformAndExternalPlaylistId("flo", "56903"))
+            .thenReturn(Optional.empty());
+        when(playlistRepository.save(any(EmsCollectedPlaylistEntity.class))).thenAnswer(invocation -> {
+            EmsCollectedPlaylistEntity playlist = invocation.getArgument(0);
+            ReflectionTestUtils.setField(playlist, "id", 17L);
+            return playlist;
+        });
+        when(trackRepository.findBySourcePlatformAndExternalTrackId("flo", "588352795"))
+            .thenReturn(Optional.of(trackEntity));
+
+        EmsCollectionService.FloSpecialCollectionResult result = service().collectFloSpecial();
+
+        assertThat(result.sectionCount()).isEqualTo(1);
+        assertThat(result.collectedPlaylistCount()).isEqualTo(1);
+        assertThat(result.collectedTrackCount()).isEqualTo(1);
+        assertThat(result.failures()).isEmpty();
+        ArgumentCaptor<EmsCollectedPlaylistEntity> playlistCaptor =
+            ArgumentCaptor.forClass(EmsCollectedPlaylistEntity.class);
+        verify(playlistRepository).save(playlistCaptor.capture());
+        assertThat(playlistCaptor.getValue().getCurator()).isEqualTo("FLO Channel");
+        assertThat(playlistCaptor.getValue().getSearchQuery()).isEqualTo("놓치면 아쉬운 주간 하이라이트");
+        verify(playlistTrackRepository).deleteByPlaylistId(17L);
+        verify(playlistTrackRepository).upsertPlaylistTrackLink(17L, 18L, 0);
     }
 
     @Test
@@ -408,6 +472,7 @@ class EmsCollectionServiceTest {
             playlistTrackRepository,
             poolRunRepository,
             poolEntryRepository,
+            floSpecialCurationService,
             eventPublisher
         );
     }

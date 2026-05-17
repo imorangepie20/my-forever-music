@@ -42,6 +42,7 @@ public class EmsCollectionService {
 
     private static final Logger log = LoggerFactory.getLogger(EmsCollectionService.class);
     private static final String SEARCH_POOL_SOURCE = "search_pool";
+    public static final String FLO_SPECIAL_SOURCE = "flo_special";
     private static final List<String> TIDAL_HOME_PAGE_SOURCE_IDS = List.of(
         "THE_HITS",
         "POPULAR_MIXES",
@@ -59,6 +60,7 @@ public class EmsCollectionService {
     private final EmsCollectedPlaylistTrackRepository playlistTrackRepository;
     private final EmsPoolIngestRunRepository poolRunRepository;
     private final EmsPoolEntryRepository poolEntryRepository;
+    private final FloSpecialCurationService floSpecialCurationService;
     private final ApplicationEventPublisher eventPublisher;
 
     public EmsCollectionService(
@@ -72,6 +74,7 @@ public class EmsCollectionService {
         EmsCollectedPlaylistTrackRepository playlistTrackRepository,
         EmsPoolIngestRunRepository poolRunRepository,
         EmsPoolEntryRepository poolEntryRepository,
+        FloSpecialCurationService floSpecialCurationService,
         ApplicationEventPublisher eventPublisher
     ) {
         this.spotifyWebApiClient = spotifyWebApiClient;
@@ -84,6 +87,7 @@ public class EmsCollectionService {
         this.playlistTrackRepository = playlistTrackRepository;
         this.poolRunRepository = poolRunRepository;
         this.poolEntryRepository = poolEntryRepository;
+        this.floSpecialCurationService = floSpecialCurationService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -539,6 +543,59 @@ public class EmsCollectionService {
         return collectFromProvider(userId, platformId, query, limit, "public_pool");
     }
 
+    @Transactional
+    public FloSpecialCollectionResult collectFloSpecial() {
+        Instant now = Instant.now();
+        FloSpecialCurationService.FloSpecialCuration curation = floSpecialCurationService.getSpecial(null);
+        int collectedPlaylistCount = 0;
+        int collectedTrackCount = 0;
+        List<FloSpecialCollectionFailure> failures = new ArrayList<>();
+
+        for (FloSpecialCurationService.FloSpecialSection section : curation.sections()) {
+            for (FloSpecialCurationService.FloSpecialPlaylist playlist : section.playlists()) {
+                try {
+                    FloSpecialCurationService.FloSpecialPlaylistTracks playlistTracks =
+                        floSpecialCurationService.getTracks(playlist);
+                    EmsCollectedPlaylistEntity playlistEntity = upsertPlaylistFromFlo(
+                        playlist,
+                        section,
+                        playlistTracks.trackCount(),
+                        now
+                    );
+                    collectedPlaylistCount++;
+                    playlistTrackRepository.deleteByPlaylistId(playlistEntity.getId());
+
+                    List<FloSpecialCurationService.FloSpecialTrack> tracks = playlistTracks.tracks();
+                    for (int i = 0; i < tracks.size(); i++) {
+                        EmsCollectedTrackEntity trackEntity = upsertTrackFromFlo(tracks.get(i), now);
+                        linkPlaylistTrack(playlistEntity, trackEntity, i);
+                        collectedTrackCount++;
+                    }
+                } catch (RuntimeException exception) {
+                    failures.add(new FloSpecialCollectionFailure(
+                        section.title(),
+                        playlist.externalPlaylistId(),
+                        exception.getMessage()
+                    ));
+                    log.warn(
+                        "FLO special collection failed for section='{}' playlist={}: {}",
+                        section.title(),
+                        playlist.externalPlaylistId(),
+                        exception.getMessage()
+                    );
+                }
+            }
+        }
+
+        return new FloSpecialCollectionResult(
+            curation.sections().size(),
+            collectedPlaylistCount,
+            collectedTrackCount,
+            now,
+            List.copyOf(failures)
+        );
+    }
+
     private EmsCollectionSearchResult collectFromProvider(
         String userId,
         String platformId,
@@ -698,6 +755,11 @@ public class EmsCollectionService {
             return playlistRepository.findRandomBySourcePlatform(platformId, clampedLimit);
         }
         return playlistRepository.findBySourcePlatformOrderByCollectedAtDesc(platformId, clampedLimit);
+    }
+
+    public List<EmsCollectedPlaylistEntity> getFloSpecialPlaylists(int limit) {
+        int clampedLimit = Math.min(Math.max(limit, 1), 300);
+        return playlistRepository.findRecentWithTracksByCollectionSource(FLO_SPECIAL_SOURCE, org.springframework.data.domain.PageRequest.of(0, clampedLimit));
     }
 
     public EmsCollectedPlaylistEntity getCollectedPlaylist(Long playlistId) {
@@ -1282,6 +1344,71 @@ public class EmsCollectionService {
         );
     }
 
+    private EmsCollectedPlaylistEntity upsertPlaylistFromFlo(
+        FloSpecialCurationService.FloSpecialPlaylist playlist,
+        FloSpecialCurationService.FloSpecialSection section,
+        int trackCount,
+        Instant now
+    ) {
+        String sectionTitle = normalizeRequiredText(section.title(), "FLO Special", 200);
+        String curator = "CHNL".equalsIgnoreCase(playlist.sourceType()) ? "FLO Channel" : "FLO Special";
+        return playlistRepository.findBySourcePlatformAndExternalPlaylistId("flo", playlist.externalPlaylistId())
+            .map(existing -> {
+                existing.applyCollectedMetadata(
+                    normalizeRequiredText(playlist.title(), "Untitled FLO Playlist", 200),
+                    curator,
+                    normalizeDescription(sectionTitle),
+                    truncate(playlist.coverImageUrl(), 500),
+                    truncate(playlist.platformExternalUrl(), 500),
+                    null,
+                    trackCount,
+                    FLO_SPECIAL_SOURCE,
+                    sectionTitle,
+                    now
+                );
+                return existing;
+            })
+            .orElseGet(() -> playlistRepository.save(new EmsCollectedPlaylistEntity(
+                truncate(playlist.externalPlaylistId(), 160),
+                normalizeRequiredText(playlist.title(), "Untitled FLO Playlist", 200),
+                "flo",
+                curator,
+                normalizeDescription(sectionTitle),
+                truncate(playlist.coverImageUrl(), 500),
+                truncate(playlist.platformExternalUrl(), 500),
+                null,
+                trackCount,
+                FLO_SPECIAL_SOURCE,
+                sectionTitle,
+                now
+            )));
+    }
+
+    private EmsCollectedTrackEntity upsertTrackFromFlo(FloSpecialCurationService.FloSpecialTrack track, Instant now) {
+        return upsertCollectedTrack(
+            track.externalTrackId(),
+            track.title(),
+            track.artistName(),
+            "flo",
+            null,
+            track.albumTitle(),
+            track.albumImageUrl(),
+            track.platformExternalUrl(),
+            null,
+            null,
+            track.durationMs(),
+            FLO_SPECIAL_SOURCE,
+            now,
+            unavailableAudioFeatures(
+                track.externalTrackId(),
+                track.platformExternalUrl(),
+                null,
+                track.durationMs(),
+                now
+            )
+        );
+    }
+
     private EmsCollectedTrackEntity upsertCollectedTrack(
         String externalTrackId,
         String title,
@@ -1449,6 +1576,20 @@ public class EmsCollectionService {
         long pendingTrackCountAfter,
         double coverageRatioAfter,
         Instant backfilledAt
+    ) {}
+
+    public record FloSpecialCollectionResult(
+        int sectionCount,
+        int collectedPlaylistCount,
+        int collectedTrackCount,
+        Instant collectedAt,
+        List<FloSpecialCollectionFailure> failures
+    ) {}
+
+    public record FloSpecialCollectionFailure(
+        String sectionTitle,
+        String externalPlaylistId,
+        String message
     ) {}
 
     private record SpotifyPlaylistSource(

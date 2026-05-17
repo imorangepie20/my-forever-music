@@ -19,7 +19,9 @@ import {
 import {
     ApiError,
     fetchEmsCollectedPlaylistDetail,
+    fetchEmsFloSpecial,
     fetchEmsPlaylistSections,
+    refreshEmsFloSpecial,
     searchEmsCollection,
 } from '@/services/api'
 import type {
@@ -28,6 +30,7 @@ import type {
     EmsCollectionPlaylistSectionItem,
     EmsCollectionSearchPlaylistItem,
     EmsCollectionSearchResponse,
+    EmsFloSpecialSection,
 } from '@/types/api'
 
 type DiscoveryPlatformId = string
@@ -35,6 +38,7 @@ type DiscoveryPlatformId = string
 const defaultDiscoveryPlatformIds: DiscoveryPlatformId[] = ['tidal', 'spotify']
 const SEARCH_RESULT_PAGE_SIZE = 12
 const SEARCH_CACHE_PREFIX = 'ems-search'
+const FLO_SPECIAL_DISPLAY_LIMIT = 120
 
 const openExternal = (url?: string | null) => {
     if (!url) {
@@ -84,6 +88,10 @@ const EmsPage = () => {
     const [isLoadingCollection, setIsLoadingCollection] = useState(false)
     const [preparingPlaylistId, setPreparingPlaylistId] = useState<number | null>(null)
     const [collectionError, setCollectionError] = useState<string | null>(null)
+    const [floSpecialSections, setFloSpecialSections] = useState<EmsFloSpecialSection[]>([])
+    const [isLoadingFloSpecial, setIsLoadingFloSpecial] = useState(false)
+    const [isRefreshingFloSpecial, setIsRefreshingFloSpecial] = useState(false)
+    const [floSpecialError, setFloSpecialError] = useState<string | null>(null)
 
     useEffect(() => {
         const controller = new AbortController()
@@ -117,6 +125,31 @@ const EmsPage = () => {
 
         return () => controller.abort()
     }, [activeUserId])
+
+    useEffect(() => {
+        const controller = new AbortController()
+
+        setIsLoadingFloSpecial(true)
+        setFloSpecialError(null)
+
+        fetchEmsFloSpecial(controller.signal, FLO_SPECIAL_DISPLAY_LIMIT)
+            .then((response) => {
+                startTransition(() => setFloSpecialSections(response.sections))
+            })
+            .catch((err: unknown) => {
+                if (err instanceof DOMException && err.name === 'AbortError') return
+                const message =
+                    err instanceof ApiError
+                        ? err.message
+                        : 'Unable to load FLO Special playlists.'
+                startTransition(() => setFloSpecialError(message))
+            })
+            .finally(() => {
+                setIsLoadingFloSpecial(false)
+            })
+
+        return () => controller.abort()
+    }, [])
 
     useEffect(() => {
         setSearchQuery(urlQuery)
@@ -212,6 +245,7 @@ const EmsPage = () => {
 
     const handlePlayEmsPlaylist = async (playlist: EmsCollectionPlaylistItem) => {
         setCollectionError(null)
+        setFloSpecialError(null)
         setPreparingPlaylistId(playlist.id)
 
         try {
@@ -231,6 +265,32 @@ const EmsPage = () => {
             setCollectionError(message)
         } finally {
             setPreparingPlaylistId(null)
+        }
+    }
+
+    const handleRefreshFloSpecial = async () => {
+        setIsRefreshingFloSpecial(true)
+        setFloSpecialError(null)
+
+        try {
+            const refreshResult = await refreshEmsFloSpecial()
+            if (refreshResult.status === 'failed') {
+                setFloSpecialError(refreshResult.message || 'FLO Special refresh failed.')
+                return
+            }
+            const response = await fetchEmsFloSpecial(undefined, FLO_SPECIAL_DISPLAY_LIMIT)
+            startTransition(() => setFloSpecialSections(response.sections))
+            if (refreshResult.failures.length > 0) {
+                setFloSpecialError(refreshResult.message)
+            }
+        } catch (requestError: unknown) {
+            const message =
+                requestError instanceof ApiError
+                    ? requestError.message
+                    : 'Unable to refresh FLO Special playlists.'
+            setFloSpecialError(message)
+        } finally {
+            setIsRefreshingFloSpecial(false)
         }
     }
 
@@ -365,6 +425,55 @@ const EmsPage = () => {
             </HudCard>
 
             <HudCard
+                title="FLO Special"
+                subtitle="FLO topics and playlists stored in EMS"
+                action={
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void handleRefreshFloSpecial()}
+                        disabled={isRefreshingFloSpecial}
+                    >
+                        <RefreshCw size={15} className={isRefreshingFloSpecial ? 'animate-spin' : undefined} />
+                        Refresh
+                    </Button>
+                }
+            >
+                <div className="space-y-5">
+                    {(isLoadingFloSpecial || isRefreshingFloSpecial) && (
+                        <span className="inline-flex items-center gap-2 text-xs text-hud-text-muted">
+                            <RefreshCw size={14} className="animate-spin" />
+                            {isRefreshingFloSpecial ? 'Updating FLO' : 'Loading FLO'}
+                        </span>
+                    )}
+
+                    {floSpecialError && (
+                        <div className="rounded-2xl border border-hud-accent-warning/40 bg-hud-accent-warning/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                            {floSpecialError}
+                        </div>
+                    )}
+
+                    {floSpecialSections.length > 0 ? (
+                        <div className="space-y-7">
+                            {floSpecialSections.map((section) => (
+                                <FloSpecialSectionView
+                                    key={section.title}
+                                    section={section}
+                                    preparingPlaylistId={preparingPlaylistId}
+                                    onPlay={handlePlayEmsPlaylist}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">
+                            FLO Special playlists will appear here after the first refresh stores them in EMS.
+                        </div>
+                    )}
+                </div>
+            </HudCard>
+
+            <HudCard
                 title="EMS Curated Playlist Atlas"
                 subtitle="Personalized genre, mood, quality, and fresh sections generated from the EMS pool"
                 action={
@@ -440,6 +549,62 @@ const playlistSupportingText = (item: EmsCollectionPlaylistSectionItem) => {
     const coverageText = `${coverage.filled_track_count}/${coverage.track_count} audio features · ${formatPercent(coverage.coverage_ratio)}`
     const signals = item.match_signals.slice(0, 2).join(' · ')
     return signals ? `${signals} · ${coverageText}` : coverageText
+}
+
+const floPlaylistSupportingText = (playlist: EmsCollectionPlaylistItem) => {
+    const coverage = playlist.audio_feature_coverage
+    return `${coverage.track_count} stored tracks · ${formatPercent(coverage.coverage_ratio)} audio features`
+}
+
+const FloSpecialSectionView = ({
+    section,
+    preparingPlaylistId,
+    onPlay,
+}: {
+    section: EmsFloSpecialSection
+    preparingPlaylistId: number | null
+    onPlay: (playlist: EmsCollectionPlaylistItem) => Promise<void>
+}) => {
+    if (section.playlists.length === 0) {
+        return null
+    }
+
+    return (
+        <section className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                        <Sparkles size={15} />
+                        FLO · {section.source_type}
+                    </div>
+                    <h2 className="mt-2 text-2xl font-semibold text-hud-text-primary">{section.title}</h2>
+                </div>
+                <span className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 px-3 py-2 text-xs uppercase tracking-[0.18em] text-hud-text-muted">
+                    {section.playlists.length} playlists
+                </span>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {section.playlists.map((playlist) => (
+                    <PlaylistFeatureCard
+                        key={playlist.id}
+                        title={playlist.title}
+                        sourcePlatform={playlist.source_platform}
+                        curator={playlist.curator || 'FLO Special'}
+                        trackCount={playlist.track_count}
+                        description={playlist.description || section.title}
+                        supportingText={floPlaylistSupportingText(playlist)}
+                        imageUrl={playlist.cover_image_url}
+                        actionLabel="Open Playlist"
+                        detailPath={buildEmsPlaylistDetailPath(playlist.id)}
+                        isPlayLoading={preparingPlaylistId === playlist.id}
+                        onPlay={() => void onPlay(playlist)}
+                        onOpenExternal={() => openExternal(playlist.platform_external_url)}
+                    />
+                ))}
+            </div>
+        </section>
+    )
 }
 
 const EmsPlaylistSectionView = ({
