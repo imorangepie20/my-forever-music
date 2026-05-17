@@ -1920,6 +1920,25 @@ export interface HeroTrackListResponse {
     tracks: HeroTrackResponse[]
 }
 
+export interface UserTrackLikeRequest {
+    user_id: string
+    source_platform: string
+    external_track_id: string
+    title?: string | null
+    artist_name?: string | null
+    album_title?: string | null
+    image_url?: string | null
+    spotify_track_id?: string | null
+    platform_external_url?: string | null
+}
+
+export interface UserTrackLikeResponse {
+    liked: boolean
+    source_platform: string
+    external_track_id: string
+    liked_at: string | null
+}
+
 export interface GmsRecommendationFeedbackResponse {
     service: string
     status: string

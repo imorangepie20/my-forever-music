@@ -1,6 +1,7 @@
 import {
     AudioLines,
     ExternalLink,
+    Heart,
     ListMusic,
     Loader2,
     Maximize2,
@@ -18,7 +19,9 @@ import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import MusicArtwork from '@/components/music/MusicArtwork'
+import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { usePlayback } from '@/contexts/PlaybackContext'
+import { useTrackLike } from '@/hooks/useTrackLike'
 import { formatDuration, resolvePlaybackPlatformId } from '@/lib/musicPlayback'
 
 interface PlaybackDockProps {
@@ -116,6 +119,21 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
         clearItem,
     } = usePlayback()
     const navigate = useNavigate()
+    const { session } = useAuthSession()
+
+    const likeIdentity = {
+        userId: session?.userId ?? null,
+        sourcePlatform: currentItem?.sourcePlatform ?? null,
+        externalTrackId: currentItem?.externalTrackId ?? currentItem?.id ?? null,
+    }
+    const likeController = useTrackLike(likeIdentity, {
+        title: currentItem?.title,
+        artistName: currentItem?.subtitle?.split(' · ')[0] ?? currentItem?.subtitle ?? null,
+        albumTitle: currentItem?.albumTitle ?? null,
+        imageUrl: currentItem?.imageUrl ?? null,
+        spotifyTrackId: currentItem?.spotifyTrackId ?? null,
+        platformExternalUrl: currentItem?.externalUrl ?? null,
+    })
 
     if (!currentItem) {
         return null
@@ -258,6 +276,24 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                                 aria-label="Playback volume"
                             />
                         </div>
+                        {likeController.available && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => void likeController.toggle()}
+                                disabled={likeController.loading}
+                                aria-label={likeController.liked ? 'Unlike track' : 'Like track'}
+                                aria-pressed={likeController.liked}
+                                title={likeController.liked ? 'Unlike' : 'Like'}
+                                className={`h-11 w-11 px-0 ${likeController.liked ? 'text-rose-400 hover:text-rose-300' : ''}`}
+                            >
+                                <Heart
+                                    size={18}
+                                    fill={likeController.liked ? 'currentColor' : 'none'}
+                                    strokeWidth={likeController.liked ? 1.5 : 2}
+                                />
+                            </Button>
+                        )}
                         {playbackPlatformId === 'tidal' && (
                             <Button
                                 type="button"

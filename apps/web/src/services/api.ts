@@ -78,6 +78,8 @@ import type {
     GmsRecommendationFeedbackResponse,
     HeroTrackListResponse,
     HeroTrackResponse,
+    UserTrackLikeRequest,
+    UserTrackLikeResponse,
     UserMusicEventRequest,
     UserMusicEventResponse,
     PmsWorkspaceBootstrapResponse,
@@ -237,6 +239,24 @@ export const fetchLatestTracks = async (
     const payload = (await response.json()) as HeroTrackListResponse
     return payload.tracks ?? []
 }
+
+export const fetchUserTrackLikeState = (
+    userId: string,
+    sourcePlatform: string,
+    externalTrackId: string,
+    signal?: AbortSignal,
+) =>
+    requestJson<UserTrackLikeResponse>(
+        `/api/v1/user/likes/state?user_id=${encodeURIComponent(userId)}&source_platform=${encodeURIComponent(sourcePlatform)}&external_track_id=${encodeURIComponent(externalTrackId)}`,
+        { signal, cache: 'no-store' },
+    )
+
+export const toggleUserTrackLike = (payload: UserTrackLikeRequest) =>
+    requestJson<UserTrackLikeResponse>('/api/v1/user/likes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    })
 
 export const fetchHeroTracks = async (
     userId: string | null | undefined,
