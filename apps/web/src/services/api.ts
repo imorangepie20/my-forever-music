@@ -80,6 +80,7 @@ import type {
     HeroTrackResponse,
     MelonChartListResponse,
     MelonChartTrack,
+    MelonResolveResponse,
     PopularPlaylistListResponse,
     PopularPlaylistResponse,
     UserTrackLikeRequest,
@@ -241,6 +242,12 @@ export const fetchMelonHot100 = async (
     const payload = (await response.json()) as MelonChartListResponse
     return { snapshotAt: payload.snapshot_at, tracks: payload.tracks ?? [] }
 }
+
+export const resolveMelonHotTrack = (rank: number, signal?: AbortSignal) =>
+    requestJson<MelonResolveResponse>(
+        `/api/v1/main-page/melon-hot-100/${rank}/resolve`,
+        { signal, cache: 'no-store' },
+    )
 
 export const triggerMelonScrape = async () => {
     const response = await fetch(buildApiUrl('/api/v1/admin/melon/scrape'), {

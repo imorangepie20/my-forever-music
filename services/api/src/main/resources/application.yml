@@ -232,6 +232,11 @@ app:
     reccobeats:
       enabled: ${RECCOBEATS_ENABLED:true}
       base-url: ${RECCOBEATS_API_BASE_URL:https://api.reccobeats.com/v1}
+  melon:
+    scrape:
+      enabled: ${MELON_SCRAPE_ENABLED:false}
+      fixed-delay-ms: ${MELON_SCRAPE_FIXED_DELAY_MS:86400000}
+      initial-delay-ms: ${MELON_SCRAPE_INITIAL_DELAY_MS:300000}
   recommendation:
     metadata:
       wikidata:

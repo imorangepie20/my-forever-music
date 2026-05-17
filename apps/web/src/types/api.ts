@@ -1952,6 +1952,20 @@ export interface MelonChartListResponse {
     tracks: MelonChartTrack[]
 }
 
+export interface MelonResolveResponse {
+    rank: number
+    melon_song_id: string | null
+    melon_title: string
+    melon_artist_name: string
+    spotify_track_id: string | null
+    resolved_title: string | null
+    resolved_artist_name: string | null
+    resolved_album_title: string | null
+    image_url: string | null
+    spotify_external_url: string | null
+    resolved: boolean
+}
+
 export interface UserTrackLikeRequest {
     user_id: string
     source_platform: string

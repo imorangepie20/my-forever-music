@@ -1,6 +1,6 @@
-import { ArrowRight, ExternalLink } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import MusicArtwork from '@/components/music/MusicArtwork'
+import MelonChartRow from '@/components/home/MelonChartRow'
 import { useMelonHot100 } from '@/hooks/useMelonHot100'
 
 const SECTION_LIMIT = 10
@@ -53,28 +53,7 @@ const MelonHot100Section = () => {
             <ol className="grid gap-2 sm:grid-cols-2">
                 {state.tracks.map((track) => (
                     <li key={`${track.rank}-${track.melon_song_id ?? track.title}`}>
-                        <a
-                            href={track.song_external_url ?? '#'}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                            className="group flex items-center gap-3 rounded-xl border border-hud-border-secondary bg-hud-bg-primary/70 px-3 py-2 transition-hud hover:border-hud-border-primary hover:bg-hud-bg-primary/90"
-                        >
-                            <span className="w-7 text-center font-mono text-xs text-hud-text-muted">
-                                {track.rank}
-                            </span>
-                            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-hud-border-secondary bg-hud-bg-primary">
-                                <MusicArtwork
-                                    imageUrl={track.image_url}
-                                    seed={`melon-${track.rank}`}
-                                    label={track.title}
-                                />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-hud-text-primary">{track.title}</p>
-                                <p className="truncate text-xs text-hud-text-secondary">{track.artist_name}</p>
-                            </div>
-                            <ExternalLink size={14} className="text-hud-text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100" />
-                        </a>
+                        <MelonChartRow track={track} compact />
                     </li>
                 ))}
             </ol>

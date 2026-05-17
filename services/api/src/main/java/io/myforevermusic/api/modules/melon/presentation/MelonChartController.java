@@ -1,10 +1,12 @@
 package io.myforevermusic.api.modules.melon.presentation;
 
+import io.myforevermusic.api.modules.melon.application.MelonChartResolverService;
 import io.myforevermusic.api.modules.melon.application.MelonChartService;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,9 +18,14 @@ public class MelonChartController {
     private static final int DEFAULT_LIMIT = 10;
 
     private final MelonChartService melonChartService;
+    private final MelonChartResolverService melonChartResolverService;
 
-    public MelonChartController(MelonChartService melonChartService) {
+    public MelonChartController(
+        MelonChartService melonChartService,
+        MelonChartResolverService melonChartResolverService
+    ) {
         this.melonChartService = melonChartService;
+        this.melonChartResolverService = melonChartResolverService;
     }
 
     @GetMapping("/melon-hot-100")
@@ -42,5 +49,13 @@ public class MelonChartController {
         }
         Instant snapshotAt = tracks.get(0).snapshotAt();
         return ResponseEntity.ok(new MelonChartTrackResponse.ListEnvelope(snapshotAt, tracks));
+    }
+
+    @GetMapping("/melon-hot-100/{rank}/resolve")
+    public ResponseEntity<MelonResolveResponse> resolve(@PathVariable("rank") int rank) {
+        return melonChartResolverService
+            .resolveByRank(rank)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }
