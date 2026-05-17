@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,7 @@ public class UserTrackLikeService {
     private final UserTrackLikeRepository repository;
     private final Clock clock;
 
+    @Autowired
     public UserTrackLikeService(UserTrackLikeRepository repository) {
         this(repository, Clock.systemUTC());
     }
