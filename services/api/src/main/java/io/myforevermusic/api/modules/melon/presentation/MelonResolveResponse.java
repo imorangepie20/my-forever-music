@@ -9,12 +9,15 @@ public record MelonResolveResponse(
     String melonSongId,
     String melonTitle,
     String melonArtistName,
+    String sourcePlatform,
     String spotifyTrackId,
+    String tidalTrackId,
+    String tidalUri,
     String resolvedTitle,
     String resolvedArtistName,
     String resolvedAlbumTitle,
     String imageUrl,
-    String spotifyExternalUrl,
+    String externalUrl,
     boolean resolved
 ) {
 }

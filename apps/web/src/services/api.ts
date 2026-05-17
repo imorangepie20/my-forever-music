@@ -243,11 +243,19 @@ export const fetchMelonHot100 = async (
     return { snapshotAt: payload.snapshot_at, tracks: payload.tracks ?? [] }
 }
 
-export const resolveMelonHotTrack = (rank: number, signal?: AbortSignal) =>
-    requestJson<MelonResolveResponse>(
-        `/api/v1/main-page/melon-hot-100/${rank}/resolve`,
+export const resolveMelonHotTrack = (
+    rank: number,
+    userId?: string | null,
+    signal?: AbortSignal,
+) => {
+    const query = userId && userId.trim()
+        ? `?user_id=${encodeURIComponent(userId.trim())}`
+        : ''
+    return requestJson<MelonResolveResponse>(
+        `/api/v1/main-page/melon-hot-100/${rank}/resolve${query}`,
         { signal, cache: 'no-store' },
     )
+}
 
 export const triggerMelonScrape = async () => {
     const response = await fetch(buildApiUrl('/api/v1/admin/melon/scrape'), {

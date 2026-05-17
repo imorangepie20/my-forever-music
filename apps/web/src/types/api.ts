@@ -1957,12 +1957,15 @@ export interface MelonResolveResponse {
     melon_song_id: string | null
     melon_title: string
     melon_artist_name: string
+    source_platform: 'tidal' | 'spotify' | null
     spotify_track_id: string | null
+    tidal_track_id: string | null
+    tidal_uri: string | null
     resolved_title: string | null
     resolved_artist_name: string | null
     resolved_album_title: string | null
     image_url: string | null
-    spotify_external_url: string | null
+    external_url: string | null
     resolved: boolean
 }
 

@@ -52,9 +52,12 @@ public class MelonChartController {
     }
 
     @GetMapping("/melon-hot-100/{rank}/resolve")
-    public ResponseEntity<MelonResolveResponse> resolve(@PathVariable("rank") int rank) {
+    public ResponseEntity<MelonResolveResponse> resolve(
+        @PathVariable("rank") int rank,
+        @RequestParam(value = "user_id", required = false) String userId
+    ) {
         return melonChartResolverService
-            .resolveByRank(rank)
+            .resolveByRank(rank, userId)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
     }

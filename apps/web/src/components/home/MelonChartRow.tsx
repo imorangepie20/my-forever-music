@@ -27,25 +27,34 @@ const MelonChartRow = ({ track, compact = false }: MelonChartRowProps) => {
         setLoading(true)
         setError(null)
         try {
-            const resolved = await resolveMelonHotTrack(track.rank)
-            if (!resolved.resolved || !resolved.spotify_track_id) {
-                setError('Spotify match not found')
+            const resolved = await resolveMelonHotTrack(track.rank, session.userId)
+            if (!resolved.resolved || !resolved.source_platform) {
+                setError('Streaming match not found')
+                return
+            }
+            const externalTrackId = resolved.source_platform === 'tidal'
+                ? resolved.tidal_track_id
+                : resolved.spotify_track_id
+            if (!externalTrackId) {
+                setError('Streaming match not found')
                 return
             }
             await playback.playItem({
-                id: resolved.spotify_track_id,
+                id: externalTrackId,
                 kind: 'track',
                 title: resolved.resolved_title ?? track.title,
                 subtitle: resolved.resolved_album_title
                     ? `${resolved.resolved_artist_name ?? track.artist_name} · ${resolved.resolved_album_title}`
                     : resolved.resolved_artist_name ?? track.artist_name,
-                sourcePlatform: 'spotify',
-                playbackPlatformId: 'spotify',
+                sourcePlatform: resolved.source_platform,
+                playbackPlatformId: resolved.source_platform,
                 spotifyTrackId: resolved.spotify_track_id,
-                externalTrackId: resolved.spotify_track_id,
+                tidalTrackId: resolved.tidal_track_id,
+                externalTrackId,
+                platformUri: resolved.tidal_uri,
                 imageUrl: resolved.image_url ?? track.image_url,
                 albumTitle: resolved.resolved_album_title,
-                externalUrl: resolved.spotify_external_url,
+                externalUrl: resolved.external_url,
             })
         } catch (cause) {
             const message = cause instanceof ApiError

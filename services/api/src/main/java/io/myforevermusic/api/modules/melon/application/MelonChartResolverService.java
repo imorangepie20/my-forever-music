@@ -3,6 +3,9 @@ package io.myforevermusic.api.modules.melon.application;
 import io.myforevermusic.api.modules.melon.infrastructure.persistence.MelonChartTrackEntity;
 import io.myforevermusic.api.modules.melon.infrastructure.persistence.MelonChartTrackRepository;
 import io.myforevermusic.api.modules.melon.presentation.MelonResolveResponse;
+import io.myforevermusic.api.modules.platform.application.TidalPlaybackTargetResolverService;
+import io.myforevermusic.api.modules.platform.application.TidalPlaybackTargetResolverService.TidalPlaybackTarget;
+import io.myforevermusic.api.modules.platform.application.TidalPlaybackTargetResolverService.TrackQuery;
 import io.myforevermusic.api.modules.platform.infrastructure.spotify.SpotifyPublicCatalogClient;
 import io.myforevermusic.api.modules.platform.infrastructure.spotify.SpotifyPublicCatalogClient.PublicTrack;
 import java.util.List;
@@ -12,9 +15,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
- * Resolves a Melon chart row into a playable Spotify track via the public
- * catalogue search. Falls back to title-only search when artist-prefixed query
- * misses, which happens occasionally with romanised K-pop releases.
+ * Resolves a Melon chart row into a playable track. TIDAL is preferred when
+ * the caller is signed in and has a stored TIDAL credential — Spotify Client
+ * Credentials are the universal fallback so anonymous visitors still get a
+ * Spotify match.
  */
 @Service
 public class MelonChartResolverService {
@@ -24,35 +28,85 @@ public class MelonChartResolverService {
 
     private final MelonChartTrackRepository repository;
     private final SpotifyPublicCatalogClient spotifyPublicCatalogClient;
+    private final TidalPlaybackTargetResolverService tidalResolver;
 
     public MelonChartResolverService(
         MelonChartTrackRepository repository,
-        SpotifyPublicCatalogClient spotifyPublicCatalogClient
+        SpotifyPublicCatalogClient spotifyPublicCatalogClient,
+        TidalPlaybackTargetResolverService tidalResolver
     ) {
         this.repository = repository;
         this.spotifyPublicCatalogClient = spotifyPublicCatalogClient;
+        this.tidalResolver = tidalResolver;
     }
 
-    public Optional<MelonResolveResponse> resolveByRank(int rank) {
+    public Optional<MelonResolveResponse> resolveByRank(int rank, String userId) {
         return repository.findAll().stream()
             .filter(track -> track.getRank() == rank)
             .findFirst()
-            .map(this::resolve);
+            .map(track -> resolve(track, userId));
     }
 
-    private MelonResolveResponse resolve(MelonChartTrackEntity entity) {
+    private MelonResolveResponse resolve(MelonChartTrackEntity entity, String userId) {
+        if (userId != null && !userId.isBlank()) {
+            Optional<MelonResolveResponse> tidalMatch = tryTidal(entity, userId);
+            if (tidalMatch.isPresent()) {
+                return tidalMatch.get();
+            }
+        }
+        return resolveViaSpotify(entity);
+    }
+
+    private Optional<MelonResolveResponse> tryTidal(MelonChartTrackEntity entity, String userId) {
+        try {
+            TidalPlaybackTarget target = tidalResolver.resolve(userId, new TrackQuery(
+                entity.getTitle(),
+                entity.getArtistName(),
+                "melon",
+                null,
+                null,
+                null,
+                null,
+                null
+            ));
+            return Optional.of(new MelonResolveResponse(
+                entity.getRank(),
+                entity.getMelonSongId(),
+                entity.getTitle(),
+                entity.getArtistName(),
+                "tidal",
+                null,
+                target.tidalTrackId(),
+                target.tidalUri(),
+                target.title(),
+                target.artistName(),
+                target.albumTitle(),
+                target.albumImageUrl() != null ? target.albumImageUrl() : entity.getImageUrl(),
+                target.platformExternalUrl(),
+                true
+            ));
+        } catch (RuntimeException ex) {
+            log.debug(
+                "Melon TIDAL resolve fell back to Spotify (user={}, rank={}): {}",
+                userId, entity.getRank(), ex.getMessage()
+            );
+            return Optional.empty();
+        }
+    }
+
+    private MelonResolveResponse resolveViaSpotify(MelonChartTrackEntity entity) {
         String primaryQuery = "track:\"%s\" artist:\"%s\"".formatted(
             sanitize(entity.getTitle()),
             sanitize(entity.getArtistName())
         );
         List<PublicTrack> hits = spotifyPublicCatalogClient.searchTracks(primaryQuery, SEARCH_LIMIT);
         if (hits.isEmpty()) {
-            String fallbackQuery = "%s %s".formatted(sanitize(entity.getArtistName()), sanitize(entity.getTitle()));
-            hits = spotifyPublicCatalogClient.searchTracks(fallbackQuery, SEARCH_LIMIT);
+            String fallback = "%s %s".formatted(sanitize(entity.getArtistName()), sanitize(entity.getTitle()));
+            hits = spotifyPublicCatalogClient.searchTracks(fallback, SEARCH_LIMIT);
         }
 
         if (hits.isEmpty()) {
-            log.debug("Spotify resolve missed for Melon rank={} title='{}'", entity.getRank(), entity.getTitle());
+            log.debug("Melon Spotify resolve missed rank={} title='{}'", entity.getRank(), entity.getTitle());
             return new MelonResolveResponse(
                 entity.getRank(),
                 entity.getMelonSongId(),
@@ -64,6 +118,9 @@ public class MelonChartResolverService {
                 null,
                 null,
                 null,
+                null,
+                entity.getImageUrl(),
+                null,
                 false
             );
         }
@@ -74,7 +131,10 @@ public class MelonChartResolverService {
             entity.getMelonSongId(),
             entity.getTitle(),
             entity.getArtistName(),
+            "spotify",
             best.spotifyTrackId(),
+            null,
+            null,
             best.title(),
             best.artistName(),
             best.albumTitle(),
