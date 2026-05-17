@@ -55,23 +55,7 @@ const HeroEqBanner = () => {
         if (!audio || !previewUrl) {
             return
         }
-        audio.muted = true
-        audio.currentTime = 0
-        setIsMuted(true)
-        setIsEnded(false)
-        setIsPlaying(false)
-        setPosition(0)
-        audio.play().catch(() => {
-            // Muted autoplay may still be blocked in restrictive browsers — surface as
-            // an obvious "press play" affordance via the existing isPlaying=false state.
-        })
-    }, [previewUrl])
 
-    useEffect(() => {
-        const audio = audioRef.current
-        if (!audio) {
-            return
-        }
         const handlePlay = () => setIsPlaying(true)
         const handlePause = () => setIsPlaying(false)
         const handleEnded = () => {
@@ -87,6 +71,18 @@ const HeroEqBanner = () => {
         audio.addEventListener('timeupdate', handleTimeUpdate)
         audio.addEventListener('durationchange', handleDurationChange)
 
+        audio.muted = true
+        audio.currentTime = 0
+        setIsMuted(true)
+        setIsEnded(false)
+        setIsPlaying(false)
+        setPosition(0)
+        setDuration(audio.duration || 0)
+        audio.play().catch(() => {
+            // Muted autoplay may still be blocked in restrictive browsers — surface as
+            // an obvious "press play" affordance via the existing isPlaying=false state.
+        })
+
         return () => {
             audio.removeEventListener('play', handlePlay)
             audio.removeEventListener('pause', handlePause)
@@ -94,7 +90,7 @@ const HeroEqBanner = () => {
             audio.removeEventListener('timeupdate', handleTimeUpdate)
             audio.removeEventListener('durationchange', handleDurationChange)
         }
-    }, [])
+    }, [previewUrl])
 
     const handlePrimary = () => {
         const audio = audioRef.current
