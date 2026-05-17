@@ -37,6 +37,12 @@ public interface EmsCollectedTrackRepository extends JpaRepository<EmsCollectedT
 
     List<EmsCollectedTrackEntity> findByTitleIgnoreCase(String title);
 
+    Optional<EmsCollectedTrackEntity> findFirstByCollectionSourceAndPreviewUrlIsNotNullOrderByCollectedAtDesc(
+        String collectionSource
+    );
+
+    Optional<EmsCollectedTrackEntity> findFirstByPreviewUrlIsNotNullOrderByCollectedAtDesc();
+
     @Modifying
     @Query("update EmsCollectedTrackEntity track set track.isrc = :isrc where track.id = :id and (track.isrc is null or track.isrc = '')")
     int updateIsrcIfNull(@Param("id") Long id, @Param("isrc") String isrc);
