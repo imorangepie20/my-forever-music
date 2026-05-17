@@ -12,6 +12,8 @@ public record MagazineArticleResponse(
     String articleUrl,
     String articleTitle,
     String articleTitleKo,
+    String description,
+    String descriptionKo,
     String rationale,
     String rationaleKo,
     String imageUrl,

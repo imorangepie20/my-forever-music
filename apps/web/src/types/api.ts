@@ -2014,6 +2014,8 @@ export interface MagazineArticleResponse {
     article_url: string
     article_title: string
     article_title_ko: string | null
+    description: string | null
+    description_ko: string | null
     rationale: string | null
     rationale_ko: string | null
     image_url: string | null

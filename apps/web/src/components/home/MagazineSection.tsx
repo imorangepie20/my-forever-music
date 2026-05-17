@@ -63,6 +63,7 @@ const MagazineSection = () => {
 const MagazineCard = ({ article }: { article: MagazineArticleResponse }) => {
     const captured = formatCapturedAt(article.captured_at)
     const headline = article.article_title_ko ?? article.article_title
+    const bodyCopy = article.description_ko ?? article.description
     const supportingCopy = article.rationale_ko ?? article.rationale
     return (
         <a
@@ -96,8 +97,11 @@ const MagazineCard = ({ article }: { article: MagazineArticleResponse }) => {
                         {article.article_title}
                     </p>
                 )}
-                {supportingCopy && (
-                    <p className="mt-2 text-sm leading-5 text-hud-text-secondary">{supportingCopy}</p>
+                {bodyCopy && (
+                    <p className="mt-2 text-sm leading-6 text-hud-text-secondary">{bodyCopy}</p>
+                )}
+                {supportingCopy && supportingCopy !== bodyCopy && (
+                    <p className="mt-2 text-xs leading-5 text-hud-text-muted">{supportingCopy}</p>
                 )}
             </div>
             <div className="mt-3 flex items-center justify-between border-t border-hud-border-secondary/60 pt-3 text-xs text-hud-text-muted clear-both">

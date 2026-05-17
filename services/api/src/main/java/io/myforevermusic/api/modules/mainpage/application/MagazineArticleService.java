@@ -43,12 +43,15 @@ public class MagazineArticleService {
             }
             String title = row.getArticleTitle();
             String rationale = row.getRationale();
+            String description = enricher.fetchDescription(url);
             articles.add(new MagazineArticleResponse(
                 row.getSourceName(),
                 row.getSourceUrl(),
                 url,
                 title,
                 enricher.translateToKorean(title),
+                description,
+                enricher.translateToKorean(description),
                 rationale,
                 enricher.translateToKorean(rationale),
                 enricher.fetchImageUrl(url),
