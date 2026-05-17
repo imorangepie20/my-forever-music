@@ -1936,6 +1936,22 @@ export interface PopularPlaylistListResponse {
     playlists: PopularPlaylistResponse[]
 }
 
+export interface MelonChartTrack {
+    rank: number
+    melon_song_id: string | null
+    title: string
+    artist_name: string
+    album_title: string | null
+    image_url: string | null
+    song_external_url: string | null
+    snapshot_at: string
+}
+
+export interface MelonChartListResponse {
+    snapshot_at: string
+    tracks: MelonChartTrack[]
+}
+
 export interface UserTrackLikeRequest {
     user_id: string
     source_platform: string

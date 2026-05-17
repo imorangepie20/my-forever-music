@@ -78,6 +78,8 @@ import type {
     GmsRecommendationFeedbackResponse,
     HeroTrackListResponse,
     HeroTrackResponse,
+    MelonChartListResponse,
+    MelonChartTrack,
     PopularPlaylistListResponse,
     PopularPlaylistResponse,
     UserTrackLikeRequest,
@@ -217,6 +219,39 @@ export const fetchHeroTrack = async (
         throw new ApiError(payload.message, response.status, payload.code)
     }
     return (await response.json()) as HeroTrackResponse
+}
+
+export const fetchMelonHot100 = async (
+    limit: number | null,
+    full: boolean,
+    signal?: AbortSignal,
+): Promise<{ snapshotAt: string | null; tracks: MelonChartTrack[] }> => {
+    const path = full
+        ? '/api/v1/main-page/melon-hot-100/full'
+        : `/api/v1/main-page/melon-hot-100?limit=${Math.max(1, limit ?? 10)}`
+    const headers = new Headers({ Accept: 'application/json' })
+    const response = await fetch(buildApiUrl(path), { signal, headers, cache: 'no-store' })
+    if (response.status === 204) {
+        return { snapshotAt: null, tracks: [] }
+    }
+    if (!response.ok) {
+        const payload = await readErrorPayload(response)
+        throw new ApiError(payload.message, response.status, payload.code)
+    }
+    const payload = (await response.json()) as MelonChartListResponse
+    return { snapshotAt: payload.snapshot_at, tracks: payload.tracks ?? [] }
+}
+
+export const triggerMelonScrape = async () => {
+    const response = await fetch(buildApiUrl('/api/v1/admin/melon/scrape'), {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) {
+        const payload = await readErrorPayload(response)
+        throw new ApiError(payload.message, response.status, payload.code)
+    }
+    return (await response.json()) as { status: string; track_count: number; ran_at: string }
 }
 
 export const fetchPopularPlaylists = async (

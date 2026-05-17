@@ -9,6 +9,7 @@ import FeatureCoverageAdminPage from './pages/FeatureCoverageAdminPage'
 import GmsPlaylistsPage from './pages/GmsPlaylistsPage'
 import GmsPreviewPage from './pages/GmsPreviewPage'
 import HomePage from './pages/HomePage'
+import MelonHot100Page from './pages/MelonHot100Page'
 import NotFoundPage from './pages/NotFoundPage'
 import PlaybackHarnessPage from './pages/PlaybackHarnessPage'
 import MetadataNormalizationAdminPage from './pages/MetadataNormalizationAdminPage'
@@ -47,6 +48,7 @@ function App() {
                     <Route path="ems/search/playlists/:platformId/:externalPlaylistId" element={<EmsSearchPlaylistDetailPage />} />
                     <Route path="playlists/ems/:playlistId" element={<EmsPlaylistDetailPage />} />
                     <Route path="playlists/pms/:playlistId" element={<PmsPlaylistDetailPage />} />
+                    <Route path="melon-hot-100" element={<MelonHot100Page />} />
                 </Route>
                 <Route path="login" element={<Login />} />
                 <Route path="signin" element={<Login />} />
