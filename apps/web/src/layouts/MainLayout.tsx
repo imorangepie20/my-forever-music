@@ -24,7 +24,7 @@ const MainLayout = () => {
             >
                 <Header onMenuToggle={() => setSidebarOpen((current) => !current)} />
 
-                <main className="px-4 pb-44 pt-6 sm:px-6 lg:px-8">
+                <main className="px-4 pb-72 pt-6 sm:px-6 lg:px-8 xl:pb-56 2xl:pb-44">
                     <Outlet />
                 </main>
             </div>

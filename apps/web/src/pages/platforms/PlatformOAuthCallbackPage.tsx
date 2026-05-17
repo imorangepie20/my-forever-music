@@ -5,6 +5,8 @@ import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
+import { resetSpotifyWebPlayer } from '@/lib/spotifyPlaybackSdk'
+import { tidalReset } from '@/lib/tidalStreamPlayback'
 import { ApiError, completePlatformAuthorization } from '@/services/api'
 import type {
     PlatformAuthorizationCompleteResponse,
@@ -12,6 +14,16 @@ import type {
 } from '@/types/api'
 
 const STORAGE_KEY = 'my-forever-music.platform-oauth-session'
+
+const resetLocalPlaybackAuthorization = (userId: string, platformId: string) => {
+    if (platformId === 'spotify') {
+        resetSpotifyWebPlayer(userId)
+        return
+    }
+    if (platformId === 'tidal') {
+        void tidalReset().catch(() => undefined)
+    }
+}
 
 const loadPendingAuthorization = (state: string | null): PlatformAuthorizationStartResponse | null => {
     if (!state || typeof window === 'undefined') {
@@ -86,6 +98,7 @@ const PlatformOAuthCallbackPage = () => {
             .then((response) => {
                 setResult(response)
                 setError(null)
+                resetLocalPlaybackAuthorization(response.connection.user_id, response.connection.platform_id)
                 updateWorkspace({
                     userId: response.connection.user_id,
                     preferredPlatformId: session?.preferredPlatformId ?? pending.authorization.platform_id,

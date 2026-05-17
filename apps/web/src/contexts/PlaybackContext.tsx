@@ -17,6 +17,7 @@ import {
     spotifyPause,
     spotifyPreviousTrack,
     spotifyResume,
+    resetSpotifyWebPlayer,
     spotifySeek,
     spotifySetRepeat,
     spotifySetShuffle,
@@ -134,6 +135,7 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
     const positionMsRef = useRef(positionMs)
     const durationMsRef = useRef(durationMs)
     const playbackRequestIdRef = useRef(0)
+    const previousSessionUserIdRef = useRef(session?.userId ?? null)
     const tidalCallbacksRef = useRef<TidalPlayerCallbacks>({})
     const tidalPreviewBlockedRef = useRef(false)
     const lastSpotifyStateRef = useRef<{
@@ -208,6 +210,19 @@ export const PlaybackProvider = ({ children }: { children: ReactNode }) => {
         tidalPreviewBlockedRef.current = false
         lastSpotifyStateRef.current = { trackId: null, position: 0, duration: 0, completionEmittedForTrackId: null }
     }, [])
+
+    useEffect(() => {
+        const nextUserId = session?.userId ?? null
+        if (previousSessionUserIdRef.current === nextUserId) {
+            return
+        }
+
+        previousSessionUserIdRef.current = nextUserId
+        playbackRequestIdRef.current += 1
+        resetPlaybackSurface()
+        resetSpotifyWebPlayer()
+        void tidalReset().catch(() => undefined)
+    }, [resetPlaybackSurface, session?.userId])
 
     const recordPlaybackEvent = useCallback(
         (

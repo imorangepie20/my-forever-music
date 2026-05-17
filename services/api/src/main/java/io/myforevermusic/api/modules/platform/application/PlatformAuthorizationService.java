@@ -97,6 +97,7 @@ public class PlatformAuthorizationService {
                 now
             )
         );
+        resetExistingAuthorization(account.userId(), platform.platformId());
 
         return new PlatformAuthorizationStartResponse(
             "api",
@@ -176,7 +177,7 @@ public class PlatformAuthorizationService {
             now
         );
         PlatformAccountProfile externalProfile = platformAccountProfileResolverRegistry
-            .resolve(provisionalCredential)
+            .resolveStrictly(provisionalCredential)
             .orElse(null);
         String externalUserId = firstNonBlank(
             externalProfile == null ? null : externalProfile.externalUserId(),
@@ -280,6 +281,7 @@ public class PlatformAuthorizationService {
                 spotify.getRedirectUri(),
                 spotify.getAuthorizationUri(),
                 spotify.getScopes(),
+                true,
                 "Spotify OAuth is not configured. Set SPOTIFY_OAUTH_ENABLED, SPOTIFY_CLIENT_ID, and SPOTIFY_REDIRECT_URI before starting platform onboarding."
             );
         }
@@ -293,6 +295,7 @@ public class PlatformAuthorizationService {
                 tidal.getRedirectUri(),
                 tidal.getAuthorizationUri(),
                 tidal.getScopes(),
+                false,
                 "TIDAL OAuth is not configured. Set TIDAL_OAUTH_ENABLED, TIDAL_CLIENT_ID, TIDAL_REDIRECT_URI, TIDAL_COUNTRY_CODE, and TIDAL_SCOPES before starting TIDAL onboarding."
             );
         }
@@ -300,6 +303,11 @@ public class PlatformAuthorizationService {
         throw new IllegalArgumentException(
             "%s OAuth is not implemented yet.".formatted(platform.displayName())
         );
+    }
+
+    private void resetExistingAuthorization(String userId, String platformId) {
+        platformCredentialStore.clear(userId, platformId);
+        platformConnectionStore.disconnect(userId, platformId);
     }
 
     private String buildPkceAuthorizationUrl(
@@ -316,6 +324,9 @@ public class PlatformAuthorizationService {
 
         if (!requestedScopes.isEmpty()) {
             authorizationUrl += "&scope=" + encode(String.join(" ", requestedScopes));
+        }
+        if (oauthStartConfig.showDialog()) {
+            authorizationUrl += "&show_dialog=true";
         }
 
         return authorizationUrl
@@ -360,6 +371,7 @@ public class PlatformAuthorizationService {
         String redirectUri,
         String authorizationUri,
         List<String> requestedScopes,
+        boolean showDialog,
         String notConfiguredMessage
     ) {
     }

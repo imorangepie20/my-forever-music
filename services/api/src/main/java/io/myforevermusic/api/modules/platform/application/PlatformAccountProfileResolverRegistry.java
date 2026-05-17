@@ -24,6 +24,13 @@ public class PlatformAccountProfileResolverRegistry {
             .flatMap(resolver -> resolveSafely(resolver, credential));
     }
 
+    public Optional<PlatformAccountProfile> resolveStrictly(PlatformAccountCredential credential) {
+        return resolvers.stream()
+            .filter(resolver -> resolver.supports(credential.platformId()))
+            .findFirst()
+            .map(resolver -> resolver.resolve(credential));
+    }
+
     private Optional<PlatformAccountProfile> resolveSafely(
         PlatformAccountProfileResolver resolver,
         PlatformAccountCredential credential

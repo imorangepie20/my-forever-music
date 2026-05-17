@@ -17,7 +17,7 @@ import type { AuthLoginResponse } from '../../types/api'
 
 const Login = () => {
     const { setSessionFromAuthentication } = useAuthSession()
-    const { updateWorkspace } = useRecommendationWorkspace()
+    const { resetWorkspace, updateWorkspace } = useRecommendationWorkspace()
     const [showPassword, setShowPassword] = useState(false)
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -38,6 +38,7 @@ const Login = () => {
             })
 
             setSessionFromAuthentication(response)
+            resetWorkspace()
             updateWorkspace({
                 userId: response.user.user_id,
                 preferredPlatformId: response.onboarding.preferred_platform_id,

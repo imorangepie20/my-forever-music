@@ -93,6 +93,7 @@ let sdkLoadPromise: Promise<void> | null = null
 let playerSession: SpotifyPlayerSession | null = null
 let playerSessionPromise: Promise<SpotifyPlayerSession> | null = null
 let activeCallbacks: SpotifyPlayerCallbacks = {}
+let playerSessionResetId = 0
 const tokenCache = new Map<string, CachedToken>()
 
 const delay = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
@@ -245,8 +246,13 @@ export const ensureSpotifyWebPlayer = async (userId: string, callbacks: SpotifyP
         return playerSessionPromise
     }
 
+    const resetId = playerSessionResetId
     playerSessionPromise = createSpotifyPlayer(userId)
         .then((session) => {
+            if (resetId !== playerSessionResetId) {
+                session.player.disconnect()
+                throw new Error('Spotify player session was reset.')
+            }
             playerSession = session
             return session
         })
@@ -255,6 +261,23 @@ export const ensureSpotifyWebPlayer = async (userId: string, callbacks: SpotifyP
         })
 
     return playerSessionPromise
+}
+
+export const resetSpotifyWebPlayer = (userId?: string) => {
+    playerSessionResetId += 1
+    activeCallbacks = {}
+    if (userId) {
+        tokenCache.delete(`${userId}:spotify`)
+    } else {
+        tokenCache.clear()
+    }
+    if (!playerSession || (userId && playerSession.userId !== userId)) {
+        playerSessionPromise = null
+        return
+    }
+    playerSession.player.disconnect()
+    playerSession = null
+    playerSessionPromise = null
 }
 
 const spotifyApiRequest = async (

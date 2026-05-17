@@ -40,12 +40,12 @@ interface ControlButtonProps {
 const qualityTone = (label: string | null) => {
     const normalized = label?.toLowerCase() ?? ''
     if (normalized.includes('lossless') || normalized.includes('flac') || normalized.includes('master')) {
-        return 'border-hud-accent-primary/40 bg-hud-accent-primary/10 text-hud-accent-primary'
+        return 'text-hud-accent-primary'
     }
     if (normalized.includes('spotify')) {
-        return 'border-hud-accent-success/40 bg-hud-accent-success/10 text-hud-accent-success'
+        return 'text-hud-accent-success'
     }
-    return 'border-hud-border-secondary bg-white/[0.03] text-hud-text-secondary'
+    return 'text-hud-text-secondary'
 }
 
 const formatQualityParts = (label: string | null, platformId?: string | null) => {
@@ -78,13 +78,12 @@ const ControlButton = ({ children, label, active = false, disabled = false, prim
         type="button"
         onClick={onClick}
         disabled={disabled}
-        className={`relative flex items-center justify-center rounded-full border transition-hud disabled:cursor-not-allowed disabled:opacity-50 ${
-            primary
-                ? 'h-12 w-12 border-hud-accent-primary/50 bg-hud-accent-primary text-hud-bg-primary shadow-hud-glow hover:bg-hud-accent-primary/90'
-                : active
-                    ? 'h-10 w-10 border-hud-accent-primary/50 bg-hud-accent-primary/10 text-hud-accent-primary'
-                    : 'h-10 w-10 border-hud-border-secondary bg-white/[0.02] text-hud-text-secondary hover:border-hud-border-primary hover:bg-white/[0.05] hover:text-hud-text-primary'
-        }`}
+        className={`relative flex items-center justify-center rounded-full border transition-hud disabled:cursor-not-allowed disabled:opacity-50 ${primary
+            ? 'h-12 w-12 border-hud-accent-primary/50 bg-hud-accent-primary text-hud-bg-primary shadow-hud-glow hover:bg-hud-accent-primary/90'
+            : active
+                ? 'h-10 w-10 border-hud-accent-primary/50 bg-hud-accent-primary/10 text-hud-accent-primary'
+                : 'h-10 w-10 border-hud-border-secondary bg-white/[0.02] text-hud-text-secondary hover:border-hud-border-primary hover:bg-white/[0.05] hover:text-hud-text-primary'
+            }`}
         aria-label={label}
         title={label}
     >
@@ -156,8 +155,8 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
     }
 
     return (
-        <div className={`fixed bottom-0 right-0 z-40 border-t border-hud-border-secondary bg-[rgba(11,18,32,0.96)] shadow-[0_-18px_55px_rgba(0,0,0,0.38)] backdrop-blur-xl transition-all duration-300 ${sidebarCollapsed ? 'lg:left-24' : 'lg:left-72'}`}>
-            <div className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 lg:grid-cols-[minmax(260px,390px)_minmax(360px,1fr)_minmax(330px,430px)] lg:px-8">
+        <div className={`fixed bottom-0 left-0 right-0 z-40 border-t border-hud-border-secondary bg-[rgba(11,18,32,0.96)] shadow-[0_-18px_55px_rgba(0,0,0,0.38)] backdrop-blur-xl transition-all duration-300 ${sidebarCollapsed ? 'lg:left-24' : 'lg:left-72'}`}>
+            <div className="mx-auto grid max-w-[1680px] gap-3 px-3 py-3 sm:px-4 lg:px-6 xl:grid-cols-[minmax(240px,360px)_minmax(320px,1fr)] min-[1800px]:grid-cols-[minmax(260px,380px)_minmax(420px,1fr)_minmax(520px,620px)] min-[1800px]:gap-4 min-[1800px]:px-8 min-[1800px]:py-4">
                 <div className="flex min-w-0 items-center gap-4">
                     <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-hud-border-secondary bg-hud-bg-primary shadow-hud">
                         <MusicArtwork
@@ -247,9 +246,9 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                     )}
                 </div>
 
-                <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_auto]">
-                    <div className={`flex min-w-0 items-center gap-3 rounded-lg border px-3 py-2 ${qualityClassName}`} title={audioQualityLabel ?? undefined}>
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-current/20 bg-black/10">
+                <div className="grid min-w-0 items-center gap-3 sm:grid-cols-[minmax(180px,260px)_auto] sm:justify-between xl:col-span-2 xl:grid-cols-[minmax(220px,320px)_auto] min-[1800px]:col-span-1 min-[1800px]:grid-cols-[minmax(150px,180px)_auto]">
+                    <div className={`flex min-w-0 items-center gap-2 px-1 py-1 ${qualityClassName}`} title={audioQualityLabel ?? undefined}>
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-current/20 bg-white/[0.03]">
                             <AudioLines size={18} />
                         </span>
                         <span className="min-w-0">
@@ -258,13 +257,13 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                         </span>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2">
-                        <div className="inline-flex h-11 items-center gap-2 rounded-lg border border-hud-border-secondary bg-white/[0.03] px-3 text-sm text-hud-text-secondary">
-                            <ListMusic size={16} className="text-hud-accent-primary" />
+                    <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 rounded-lg border border-hud-border-secondary bg-white/[0.03] px-2 py-0">
+                        <div className="inline-flex h-10 items-center gap-2 px-2 text-sm text-hud-text-secondary">
+                            <ListMusic size={24} className="text-hud-accent-primary" />
                             <span className="font-semibold text-hud-text-primary">{queue.length > 0 ? `${currentIndex + 1}/${queue.length}` : '0/0'}</span>
                         </div>
-                        <div className="hidden items-center gap-2 rounded-lg border border-hud-border-secondary bg-white/[0.03] px-3 py-2 xl:flex">
-                            <Volume2 size={17} className="text-hud-text-secondary" />
+                        <div className="hidden h-10 items-center gap-2 px-2 min-[1500px]:flex">
+                            <Volume2 size={25} className="text-hud-text-secondary" />
                             <input
                                 type="range"
                                 min={0}
@@ -272,7 +271,7 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                                 step={0.01}
                                 value={volume}
                                 onChange={(event) => void setVolume(Number(event.target.value))}
-                                className="w-20 accent-hud-accent-primary"
+                                className="w-14 accent-hud-accent-primary min-[1900px]:w-20"
                                 aria-label="Playback volume"
                             />
                         </div>
@@ -285,10 +284,10 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                                 aria-label={likeController.liked ? 'Unlike track' : 'Like track'}
                                 aria-pressed={likeController.liked}
                                 title={likeController.liked ? 'Unlike' : 'Like'}
-                                className={`h-11 w-11 px-0 ${likeController.liked ? 'text-rose-400 hover:text-rose-300' : ''}`}
+                                className={`h-12 w-12 px-0 ${likeController.liked ? 'text-rose-400 hover:text-rose-300' : ''}`}
                             >
                                 <Heart
-                                    size={18}
+                                    size={35}
                                     fill={likeController.liked ? 'currentColor' : 'none'}
                                     strokeWidth={likeController.liked ? 1.5 : 2}
                                 />
@@ -301,9 +300,9 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                                 onClick={() => navigate('/visualizer')}
                                 aria-label="Open visualizer"
                                 title="Open visualizer"
-                                className="h-11 w-11 px-0"
+                                className="h-12 w-12 px-0"
                             >
-                                <Maximize2 size={18} />
+                                <Maximize2 size={35} />
                             </Button>
                         )}
                         {currentItem.externalUrl && (
@@ -312,13 +311,13 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                                 variant="ghost"
                                 onClick={() => window.open(currentItem.externalUrl ?? undefined, '_blank', 'noopener,noreferrer')}
                                 aria-label="Open in platform"
-                                className="h-11 w-11 px-0"
+                                className="h-12 w-12 px-0"
                             >
-                                <ExternalLink size={18} />
+                                <ExternalLink size={35} />
                             </Button>
                         )}
-                        <Button type="button" variant="ghost" onClick={clearItem} aria-label="Close player" className="h-11 w-11 px-0">
-                            <X size={18} />
+                        <Button type="button" variant="ghost" onClick={clearItem} aria-label="Close player" className="h-12 w-12 px-0">
+                            <X size={35} />
                         </Button>
                     </div>
                 </div>

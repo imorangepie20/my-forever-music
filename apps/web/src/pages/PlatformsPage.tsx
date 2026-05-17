@@ -5,6 +5,8 @@ import Button from '@/components/common/Button'
 import HudCard from '@/components/common/HudCard'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { useRecommendationWorkspace } from '@/contexts/RecommendationWorkspaceContext'
+import { resetSpotifyWebPlayer } from '@/lib/spotifyPlaybackSdk'
+import { tidalReset } from '@/lib/tidalStreamPlayback'
 import {
     ApiError,
     connectLastFmProfile,
@@ -38,6 +40,30 @@ const stageLabel: Record<string, string> = {
 }
 
 const OAUTH_STORAGE_KEY = 'my-forever-music.platform-oauth-session'
+
+const clearPendingOAuthStorage = () => {
+    if (typeof window === 'undefined') {
+        return
+    }
+
+    const prefix = `${OAUTH_STORAGE_KEY}.`
+    for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
+        const key = window.sessionStorage.key(index)
+        if (key?.startsWith(prefix)) {
+            window.sessionStorage.removeItem(key)
+        }
+    }
+}
+
+const resetLocalPlaybackAuthorization = (userId: string, platformId: WorkspacePlatformId) => {
+    if (platformId === 'spotify') {
+        resetSpotifyWebPlayer(userId)
+        return
+    }
+    if (platformId === 'tidal') {
+        void tidalReset().catch(() => undefined)
+    }
+}
 
 const PlatformsPage = () => {
     const navigate = useNavigate()
@@ -155,6 +181,7 @@ const PlatformsPage = () => {
                     user_id: session.userId,
                     platform_id: platformId,
                 })
+                resetLocalPlaybackAuthorization(session.userId, platformId)
 
                 await reloadConnections()
             } else {
@@ -162,6 +189,8 @@ const PlatformsPage = () => {
                     const response = await startTidalDeviceAuthorization({
                         user_id: session.userId,
                     })
+                    clearPendingOAuthStorage()
+                    resetLocalPlaybackAuthorization(session.userId, platformId)
                     setTidalDeviceAuth(response)
                     setTidalDeviceMessage(null)
                     return
@@ -173,6 +202,8 @@ const PlatformsPage = () => {
                 })
 
                 if (typeof window !== 'undefined') {
+                    clearPendingOAuthStorage()
+                    resetLocalPlaybackAuthorization(session.userId, platformId)
                     window.sessionStorage.setItem(
                         `${OAUTH_STORAGE_KEY}.${response.authorization.state}`,
                         JSON.stringify(response),

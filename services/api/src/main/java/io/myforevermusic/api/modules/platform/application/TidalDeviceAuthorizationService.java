@@ -110,6 +110,9 @@ public class TidalDeviceAuthorizationService {
                 throw new IllegalArgumentException("TIDAL device authorization response was missing device code, user code, or verification URI.");
             }
 
+            platformCredentialStore.clear(account.userId(), TIDAL_PLATFORM_ID);
+            platformConnectionStore.disconnect(account.userId(), TIDAL_PLATFORM_ID);
+
             return new TidalDeviceAuthorizationStartResponse(
                 "api",
                 "authorization_pending",

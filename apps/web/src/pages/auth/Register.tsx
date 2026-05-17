@@ -20,7 +20,7 @@ import type { AuthRegistrationResponse, PlatformCatalogResponse, WorkspacePlatfo
 
 const Register = () => {
     const { setSessionFromAuthentication } = useAuthSession()
-    const { updateWorkspace } = useRecommendationWorkspace()
+    const { resetWorkspace, updateWorkspace } = useRecommendationWorkspace()
     const [showPassword, setShowPassword] = useState(false)
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
@@ -79,6 +79,7 @@ const Register = () => {
             })
 
             setSessionFromAuthentication(response)
+            resetWorkspace()
             updateWorkspace({
                 userId: response.user.user_id,
                 preferredPlatformId: response.onboarding.preferred_platform_id,

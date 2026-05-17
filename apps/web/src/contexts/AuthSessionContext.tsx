@@ -28,8 +28,22 @@ interface AuthSessionContextValue {
 }
 
 const STORAGE_KEY = 'my-forever-music.auth-session'
+const PLATFORM_OAUTH_STORAGE_PREFIX = 'my-forever-music.platform-oauth-session.'
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null)
+
+const clearPendingPlatformOAuthSessions = () => {
+    if (typeof window === 'undefined') {
+        return
+    }
+
+    for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
+        const key = window.sessionStorage.key(index)
+        if (key?.startsWith(PLATFORM_OAUTH_STORAGE_PREFIX)) {
+            window.sessionStorage.removeItem(key)
+        }
+    }
+}
 
 const getInitialSession = (): AuthSessionState | null => {
     if (typeof window === 'undefined') {
@@ -79,11 +93,17 @@ export const AuthSessionProvider = ({ children }: { children: ReactNode }) => {
     const value = useMemo<AuthSessionContextValue>(
         () => ({
             session,
-            setSessionFromAuthentication: (response) => setSession(toSessionState(response)),
+            setSessionFromAuthentication: (response) => {
+                clearPendingPlatformOAuthSessions()
+                setSession(toSessionState(response))
+            },
             updateSession: (patch) => {
                 setSession((current) => (current ? { ...current, ...patch } : current))
             },
-            clearSession: () => setSession(null),
+            clearSession: () => {
+                clearPendingPlatformOAuthSessions()
+                setSession(null)
+            },
         }),
         [session],
     )
