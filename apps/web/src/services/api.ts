@@ -76,6 +76,7 @@ import type {
     GmsRecommendationPreviewResponse,
     GmsRecommendationFeedbackRequest,
     GmsRecommendationFeedbackResponse,
+    HeroTrackResponse,
     UserMusicEventRequest,
     UserMusicEventResponse,
     PmsWorkspaceBootstrapResponse,
@@ -189,6 +190,29 @@ export const getAiDocsUrl = () =>
 
 export const fetchSystemInfo = (signal?: AbortSignal) =>
     requestJson<SystemInfoResponse>('/api/v1/system/info', { signal })
+
+export const fetchHeroTrack = async (
+    userId: string | null | undefined,
+    signal?: AbortSignal,
+): Promise<HeroTrackResponse | null> => {
+    const query = userId && userId.trim()
+        ? `?user_id=${encodeURIComponent(userId.trim())}`
+        : ''
+    const headers = new Headers({ Accept: 'application/json' })
+    const response = await fetch(buildApiUrl(`/api/v1/main-page/hero-track${query}`), {
+        signal,
+        headers,
+        cache: 'no-store',
+    })
+    if (response.status === 204) {
+        return null
+    }
+    if (!response.ok) {
+        const payload = await readErrorPayload(response)
+        throw new ApiError(payload.message, response.status, payload.code)
+    }
+    return (await response.json()) as HeroTrackResponse
+}
 
 export const fetchSchedulingAdminStatus = (userId: string, signal?: AbortSignal) =>
     requestJson<SchedulingAdminResponse>(

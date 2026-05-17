@@ -1902,6 +1902,20 @@ export interface GmsRecommendationFeedbackRequest {
     reason?: string | null
 }
 
+export interface HeroTrackResponse {
+    external_track_id: string
+    source_platform: string
+    spotify_track_id: string | null
+    title: string
+    artist_name: string
+    album_title: string | null
+    image_url: string | null
+    preview_url: string
+    platform_external_url: string | null
+    duration_ms: number | null
+    source_label: string | null
+}
+
 export interface GmsRecommendationFeedbackResponse {
     service: string
     status: string
