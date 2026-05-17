@@ -346,6 +346,38 @@ export interface SpotifyPlaybackTargetResolveResponse {
     match_score: number
 }
 
+export interface YouTubePlaybackTargetResolveRequest {
+    user_id: string
+    title: string
+    artist_name: string
+    source_platform?: string | null
+    external_track_id?: string | null
+    platform_uri?: string | null
+    spotify_track_id?: string | null
+    tidal_track_id?: string | null
+    isrc?: string | null
+    duration_ms?: number | null
+    excluded_video_ids?: string[] | null
+}
+
+export interface YouTubePlaybackTargetResolveResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string
+    source_platform: string | null
+    source_track_id: string | null
+    youtube_video_id: string
+    youtube_url: string
+    title: string
+    channel_title: string
+    thumbnail_url: string | null
+    duration_ms: number | null
+    match_reason: string
+    match_score: number
+    candidate_count: number
+}
+
 export interface LastFmProfileConnectRequest {
     user_id: string
     username: string
@@ -1729,6 +1761,46 @@ export interface EmsCollectionPlaylistSectionsResponse {
     title_model: string
     personalized: boolean
     sections: EmsCollectionPlaylistSection[]
+}
+
+export interface EmsFloSpecialSection {
+    source_type: string
+    title: string
+    playlists: EmsCollectionPlaylistItem[]
+}
+
+export interface EmsFloSpecialFailureItem {
+    section_title: string | null
+    external_playlist_id: string | null
+    message: string | null
+}
+
+export interface EmsFloSpecialRunItem {
+    trigger: string | null
+    status: string
+    started_at: string | null
+    completed_at: string | null
+    section_count: number
+    collected_playlist_count: number
+    collected_track_count: number
+    failures: EmsFloSpecialFailureItem[]
+    message: string
+}
+
+export interface EmsFloSpecialResponse {
+    service: string
+    status: string
+    generated_at: string
+    source_platform: string
+    collection_source: string
+    sections: EmsFloSpecialSection[]
+    last_run: EmsFloSpecialRunItem | null
+}
+
+export interface EmsFloSpecialRefreshResponse extends EmsFloSpecialRunItem {
+    service: string
+    status: string
+    generated_at: string
 }
 
 export interface EmsCollectionPlaylistDetailResponse {

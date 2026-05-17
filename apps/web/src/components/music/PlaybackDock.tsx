@@ -15,14 +15,15 @@ import {
     Volume2,
     X,
 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useCallback, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import MusicArtwork from '@/components/music/MusicArtwork'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
 import { usePlayback } from '@/contexts/PlaybackContext'
 import { useTrackLike } from '@/hooks/useTrackLike'
-import { formatDuration, resolvePlaybackPlatformId } from '@/lib/musicPlayback'
+import { formatDuration, resolvePlaybackPlatformId, resolveYouTubeVideoId } from '@/lib/musicPlayback'
+import { setYouTubePlayerHost } from '@/lib/youtubePlayback'
 
 interface PlaybackDockProps {
     sidebarCollapsed?: boolean
@@ -119,6 +120,12 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
     } = usePlayback()
     const navigate = useNavigate()
     const { session } = useAuthSession()
+    const youtubePlayerHostCallbackRef = useCallback((element: HTMLDivElement | null) => {
+        setYouTubePlayerHost(element)
+    }, [])
+    const playbackPlatformId = currentItem ? resolvePlaybackPlatformId(currentItem) : null
+    const youtubeVideoId = currentItem ? resolveYouTubeVideoId(currentItem) : null
+    const isYouTubeActive = playbackPlatformId === 'youtube' && Boolean(youtubeVideoId)
 
     const likeIdentity = {
         userId: session?.userId ?? null,
@@ -138,7 +145,6 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
         return null
     }
 
-    const playbackPlatformId = resolvePlaybackPlatformId(currentItem)
     const totalDuration = durationMs || currentItem.durationMs || 0
     const progressValue = totalDuration > 0 ? Math.min(positionMs, totalDuration) : 0
     const repeatLabel = repeatMode === 'one' ? 'Repeat one' : repeatMode === 'all' ? 'Repeat queue' : 'Repeat off'
@@ -247,15 +253,23 @@ const PlaybackDock = ({ sidebarCollapsed = false }: PlaybackDockProps) => {
                 </div>
 
                 <div className="grid min-w-0 items-center gap-3 sm:grid-cols-[minmax(180px,260px)_auto] sm:justify-between xl:col-span-2 xl:grid-cols-[minmax(220px,320px)_auto] min-[1800px]:col-span-1 min-[1800px]:grid-cols-[minmax(150px,180px)_auto]">
-                    <div className={`flex min-w-0 items-center gap-2 px-1 py-1 ${qualityClassName}`} title={audioQualityLabel ?? undefined}>
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-current/20 bg-white/[0.03]">
-                            <AudioLines size={18} />
-                        </span>
-                        <span className="min-w-0">
-                            <span className="block truncate text-sm font-semibold leading-5">{qualityParts.title}</span>
-                            <span className="block truncate text-xs leading-4 text-hud-text-muted">{qualityParts.detail}</span>
-                        </span>
+                    <div
+                        className={`h-[90px] min-w-[160px] overflow-hidden rounded-lg border border-hud-border-secondary bg-black shadow-hud ${isYouTubeActive ? '' : 'hidden'}`}
+                        title="YouTube player"
+                    >
+                        <div ref={youtubePlayerHostCallbackRef} className="h-full w-full" />
                     </div>
+                    {!isYouTubeActive && (
+                        <div className={`flex min-w-0 items-center gap-2 px-1 py-1 ${qualityClassName}`} title={audioQualityLabel ?? undefined}>
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-current/20 bg-white/[0.03]">
+                                <AudioLines size={18} />
+                            </span>
+                            <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold leading-5">{qualityParts.title}</span>
+                                <span className="block truncate text-xs leading-4 text-hud-text-muted">{qualityParts.detail}</span>
+                            </span>
+                        </div>
+                    )}
 
                     <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 rounded-lg border border-hud-border-secondary bg-white/[0.03] px-2 py-0">
                         <div className="inline-flex h-10 items-center gap-2 px-2 text-sm text-hud-text-secondary">

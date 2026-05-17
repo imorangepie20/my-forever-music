@@ -15,6 +15,7 @@ export interface PlaybackMediaItem {
     previewUrl?: string | null
     spotifyTrackId?: string | null
     tidalTrackId?: string | null
+    youtubeVideoId?: string | null
     isrc?: string | null
     durationMs?: number | null
     supportingText?: string | null
@@ -23,6 +24,7 @@ export interface PlaybackMediaItem {
 const SPOTIFY_EMBED_BASE = 'https://open.spotify.com/embed'
 const SPOTIFY_TRACK_ID_PATTERN = /^[A-Za-z0-9]{22}$/
 const TIDAL_TRACK_ID_PATTERN = /^[A-Za-z0-9-]{2,80}$/
+const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/
 
 const readSpotifyIdFromUri = (platformUri?: string | null) => {
     if (!platformUri || !platformUri.startsWith('spotify:')) {
@@ -131,6 +133,34 @@ export const resolveTidalTrackId = (item: PlaybackMediaItem) =>
     extractTidalTrackIdFromUrl(item.platformUri) ??
     extractTidalTrackIdFromUrl(item.externalUrl)
 
+export const normalizeYouTubeVideoId = (value?: string | null) => {
+    if (!value) {
+        return null
+    }
+
+    const trimmed = value.trim()
+    return YOUTUBE_VIDEO_ID_PATTERN.test(trimmed) ? trimmed : null
+}
+
+export const extractYouTubeVideoIdFromUrl = (value?: string | null) => {
+    if (!value) {
+        return null
+    }
+
+    const trimmed = value.trim()
+    const urlMatch = trimmed.match(/(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{11})/)
+    if (urlMatch) {
+        return urlMatch[1]
+    }
+
+    return normalizeYouTubeVideoId(trimmed)
+}
+
+export const resolveYouTubeVideoId = (item: PlaybackMediaItem) =>
+    normalizeYouTubeVideoId(item.youtubeVideoId) ??
+    extractYouTubeVideoIdFromUrl(item.platformUri) ??
+    extractYouTubeVideoIdFromUrl(item.externalUrl)
+
 export const resolveSpotifyContextUri = (item: PlaybackMediaItem) => {
     const fromUri = readSpotifyIdFromUri(item.platformUri)
     if (fromUri && ['playlist', 'album'].includes(fromUri.resourceType)) {
@@ -147,11 +177,17 @@ export const resolveSpotifyContextUri = (item: PlaybackMediaItem) => {
 
 export const resolvePlaybackPlatformId = (item: PlaybackMediaItem, fallbackPlatformId?: string | null) => {
     if (item.playbackPlatformId) {
-        return item.playbackPlatformId
+        return item.playbackPlatformId === 'youtube-music' ? 'youtube' : item.playbackPlatformId
     }
 
-    if (item.kind === 'track' && (fallbackPlatformId === 'tidal' || fallbackPlatformId === 'spotify')) {
-        return fallbackPlatformId
+    const normalizedFallbackPlatformId = fallbackPlatformId === 'youtube-music' ? 'youtube' : fallbackPlatformId
+    const normalizedSourcePlatformId = item.sourcePlatform === 'youtube-music' ? 'youtube' : item.sourcePlatform
+    const playableSourcePlatformId = ['tidal', 'spotify', 'youtube'].includes(normalizedSourcePlatformId)
+        ? normalizedSourcePlatformId
+        : null
+
+    if (item.kind === 'track' && ['tidal', 'spotify', 'youtube'].includes(normalizedFallbackPlatformId ?? '')) {
+        return normalizedFallbackPlatformId
     }
 
     if (item.sourcePlatform === 'tidal' && resolveTidalTrackId(item)) {
@@ -162,11 +198,17 @@ export const resolvePlaybackPlatformId = (item: PlaybackMediaItem, fallbackPlatf
         return 'spotify'
     }
 
+    if ((item.sourcePlatform === 'youtube' || item.sourcePlatform === 'youtube-music') && resolveYouTubeVideoId(item)) {
+        return 'youtube'
+    }
+
     return (
         (resolveSpotifyTrackId(item) ? 'spotify' : null) ??
         (resolveTidalTrackId(item) ? 'tidal' : null) ??
-        item.sourcePlatform ??
-        fallbackPlatformId ??
+        (resolveYouTubeVideoId(item) ? 'youtube' : null) ??
+        playableSourcePlatformId ??
+        normalizedFallbackPlatformId ??
+        (item.kind === 'track' ? 'youtube' : normalizedSourcePlatformId) ??
         null
     )
 }

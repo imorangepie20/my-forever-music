@@ -16,6 +16,8 @@ import type {
     TidalPlaybackTargetResolveResponse,
     SpotifyPlaybackTargetResolveRequest,
     SpotifyPlaybackTargetResolveResponse,
+    YouTubePlaybackTargetResolveRequest,
+    YouTubePlaybackTargetResolveResponse,
     TidalDeviceAuthorizationPollRequest,
     TidalDeviceAuthorizationPollResponse,
     TidalDeviceAuthorizationStartRequest,
@@ -36,6 +38,8 @@ import type {
     EmsCollectionTrackBrowseResponse,
     EmsCollectionSearchPlaylistTracksResponse,
     EmsCollectedPlaylistsCleanupResponse,
+    EmsFloSpecialRefreshResponse,
+    EmsFloSpecialResponse,
     EmsAcquisitionRunRequest,
     EmsAcquisitionRunResponse,
     EmsAcquisitionRunsResponse,
@@ -451,6 +455,16 @@ export const resolveSpotifyPlaybackTarget = (payload: SpotifyPlaybackTargetResol
         signal,
     })
 
+export const resolveYouTubePlaybackTarget = (payload: YouTubePlaybackTargetResolveRequest, signal?: AbortSignal) =>
+    requestJson<YouTubePlaybackTargetResolveResponse>('/api/v1/platforms/playback/youtube/resolve-track', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal,
+    })
+
 export const connectPlatformAccount = (payload: PlatformConnectRequest) =>
     requestJson<PlatformConnectionCommandResponse>('/api/v1/platforms/connections/connect', {
         method: 'POST',
@@ -662,6 +676,18 @@ export const deleteEmsPoolAdminRun = (runId: number, userId: string) =>
 export const cleanupEmsEmptyCollectedPlaylists = (userId: string) =>
     requestJson<EmsCollectedPlaylistsCleanupResponse>(
         `/api/v1/ems/collection/admin/playlists/cleanup-empty?user_id=${encodeURIComponent(userId)}`,
+        { method: 'POST' },
+    )
+
+export const fetchEmsFloSpecial = (signal?: AbortSignal, limit: number = 120) =>
+    requestJson<EmsFloSpecialResponse>(
+        `/api/v1/ems/collection/flo-special?limit=${encodeURIComponent(String(limit))}`,
+        { signal, cache: 'no-store' },
+    )
+
+export const refreshEmsFloSpecial = () =>
+    requestJson<EmsFloSpecialRefreshResponse>(
+        '/api/v1/ems/collection/flo-special/refresh',
         { method: 'POST' },
     )
 

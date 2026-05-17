@@ -54,6 +54,8 @@ info:
     description: Spring Boot API scaffold for My Forever Music
 
 app:
+  youtube:
+    data-api-key: ${YOUTUBE_DATA_API_KEY:}
   ems:
     discovery:
       enabled: ${EMS_DISCOVERY_ENABLED:true}
