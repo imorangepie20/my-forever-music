@@ -3,6 +3,7 @@ package io.myforevermusic.api.modules.melon.application;
 import io.myforevermusic.api.modules.melon.infrastructure.persistence.MelonChartTrackEntity;
 import io.myforevermusic.api.modules.melon.infrastructure.persistence.MelonChartTrackRepository;
 import io.myforevermusic.api.modules.melon.presentation.MelonResolveResponse;
+import io.myforevermusic.api.modules.platform.application.PlatformCredentialService;
 import io.myforevermusic.api.modules.platform.application.TidalPlaybackTargetResolverService;
 import io.myforevermusic.api.modules.platform.application.TidalPlaybackTargetResolverService.TidalPlaybackTarget;
 import io.myforevermusic.api.modules.platform.application.TidalPlaybackTargetResolverService.TrackQuery;
@@ -29,15 +30,18 @@ public class MelonChartResolverService {
     private final MelonChartTrackRepository repository;
     private final SpotifyPublicCatalogClient spotifyPublicCatalogClient;
     private final TidalPlaybackTargetResolverService tidalResolver;
+    private final PlatformCredentialService platformCredentialService;
 
     public MelonChartResolverService(
         MelonChartTrackRepository repository,
         SpotifyPublicCatalogClient spotifyPublicCatalogClient,
-        TidalPlaybackTargetResolverService tidalResolver
+        TidalPlaybackTargetResolverService tidalResolver,
+        PlatformCredentialService platformCredentialService
     ) {
         this.repository = repository;
         this.spotifyPublicCatalogClient = spotifyPublicCatalogClient;
         this.tidalResolver = tidalResolver;
+        this.platformCredentialService = platformCredentialService;
     }
 
     public Optional<MelonResolveResponse> resolveByRank(int rank, String userId) {
@@ -48,13 +52,43 @@ public class MelonChartResolverService {
     }
 
     private MelonResolveResponse resolve(MelonChartTrackEntity entity, String userId) {
-        if (userId != null && !userId.isBlank()) {
+        boolean hasUser = userId != null && !userId.isBlank();
+        boolean hasTidal = hasUser && platformCredentialService.findUsableCredential(userId, "tidal").isPresent();
+        boolean hasSpotify = hasUser && platformCredentialService.findUsableCredential(userId, "spotify").isPresent();
+
+        if (hasTidal) {
             Optional<MelonResolveResponse> tidalMatch = tryTidal(entity, userId);
             if (tidalMatch.isPresent()) {
                 return tidalMatch.get();
             }
+            // TIDAL connected but no match — only fall back to Spotify if user has Spotify too.
+            if (!hasSpotify) {
+                return unresolved(entity);
+            }
+        } else if (hasUser && !hasSpotify) {
+            // Signed-in user without any streaming credentials — playback would fail anyway.
+            return unresolved(entity);
         }
         return resolveViaSpotify(entity);
+    }
+
+    private MelonResolveResponse unresolved(MelonChartTrackEntity entity) {
+        return new MelonResolveResponse(
+            entity.getRank(),
+            entity.getMelonSongId(),
+            entity.getTitle(),
+            entity.getArtistName(),
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            entity.getImageUrl(),
+            null,
+            false
+        );
     }
 
     private Optional<MelonResolveResponse> tryTidal(MelonChartTrackEntity entity, String userId) {
