@@ -34,33 +34,41 @@ public class MagazineArticleService {
         int scanLimit = Math.min(MAX_SCAN, Math.max(safeLimit * SCAN_MULTIPLIER, safeLimit));
         List<EmsAcquisitionSignalEntity> rows = signalRepository.findRecentArticles(PageRequest.of(0, scanLimit));
 
-        List<MagazineArticleResponse> articles = new ArrayList<>();
         LinkedHashSet<String> seenUrls = new LinkedHashSet<>();
+        List<EmsAcquisitionSignalEntity> uniqueRows = new ArrayList<>();
         for (EmsAcquisitionSignalEntity row : rows) {
             String url = row.getArticleUrl();
             if (url == null || url.isBlank() || !seenUrls.add(url)) {
                 continue;
             }
-            String title = row.getArticleTitle();
-            String rationale = row.getRationale();
-            String description = enricher.fetchDescription(url);
-            articles.add(new MagazineArticleResponse(
-                row.getSourceName(),
-                row.getSourceUrl(),
-                url,
-                title,
-                enricher.translateToKorean(title),
-                description,
-                enricher.translateToKorean(description),
-                rationale,
-                enricher.translateToKorean(rationale),
-                enricher.fetchImageUrl(url),
-                row.getCreatedAt()
-            ));
-            if (articles.size() >= safeLimit) {
+            uniqueRows.add(row);
+            if (uniqueRows.size() >= safeLimit) {
                 break;
             }
         }
-        return articles;
+
+        return uniqueRows.parallelStream()
+            .map(this::toResponse)
+            .toList();
+    }
+
+    private MagazineArticleResponse toResponse(EmsAcquisitionSignalEntity row) {
+        String url = row.getArticleUrl();
+        String title = row.getArticleTitle();
+        String rationale = row.getRationale();
+        String description = enricher.fetchDescription(url);
+        return new MagazineArticleResponse(
+            row.getSourceName(),
+            row.getSourceUrl(),
+            url,
+            title,
+            enricher.translateToKorean(title),
+            description,
+            enricher.translateToKorean(description),
+            rationale,
+            enricher.translateToKorean(rationale),
+            enricher.fetchImageUrl(url),
+            row.getCreatedAt()
+        );
     }
 }

@@ -18,7 +18,7 @@ public class HeroTrackController {
     private static final int DEFAULT_HERO_LIST_LIMIT = 5;
     private static final int DEFAULT_LATEST_LIMIT = 10;
     private static final int DEFAULT_POPULAR_PLAYLIST_LIMIT = 6;
-    private static final int DEFAULT_MAGAZINE_LIMIT = 2;
+    private static final int DEFAULT_MAGAZINE_LIMIT = 8;
 
     private final HeroTrackService heroTrackService;
     private final PopularPlaylistService popularPlaylistService;

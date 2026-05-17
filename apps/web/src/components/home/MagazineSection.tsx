@@ -2,7 +2,7 @@ import { ExternalLink, Newspaper } from 'lucide-react'
 import { useMagazineArticles } from '@/hooks/useMagazineArticles'
 import type { MagazineArticleResponse } from '@/types/api'
 
-const MAGAZINE_LIMIT = 2
+const MAGAZINE_LIMIT = 8
 
 const formatCapturedAt = (value: string | null) => {
     if (!value) {
@@ -29,7 +29,7 @@ const MagazineSection = () => {
                     <h2 className="text-lg font-semibold text-hud-text-primary">매거진 픽</h2>
                     <span className="text-xs text-hud-text-muted">Loading…</span>
                 </header>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                     {Array.from({ length: MAGAZINE_LIMIT }).map((_, index) => (
                         <div
                             key={index}
@@ -51,7 +51,7 @@ const MagazineSection = () => {
                 <h2 className="text-lg font-semibold text-hud-text-primary">매거진 픽</h2>
                 <span className="text-xs text-hud-text-muted">최신 {state.articles.length}건</span>
             </header>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {state.articles.map((article) => (
                     <MagazineCard key={article.article_url} article={article} />
                 ))}

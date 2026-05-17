@@ -8,7 +8,7 @@ export type MagazineArticlesState =
     | { status: 'empty'; articles: []; error: null }
     | { status: 'error'; articles: []; error: string }
 
-export function useMagazineArticles(limit = 2): MagazineArticlesState {
+export function useMagazineArticles(limit = 8): MagazineArticlesState {
     const [state, setState] = useState<MagazineArticlesState>({ status: 'loading', articles: [], error: null })
 
     useEffect(() => {
