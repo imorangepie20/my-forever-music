@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Activity, ArrowRight, Globe, Server, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Button from '@/components/common/Button'
+import GmsRecommendedPlaylistsSection from '@/components/home/GmsRecommendedPlaylistsSection'
 import HeroEqBanner from '@/components/home/HeroEqBanner'
 import LatestTracksSection from '@/components/home/LatestTracksSection'
 import PopularPlaylistsSection from '@/components/home/PopularPlaylistsSection'
@@ -76,6 +77,8 @@ const HomePage = () => {
             <LatestTracksSection />
 
             <PopularPlaylistsSection />
+
+            <GmsRecommendedPlaylistsSection />
 
             <section className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
                 <HudCard className="overflow-hidden">

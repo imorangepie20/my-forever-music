@@ -220,6 +220,7 @@ docs/
 - `apps/web` 메인 페이지 `LatestTracksSection` 은 `services/api` 의 `GET /api/v1/main-page/latest-tracks?limit=10` 응답으로 acquisition_pool 최신 트랙들을 카드 grid 로 표시한다. preview 유무 무관 — 카드 클릭 시 로그인 사용자는 `PlaybackContext.playItem` 으로 dock 전체 재생, 비로그인은 `/signin` 으로 redirect
 - `services/api` 는 `user_track_like` 테이블과 `POST /api/v1/user/likes`, `GET /api/v1/user/likes/state`, `GET /api/v1/user/likes` 엔드포인트를 제공. `apps/web` 의 `PlaybackDock` 가 로그인 사용자에 한해 하트 토글 버튼을 노출하고 `useTrackLike` 훅으로 상태를 동기화한다. 비로그인 사용자에겐 버튼이 숨겨짐
 - `services/api` 의 `PopularPlaylistService` 는 `EmsCollectedPlaylistRepository.findPopularByTrackCount` 로 트랙 수 내림차순으로 상위 N개를 반환한다. `GET /api/v1/main-page/popular-playlists?limit=6` 가 envelope `{ playlists }` 응답을 내며, `apps/web` 의 `PopularPlaylistsSection` 이 메인 페이지 §3 카드 grid 로 표시하고 카드 클릭 시 `/playlists/ems/{playlistId}` 상세 페이지로 이동시킨다
+- `apps/web` 메인 페이지 `GmsRecommendedPlaylistsSection` (§5) 는 기존 `GET /api/v1/gms/playlists/preview?limit=5` 를 재사용해 GMS top 추천 플레이리스트 5개를 카드 grid 로 표시한다. 비로그인 사용자에겐 `/signin` 안내 카드, 로그인 cold-start (409) 에겐 `/platforms` 안내 카드를 노출하고, 카드 클릭 시 `/playlists/ems/{playlistId}` 로 이동
 - `GET /api/v1/pms/workspace/bootstrap`는 optional `playlist_id` 기준으로 현재 음악 컨텍스트를 다시 투영함
 - `POST /api/v1/gms/recommendations/preview`는 가능하면 synthetic item 대신 `PMS user library`의 실제 playable track으로 재매핑함
 - `POST /api/v1/gms/recommendations/feedback`는 GMS 추천 후보에 대한 like/dislike/save/skip 평가를 저장함

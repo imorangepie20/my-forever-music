@@ -93,6 +93,7 @@ my-forever-music/
 - `apps/web` 메인 페이지 `LatestTracksSection` 가 `/api/v1/main-page/latest-tracks?limit=10` 의 acquisition_pool 최신 카드 grid 표시 (preview 유무 무관). 카드 클릭 시 로그인 사용자는 dock 전체 재생, 비로그인은 `/signin` 으로 이동
 - `apps/web` 의 `PlaybackDock` 가 현재 트랙에 대한 좋아요(하트) 버튼을 제공. 로그인 사용자에만 노출되며 토글 시 `POST /api/v1/user/likes` 를 호출해 `user_track_like` 테이블에 (user_id, source_platform, external_track_id) 단위로 저장/삭제하고 dock 의 하트 아이콘은 즉시 optimistic update 됨. 페이지 진입/트랙 변경 시 `GET /api/v1/user/likes/state` 로 현재 상태 재조회
 - `apps/web` 메인 페이지 `PopularPlaylistsSection` 가 `/api/v1/main-page/popular-playlists?limit=6` 의 응답을 6 카드 grid 로 표시. 정렬 기준은 `ems_collected_playlist.track_count` 내림차순 (proxy of popularity). 카드 클릭 시 기존 `/playlists/ems/{playlistId}` 상세 페이지로 이동
+- `apps/web` 메인 페이지 `GmsRecommendedPlaylistsSection` 가 로그인 사용자에 한해 `/api/v1/gms/playlists/preview?limit=5` 응답을 top-5 카드로 표시. cold-start (409) 면 "Build your taste library first" CTA, 비로그인이면 "Sign in for personalized picks" CTA
 - `apps/desktop`는 향후 Windows 앱 개발을 위한 예약 구조 생성 완료
 - `services/api`는 `GET /api/v1/platforms/catalog` 엔드포인트로 플랫폼 역할과 온보딩 흐름 제공
 - 플랫폼 카탈로그에는 `TIDAL`, `YouTube Music`, `Apple Music`, `Last.fm`까지 포함되며, 확장 순서는 `Spotify -> TIDAL -> YouTube Music`, Apple Music은 개발자 계정 준비 전까지 보류로 고정됨
