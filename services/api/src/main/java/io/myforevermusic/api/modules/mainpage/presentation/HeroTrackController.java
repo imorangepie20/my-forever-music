@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class HeroTrackController {
 
     private static final int DEFAULT_HERO_LIST_LIMIT = 5;
+    private static final int DEFAULT_LATEST_LIMIT = 10;
 
     private final HeroTrackService heroTrackService;
 
@@ -38,6 +39,18 @@ public class HeroTrackController {
     ) {
         int effectiveLimit = limit == null || limit <= 0 ? DEFAULT_HERO_LIST_LIMIT : limit;
         List<HeroTrackResponse> tracks = heroTrackService.resolveList(userId, effectiveLimit);
+        if (tracks.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(new HeroTrackListResponse(tracks));
+    }
+
+    @GetMapping("/latest-tracks")
+    public ResponseEntity<HeroTrackListResponse> getLatestTracks(
+        @RequestParam(value = "limit", required = false) Integer limit
+    ) {
+        int effectiveLimit = limit == null || limit <= 0 ? DEFAULT_LATEST_LIMIT : limit;
+        List<HeroTrackResponse> tracks = heroTrackService.findLatest(effectiveLimit);
         if (tracks.isEmpty()) {
             return ResponseEntity.noContent().build();
         }

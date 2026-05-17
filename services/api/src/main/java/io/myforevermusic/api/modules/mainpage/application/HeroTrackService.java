@@ -50,6 +50,15 @@ public class HeroTrackService {
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
+    public List<HeroTrackResponse> findLatest(int limit) {
+        int effectiveLimit = Math.min(MAX_LIST_LIMIT, Math.max(1, limit));
+        List<EmsCollectedTrackEntity> tracks = emsCollectedTrackRepository
+            .findRecentByCollectionSource(EMS_ACQUISITION_POOL, PageRequest.of(0, effectiveLimit));
+        return tracks.stream()
+            .map(track -> toResponse(track, DEFAULT_SOURCE_LABEL))
+            .toList();
+    }
+
     public List<HeroTrackResponse> resolveList(String userId, int limit) {
         int effectiveLimit = Math.min(MAX_LIST_LIMIT, Math.max(1, limit));
         List<HeroTrackResponse> picked = new ArrayList<>();

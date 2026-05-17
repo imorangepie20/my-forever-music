@@ -1910,7 +1910,7 @@ export interface HeroTrackResponse {
     artist_name: string
     album_title: string | null
     image_url: string | null
-    preview_url: string
+    preview_url: string | null
     platform_external_url: string | null
     duration_ms: number | null
     source_label: string | null

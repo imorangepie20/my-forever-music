@@ -215,6 +215,29 @@ export const fetchHeroTrack = async (
     return (await response.json()) as HeroTrackResponse
 }
 
+export const fetchLatestTracks = async (
+    limit: number,
+    signal?: AbortSignal,
+): Promise<HeroTrackResponse[]> => {
+    const params = new URLSearchParams()
+    params.set('limit', String(Math.max(1, limit)))
+    const headers = new Headers({ Accept: 'application/json' })
+    const response = await fetch(buildApiUrl(`/api/v1/main-page/latest-tracks?${params.toString()}`), {
+        signal,
+        headers,
+        cache: 'no-store',
+    })
+    if (response.status === 204) {
+        return []
+    }
+    if (!response.ok) {
+        const payload = await readErrorPayload(response)
+        throw new ApiError(payload.message, response.status, payload.code)
+    }
+    const payload = (await response.json()) as HeroTrackListResponse
+    return payload.tracks ?? []
+}
+
 export const fetchHeroTracks = async (
     userId: string | null | undefined,
     limit: number,

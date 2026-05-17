@@ -66,6 +66,17 @@ public interface EmsCollectedTrackRepository extends JpaRepository<EmsCollectedT
         """)
     List<EmsCollectedTrackEntity> findRecentWithPreview(Pageable pageable);
 
+    @Query("""
+        select track
+        from EmsCollectedTrackEntity track
+        where track.collectionSource = :collectionSource
+        order by track.collectedAt desc
+        """)
+    List<EmsCollectedTrackEntity> findRecentByCollectionSource(
+        @Param("collectionSource") String collectionSource,
+        Pageable pageable
+    );
+
     @Modifying
     @Query("update EmsCollectedTrackEntity track set track.isrc = :isrc where track.id = :id and (track.isrc is null or track.isrc = '')")
     int updateIsrcIfNull(@Param("id") Long id, @Param("isrc") String isrc);

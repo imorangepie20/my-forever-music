@@ -150,6 +150,24 @@ class HeroTrackServiceTest {
     }
 
     @Test
+    void findLatestReturnsAcquisitionPoolTracksRegardlessOfPreview() {
+        when(trackRepository.findRecentByCollectionSource(eq("acquisition_pool"), any(Pageable.class)))
+            .thenReturn(List.of(
+                trackOf("latest-1", "spotify", "https://preview/1"),
+                trackOf("latest-2", "spotify", null),
+                trackOf("latest-3", "tidal", null)
+            ));
+
+        List<HeroTrackResponse> list = service.findLatest(10);
+
+        assertThat(list).hasSize(3);
+        assertThat(list).extracting(HeroTrackResponse::externalTrackId)
+            .containsExactly("latest-1", "latest-2", "latest-3");
+        assertThat(list).extracting(HeroTrackResponse::sourceLabel)
+            .containsOnly("Editorial Pick");
+    }
+
+    @Test
     void resolveListReturnsEmptyListWhenNoCandidates() {
         when(snapshotStore.findRecentByUserId(anyString(), anyInt())).thenReturn(List.of());
         when(trackRepository.findRecentByCollectionSourceWithPreview(eq("acquisition_pool"), any(Pageable.class)))
