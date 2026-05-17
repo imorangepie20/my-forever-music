@@ -2008,6 +2008,22 @@ export interface PopularPlaylistListResponse {
     playlists: PopularPlaylistResponse[]
 }
 
+export interface MagazineArticleResponse {
+    source_name: string
+    source_url: string | null
+    article_url: string
+    article_title: string
+    article_title_ko: string | null
+    rationale: string | null
+    rationale_ko: string | null
+    image_url: string | null
+    captured_at: string | null
+}
+
+export interface MagazineArticleListResponse {
+    articles: MagazineArticleResponse[]
+}
+
 export interface MelonChartTrack {
     rank: number
     melon_song_id: string | null

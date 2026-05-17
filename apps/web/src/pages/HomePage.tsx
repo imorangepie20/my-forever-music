@@ -6,6 +6,7 @@ import AlgorithmIntroSection from '@/components/home/AlgorithmIntroSection'
 import GmsRecommendedPlaylistsSection from '@/components/home/GmsRecommendedPlaylistsSection'
 import HeroEqBanner from '@/components/home/HeroEqBanner'
 import LatestTracksSection from '@/components/home/LatestTracksSection'
+import MagazineSection from '@/components/home/MagazineSection'
 import MelonHot100Section from '@/components/home/MelonHot100Section'
 import PopularPlaylistsSection from '@/components/home/PopularPlaylistsSection'
 import HudCard from '@/components/common/HudCard'
@@ -85,6 +86,8 @@ const HomePage = () => {
             <GmsRecommendedPlaylistsSection />
 
             <MelonHot100Section />
+
+            <MagazineSection />
 
             <section className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
                 <HudCard className="overflow-hidden">

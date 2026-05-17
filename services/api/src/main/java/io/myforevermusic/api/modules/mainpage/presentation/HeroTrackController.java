@@ -1,6 +1,7 @@
 package io.myforevermusic.api.modules.mainpage.presentation;
 
 import io.myforevermusic.api.modules.mainpage.application.HeroTrackService;
+import io.myforevermusic.api.modules.mainpage.application.MagazineArticleService;
 import io.myforevermusic.api.modules.mainpage.application.PopularPlaylistService;
 import java.util.List;
 import java.util.Optional;
@@ -17,16 +18,20 @@ public class HeroTrackController {
     private static final int DEFAULT_HERO_LIST_LIMIT = 5;
     private static final int DEFAULT_LATEST_LIMIT = 10;
     private static final int DEFAULT_POPULAR_PLAYLIST_LIMIT = 6;
+    private static final int DEFAULT_MAGAZINE_LIMIT = 2;
 
     private final HeroTrackService heroTrackService;
     private final PopularPlaylistService popularPlaylistService;
+    private final MagazineArticleService magazineArticleService;
 
     public HeroTrackController(
         HeroTrackService heroTrackService,
-        PopularPlaylistService popularPlaylistService
+        PopularPlaylistService popularPlaylistService,
+        MagazineArticleService magazineArticleService
     ) {
         this.heroTrackService = heroTrackService;
         this.popularPlaylistService = popularPlaylistService;
+        this.magazineArticleService = magazineArticleService;
     }
 
     @GetMapping("/hero-track")
@@ -74,5 +79,17 @@ public class HeroTrackController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.ok(new PopularPlaylistResponse.ListEnvelope(playlists));
+    }
+
+    @GetMapping("/magazine-articles")
+    public ResponseEntity<MagazineArticleResponse.ListEnvelope> getMagazineArticles(
+        @RequestParam(value = "limit", required = false) Integer limit
+    ) {
+        int effectiveLimit = limit == null || limit <= 0 ? DEFAULT_MAGAZINE_LIMIT : limit;
+        List<MagazineArticleResponse> articles = magazineArticleService.findRecent(effectiveLimit);
+        if (articles.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(new MagazineArticleResponse.ListEnvelope(articles));
     }
 }

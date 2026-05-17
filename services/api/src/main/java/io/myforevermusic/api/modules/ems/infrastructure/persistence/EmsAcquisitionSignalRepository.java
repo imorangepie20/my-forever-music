@@ -2,6 +2,7 @@ package io.myforevermusic.api.modules.ems.infrastructure.persistence;
 
 import java.time.Instant;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +12,16 @@ public interface EmsAcquisitionSignalRepository extends JpaRepository<EmsAcquisi
     List<EmsAcquisitionSignalEntity> findTop50ByRunIdOrderByIdAsc(@Param("runId") Long runId);
 
     boolean existsByArticleUrl(String articleUrl);
+
+    @Query("""
+        select signal from EmsAcquisitionSignalEntity signal
+        where signal.articleUrl is not null
+          and signal.articleTitle is not null
+          and signal.articleUrl <> ''
+          and signal.articleTitle <> ''
+        order by signal.createdAt desc, signal.id desc
+        """)
+    List<EmsAcquisitionSignalEntity> findRecentArticles(Pageable pageable);
 
     @Query("""
         select signal.sourceName as sourceName,

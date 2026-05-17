@@ -82,6 +82,8 @@ import type {
     GmsRecommendationFeedbackResponse,
     HeroTrackListResponse,
     HeroTrackResponse,
+    MagazineArticleListResponse,
+    MagazineArticleResponse,
     MelonChartListResponse,
     MelonChartTrack,
     MelonResolveResponse,
@@ -317,6 +319,29 @@ export const fetchLatestTracks = async (
     }
     const payload = (await response.json()) as HeroTrackListResponse
     return payload.tracks ?? []
+}
+
+export const fetchMagazineArticles = async (
+    limit: number,
+    signal?: AbortSignal,
+): Promise<MagazineArticleResponse[]> => {
+    const params = new URLSearchParams()
+    params.set('limit', String(Math.max(1, limit)))
+    const headers = new Headers({ Accept: 'application/json' })
+    const response = await fetch(buildApiUrl(`/api/v1/main-page/magazine-articles?${params.toString()}`), {
+        signal,
+        headers,
+        cache: 'no-store',
+    })
+    if (response.status === 204) {
+        return []
+    }
+    if (!response.ok) {
+        const payload = await readErrorPayload(response)
+        throw new ApiError(payload.message, response.status, payload.code)
+    }
+    const payload = (await response.json()) as MagazineArticleListResponse
+    return payload.articles ?? []
 }
 
 export const fetchUserTrackLikeState = (
