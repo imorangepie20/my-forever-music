@@ -11,6 +11,8 @@ import static org.mockito.Mockito.when;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackEntity;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackRepository;
 import io.myforevermusic.api.modules.mainpage.presentation.HeroTrackResponse;
+import io.myforevermusic.api.modules.platform.infrastructure.spotify.SpotifyPublicCatalogClient;
+import io.myforevermusic.api.modules.platform.infrastructure.spotify.SpotifyPublicCatalogClient.PublicTrack;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationSnapshotStore;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationSnapshotStore.StoredSnapshot;
 import java.time.Instant;
@@ -23,7 +25,12 @@ class HeroTrackServiceTest {
 
     private final RecommendationSnapshotStore snapshotStore = mock(RecommendationSnapshotStore.class);
     private final EmsCollectedTrackRepository trackRepository = mock(EmsCollectedTrackRepository.class);
-    private final HeroTrackService service = new HeroTrackService(snapshotStore, trackRepository);
+    private final SpotifyPublicCatalogClient spotifyPublicCatalogClient = mock(SpotifyPublicCatalogClient.class);
+    private final HeroTrackService service = new HeroTrackService(
+        snapshotStore,
+        trackRepository,
+        spotifyPublicCatalogClient
+    );
 
     @Test
     void returnsTopGmsRecommendationWhenUserHasSnapshot() {
@@ -90,6 +97,7 @@ class HeroTrackServiceTest {
         when(snapshotStore.findRecentByUserId(eq("user-1"), anyInt())).thenReturn(List.of(top));
         when(trackRepository.findBySourcePlatformAndExternalTrackId("spotify", "no-preview-track"))
             .thenReturn(Optional.of(trackOf("no-preview-track", "spotify", null)));
+        when(spotifyPublicCatalogClient.getTrack("no-preview-track")).thenReturn(Optional.empty());
         when(trackRepository.findRecentByCollectionSourceWithPreview(eq("acquisition_pool"), any(Pageable.class)))
             .thenReturn(List.of(trackOf("editorial-track", "spotify", "https://preview/editorial")));
 
@@ -98,6 +106,31 @@ class HeroTrackServiceTest {
         assertThat(response).isPresent();
         assertThat(response.get().externalTrackId()).isEqualTo("editorial-track");
         assertThat(response.get().sourceLabel()).isEqualTo("Editorial Pick");
+    }
+
+    @Test
+    void enrichesGmsCandidateWithSpotifyPreviewWhenDbMissingIt() {
+        StoredSnapshot top = snapshotOf("rec-1", 1, "needs-enrich-id", "spotify");
+        when(snapshotStore.findRecentByUserId(eq("user-1"), anyInt())).thenReturn(List.of(top));
+        when(trackRepository.findBySourcePlatformAndExternalTrackId("spotify", "needs-enrich-id"))
+            .thenReturn(Optional.of(trackOf("needs-enrich-id", "spotify", null)));
+        when(spotifyPublicCatalogClient.getTrack("needs-enrich-id")).thenReturn(Optional.of(new PublicTrack(
+            "needs-enrich-id",
+            "Enriched Title",
+            "Enriched Artist",
+            "Enriched Album",
+            "https://image/enriched",
+            "https://preview/enriched",
+            "https://open.spotify.com/track/needs-enrich-id",
+            210_000
+        )));
+
+        Optional<HeroTrackResponse> response = service.resolve("user-1");
+
+        assertThat(response).isPresent();
+        assertThat(response.get().externalTrackId()).isEqualTo("needs-enrich-id");
+        assertThat(response.get().previewUrl()).isEqualTo("https://preview/enriched");
+        assertThat(response.get().sourceLabel()).isEqualTo("Recommended for you");
     }
 
     @Test

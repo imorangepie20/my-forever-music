@@ -3,6 +3,7 @@ package io.myforevermusic.api.modules.mainpage.application;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackEntity;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedTrackRepository;
 import io.myforevermusic.api.modules.mainpage.presentation.HeroTrackResponse;
+import io.myforevermusic.api.modules.platform.infrastructure.spotify.SpotifyPublicCatalogClient;
 import io.myforevermusic.api.modules.recommendation.application.RecommendationSnapshotStore;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,13 +37,16 @@ public class HeroTrackService {
 
     private final RecommendationSnapshotStore recommendationSnapshotStore;
     private final EmsCollectedTrackRepository emsCollectedTrackRepository;
+    private final SpotifyPublicCatalogClient spotifyPublicCatalogClient;
 
     public HeroTrackService(
         RecommendationSnapshotStore recommendationSnapshotStore,
-        EmsCollectedTrackRepository emsCollectedTrackRepository
+        EmsCollectedTrackRepository emsCollectedTrackRepository,
+        SpotifyPublicCatalogClient spotifyPublicCatalogClient
     ) {
         this.recommendationSnapshotStore = recommendationSnapshotStore;
         this.emsCollectedTrackRepository = emsCollectedTrackRepository;
+        this.spotifyPublicCatalogClient = spotifyPublicCatalogClient;
     }
 
     public Optional<HeroTrackResponse> resolve(String userId) {
@@ -121,16 +125,39 @@ public class HeroTrackService {
                 if (picked.size() >= limit) {
                     return;
                 }
-                emsCollectedTrackRepository
-                    .findBySourcePlatformAndExternalTrackId(snapshot.sourcePlatform(), snapshot.candidateTrackId())
-                    .filter(this::hasUsablePreview)
-                    .ifPresent(track -> {
-                        String key = trackKey(track);
-                        if (seenKeys.add(key)) {
-                            picked.add(toResponse(track, GMS_SOURCE_LABEL));
-                        }
-                    });
+                Optional<EmsCollectedTrackEntity> trackOpt = emsCollectedTrackRepository
+                    .findBySourcePlatformAndExternalTrackId(snapshot.sourcePlatform(), snapshot.candidateTrackId());
+                if (trackOpt.isEmpty()) {
+                    return;
+                }
+                EmsCollectedTrackEntity track = trackOpt.get();
+                String key = trackKey(track);
+                if (seenKeys.contains(key)) {
+                    return;
+                }
+                buildGmsResponse(track).ifPresent(response -> {
+                    seenKeys.add(key);
+                    picked.add(response);
+                });
             });
+    }
+
+    private Optional<HeroTrackResponse> buildGmsResponse(EmsCollectedTrackEntity track) {
+        if (hasUsablePreview(track)) {
+            return Optional.of(toResponse(track, GMS_SOURCE_LABEL));
+        }
+        String spotifyId = extractSpotifyTrackId(track);
+        if (spotifyId == null) {
+            return Optional.empty();
+        }
+        try {
+            return spotifyPublicCatalogClient.getTrack(spotifyId)
+                .filter(remote -> remote.previewUrl() != null && !remote.previewUrl().isBlank())
+                .map(remote -> toResponseWithPreview(track, GMS_SOURCE_LABEL, remote.previewUrl()));
+        } catch (RuntimeException ex) {
+            log.warn("Hero preview enrichment failed for spotify track {}: {}", spotifyId, ex.getMessage());
+            return Optional.empty();
+        }
     }
 
     private void collectFromEms(
@@ -171,6 +198,14 @@ public class HeroTrackService {
     }
 
     private HeroTrackResponse toResponse(EmsCollectedTrackEntity track, String sourceLabel) {
+        return toResponseWithPreview(track, sourceLabel, track.getPreviewUrl());
+    }
+
+    private HeroTrackResponse toResponseWithPreview(
+        EmsCollectedTrackEntity track,
+        String sourceLabel,
+        String previewUrl
+    ) {
         String spotifyTrackId = extractSpotifyTrackId(track);
         return new HeroTrackResponse(
             track.getExternalTrackId(),
@@ -180,7 +215,7 @@ public class HeroTrackService {
             track.getArtistName(),
             track.getAlbumTitle(),
             track.getAlbumImageUrl(),
-            track.getPreviewUrl(),
+            previewUrl,
             track.getPlatformExternalUrl(),
             track.getDurationMs(),
             sourceLabel
