@@ -11,6 +11,7 @@ import GmsPreviewPage from './pages/GmsPreviewPage'
 import HomePage from './pages/HomePage'
 import MelonHot100Page from './pages/MelonHot100Page'
 import NotFoundPage from './pages/NotFoundPage'
+import RecommendationAlgorithmPage from './pages/RecommendationAlgorithmPage'
 import PlaybackHarnessPage from './pages/PlaybackHarnessPage'
 import MetadataNormalizationAdminPage from './pages/MetadataNormalizationAdminPage'
 import PlaylistQualityAdminPage from './pages/PlaylistQualityAdminPage'
@@ -49,6 +50,7 @@ function App() {
                     <Route path="playlists/ems/:playlistId" element={<EmsPlaylistDetailPage />} />
                     <Route path="playlists/pms/:playlistId" element={<PmsPlaylistDetailPage />} />
                     <Route path="melon-hot-100" element={<MelonHot100Page />} />
+                    <Route path="about/recommendation" element={<RecommendationAlgorithmPage />} />
                 </Route>
                 <Route path="login" element={<Login />} />
                 <Route path="signin" element={<Login />} />

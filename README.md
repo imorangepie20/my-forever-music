@@ -95,6 +95,7 @@ my-forever-music/
 - `apps/web` 메인 페이지 `PopularPlaylistsSection` 가 `/api/v1/main-page/popular-playlists?limit=6` 의 응답을 6 카드 grid 로 표시. 정렬 기준은 `ems_collected_playlist.track_count` 내림차순 (proxy of popularity). 카드 클릭 시 기존 `/playlists/ems/{playlistId}` 상세 페이지로 이동
 - `apps/web` 메인 페이지 `GmsRecommendedPlaylistsSection` 가 로그인 사용자에 한해 `/api/v1/gms/playlists/preview?limit=5` 응답을 top-5 카드로 표시. cold-start (409) 면 "Build your taste library first" CTA, 비로그인이면 "Sign in for personalized picks" CTA
 - `services/api` 의 `MelonChartScraper` (Jsoup) + `MelonChartService` 가 `melon.com/chart/index.htm` 을 스크래핑해 `melon_chart_track` 테이블에 최신 100곡 snapshot 을 적재함. `POST /api/v1/admin/melon/scrape` 로 수동 트리거하며 (자동 스케줄러는 Phase 2), `GET /api/v1/main-page/melon-hot-100?limit=10` 과 `/full` 두 엔드포인트로 노출. `apps/web` 메인 페이지 `MelonHot100Section` 이 top 10 list 와 "View all 100" 링크를 표시하고, `/melon-hot-100` 라우트가 전체 100곡 리스트 페이지를 보여줌. 카드 클릭 시 Melon song URL 로 새 탭 외부 이동 (내부 재생은 Phase 2)
+- `apps/web` 메인 페이지 `AlgorithmIntroSection` (§4) 가 PMS / EMS / GMS 3단계 추천 파이프라인과 6-axis 스코어링을 간단히 소개하고, `/about/recommendation` 의 `RecommendationAlgorithmPage` 가 각 단계 + 6-axis 상세 + 피드백 루프 정책을 정리한 정적 페이지를 제공
 - `apps/desktop`는 향후 Windows 앱 개발을 위한 예약 구조 생성 완료
 - `services/api`는 `GET /api/v1/platforms/catalog` 엔드포인트로 플랫폼 역할과 온보딩 흐름 제공
 - 플랫폼 카탈로그에는 `TIDAL`, `YouTube Music`, `Apple Music`, `Last.fm`까지 포함되며, 확장 순서는 `Spotify -> TIDAL -> YouTube Music`, Apple Music은 개발자 계정 준비 전까지 보류로 고정됨
