@@ -33,7 +33,7 @@ const MagazineSection = () => {
                     {Array.from({ length: MAGAZINE_LIMIT }).map((_, index) => (
                         <div
                             key={index}
-                            className="h-56 animate-pulse rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/60"
+                            className="h-48 animate-pulse rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/60"
                         />
                     ))}
                 </div>
@@ -69,47 +69,43 @@ const MagazineCard = ({ article }: { article: MagazineArticleResponse }) => {
             href={article.article_url}
             target="_blank"
             rel="noreferrer noopener"
-            className="group flex h-full flex-col overflow-hidden rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 transition-hud hover:border-hud-border-primary hover:bg-hud-bg-primary/90"
+            className="group flex h-full flex-col rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4 transition-hud hover:border-hud-border-primary hover:bg-hud-bg-primary/90"
         >
-            <div className="relative aspect-[16/9] w-full overflow-hidden bg-hud-bg-primary">
+            <div>
                 {article.image_url ? (
                     <img
                         src={article.image_url}
                         alt={headline}
                         loading="lazy"
-                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                        className="float-right ml-3 mb-2 h-20 w-20 shrink-0 rounded-lg object-cover sm:h-24 sm:w-24"
                     />
                 ) : (
-                    <div className="flex h-full w-full items-center justify-center text-hud-text-muted">
-                        <Newspaper size={28} />
+                    <div className="float-right ml-3 mb-2 flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-hud-bg-primary text-hud-text-muted sm:h-24 sm:w-24">
+                        <Newspaper size={22} />
                     </div>
                 )}
-                <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-white backdrop-blur">
-                    <Newspaper size={11} />
-                    <span className="truncate max-w-[160px]">{article.source_name}</span>
+                <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-hud-accent-primary">
+                    <Newspaper size={12} />
+                    <span className="truncate">{article.source_name}</span>
                 </div>
-            </div>
-            <div className="flex flex-1 flex-col justify-between gap-3 p-4">
-                <div className="space-y-2">
-                    <p className="line-clamp-3 text-base font-semibold leading-6 text-hud-text-primary">
-                        {headline}
+                <p className="mt-2 text-base font-semibold leading-6 text-hud-text-primary">
+                    {headline}
+                </p>
+                {article.article_title_ko && article.article_title_ko !== article.article_title && (
+                    <p className="mt-1 text-xs leading-5 text-hud-text-muted">
+                        {article.article_title}
                     </p>
-                    {article.article_title_ko && article.article_title_ko !== article.article_title && (
-                        <p className="line-clamp-2 text-xs leading-5 text-hud-text-muted">
-                            {article.article_title}
-                        </p>
-                    )}
-                    {supportingCopy && (
-                        <p className="line-clamp-2 text-sm leading-5 text-hud-text-secondary">{supportingCopy}</p>
-                    )}
-                </div>
-                <div className="flex items-center justify-between text-xs text-hud-text-muted">
-                    <span>{captured ?? ''}</span>
-                    <span className="inline-flex items-center gap-1 text-hud-text-secondary transition-hud group-hover:text-hud-accent-primary">
-                        원문 보기
-                        <ExternalLink size={12} />
-                    </span>
-                </div>
+                )}
+                {supportingCopy && (
+                    <p className="mt-2 text-sm leading-5 text-hud-text-secondary">{supportingCopy}</p>
+                )}
+            </div>
+            <div className="mt-3 flex items-center justify-between border-t border-hud-border-secondary/60 pt-3 text-xs text-hud-text-muted clear-both">
+                <span>{captured ?? ''}</span>
+                <span className="inline-flex items-center gap-1 text-hud-text-secondary transition-hud group-hover:text-hud-accent-primary">
+                    원문 보기
+                    <ExternalLink size={12} />
+                </span>
             </div>
         </a>
     )
