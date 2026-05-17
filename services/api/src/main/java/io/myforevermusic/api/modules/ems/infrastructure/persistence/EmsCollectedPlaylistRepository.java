@@ -59,6 +59,14 @@ public interface EmsCollectedPlaylistRepository extends JpaRepository<EmsCollect
     @Query("""
         select playlist
         from EmsCollectedPlaylistEntity playlist
+        where playlist.trackCount > 0
+        order by playlist.trackCount desc, playlist.collectedAt desc
+        """)
+    List<EmsCollectedPlaylistEntity> findPopularByTrackCount(Pageable pageable);
+
+    @Query("""
+        select playlist
+        from EmsCollectedPlaylistEntity playlist
         where playlist.sourcePlatform in :platformIds
           and exists (
               select link.id

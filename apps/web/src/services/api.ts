@@ -78,6 +78,8 @@ import type {
     GmsRecommendationFeedbackResponse,
     HeroTrackListResponse,
     HeroTrackResponse,
+    PopularPlaylistListResponse,
+    PopularPlaylistResponse,
     UserTrackLikeRequest,
     UserTrackLikeResponse,
     UserMusicEventRequest,
@@ -215,6 +217,29 @@ export const fetchHeroTrack = async (
         throw new ApiError(payload.message, response.status, payload.code)
     }
     return (await response.json()) as HeroTrackResponse
+}
+
+export const fetchPopularPlaylists = async (
+    limit: number,
+    signal?: AbortSignal,
+): Promise<PopularPlaylistResponse[]> => {
+    const params = new URLSearchParams()
+    params.set('limit', String(Math.max(1, limit)))
+    const headers = new Headers({ Accept: 'application/json' })
+    const response = await fetch(buildApiUrl(`/api/v1/main-page/popular-playlists?${params.toString()}`), {
+        signal,
+        headers,
+        cache: 'no-store',
+    })
+    if (response.status === 204) {
+        return []
+    }
+    if (!response.ok) {
+        const payload = await readErrorPayload(response)
+        throw new ApiError(payload.message, response.status, payload.code)
+    }
+    const payload = (await response.json()) as PopularPlaylistListResponse
+    return payload.playlists ?? []
 }
 
 export const fetchLatestTracks = async (

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import HeroEqBanner from '@/components/home/HeroEqBanner'
 import LatestTracksSection from '@/components/home/LatestTracksSection'
+import PopularPlaylistsSection from '@/components/home/PopularPlaylistsSection'
 import HudCard from '@/components/common/HudCard'
 import StatCard from '@/components/common/StatCard'
 import { useAuthSession } from '@/contexts/AuthSessionContext'
@@ -73,6 +74,8 @@ const HomePage = () => {
             <HeroEqBanner />
 
             <LatestTracksSection />
+
+            <PopularPlaylistsSection />
 
             <section className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
                 <HudCard className="overflow-hidden">

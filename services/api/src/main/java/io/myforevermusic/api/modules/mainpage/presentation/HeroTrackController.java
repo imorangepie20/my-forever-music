@@ -1,6 +1,7 @@
 package io.myforevermusic.api.modules.mainpage.presentation;
 
 import io.myforevermusic.api.modules.mainpage.application.HeroTrackService;
+import io.myforevermusic.api.modules.mainpage.application.PopularPlaylistService;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.http.ResponseEntity;
@@ -15,11 +16,17 @@ public class HeroTrackController {
 
     private static final int DEFAULT_HERO_LIST_LIMIT = 5;
     private static final int DEFAULT_LATEST_LIMIT = 10;
+    private static final int DEFAULT_POPULAR_PLAYLIST_LIMIT = 6;
 
     private final HeroTrackService heroTrackService;
+    private final PopularPlaylistService popularPlaylistService;
 
-    public HeroTrackController(HeroTrackService heroTrackService) {
+    public HeroTrackController(
+        HeroTrackService heroTrackService,
+        PopularPlaylistService popularPlaylistService
+    ) {
         this.heroTrackService = heroTrackService;
+        this.popularPlaylistService = popularPlaylistService;
     }
 
     @GetMapping("/hero-track")
@@ -55,5 +62,17 @@ public class HeroTrackController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.ok(new HeroTrackListResponse(tracks));
+    }
+
+    @GetMapping("/popular-playlists")
+    public ResponseEntity<PopularPlaylistResponse.ListEnvelope> getPopularPlaylists(
+        @RequestParam(value = "limit", required = false) Integer limit
+    ) {
+        int effectiveLimit = limit == null || limit <= 0 ? DEFAULT_POPULAR_PLAYLIST_LIMIT : limit;
+        List<PopularPlaylistResponse> playlists = popularPlaylistService.findPopular(effectiveLimit);
+        if (playlists.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(new PopularPlaylistResponse.ListEnvelope(playlists));
     }
 }

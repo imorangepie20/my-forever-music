@@ -1920,6 +1920,22 @@ export interface HeroTrackListResponse {
     tracks: HeroTrackResponse[]
 }
 
+export interface PopularPlaylistResponse {
+    playlist_id: number
+    external_playlist_id: string
+    source_platform: string
+    title: string
+    curator: string | null
+    description: string | null
+    cover_image_url: string | null
+    platform_external_url: string | null
+    track_count: number
+}
+
+export interface PopularPlaylistListResponse {
+    playlists: PopularPlaylistResponse[]
+}
+
 export interface UserTrackLikeRequest {
     user_id: string
     source_platform: string
