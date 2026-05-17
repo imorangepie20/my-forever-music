@@ -111,6 +111,31 @@ public class SpotifyPublicCatalogClient {
         }
     }
 
+    /**
+     * Returns the cached follower count for a Spotify playlist. Uses the
+     * minimal `fields=followers.total` projection so the call stays cheap
+     * enough to run in a backfill loop.
+     */
+    public Optional<Integer> getPlaylistFollowers(String spotifyPlaylistId) {
+        if (spotifyPlaylistId == null || spotifyPlaylistId.isBlank()) {
+            return Optional.empty();
+        }
+        String uri = "%s/playlists/%s?fields=followers.total".formatted(
+            apiBaseUri(),
+            URLEncoder.encode(spotifyPlaylistId, StandardCharsets.UTF_8)
+        );
+        try {
+            SpotifyPlaylistFollowersResponse response = get(uri, SpotifyPlaylistFollowersResponse.class);
+            if (response == null || response.followers() == null || response.followers().total() == null) {
+                return Optional.empty();
+            }
+            return Optional.of(response.followers().total());
+        } catch (IllegalArgumentException ex) {
+            log.warn("Spotify playlist followers fetch failed (id={}): {}", spotifyPlaylistId, ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
     private <T> T get(String uri, Class<T> responseType) {
         String token = appTokenService.getAccessToken();
         try {
@@ -206,5 +231,13 @@ public class SpotifyPublicCatalogClient {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record SpotifyExternalUrls(String spotify) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record SpotifyPlaylistFollowersResponse(SpotifyFollowers followers) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record SpotifyFollowers(Integer total) {
     }
 }

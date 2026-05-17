@@ -1,5 +1,6 @@
 package io.myforevermusic.api.modules.ems.infrastructure.persistence;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -67,6 +68,31 @@ public interface EmsCollectedPlaylistRepository extends JpaRepository<EmsCollect
     @Query("""
         select playlist
         from EmsCollectedPlaylistEntity playlist
+        where playlist.trackCount > 0
+        order by
+            case when playlist.followersCount is null then 1 else 0 end,
+            playlist.followersCount desc,
+            playlist.trackCount desc,
+            playlist.collectedAt desc
+        """)
+    List<EmsCollectedPlaylistEntity> findPopularByFollowersThenTrackCount(Pageable pageable);
+
+    @Query("""
+        select playlist
+        from EmsCollectedPlaylistEntity playlist
+        where playlist.sourcePlatform = :sourcePlatform
+          and (playlist.popularityRefreshedAt is null or playlist.popularityRefreshedAt < :staleBefore)
+        order by playlist.popularityRefreshedAt asc nulls first, playlist.collectedAt desc
+        """)
+    List<EmsCollectedPlaylistEntity> findStalePopularityCandidates(
+        @Param("sourcePlatform") String sourcePlatform,
+        @Param("staleBefore") Instant staleBefore,
+        Pageable pageable
+    );
+
+    @Query("""
+        select playlist
+        from EmsCollectedPlaylistEntity playlist
         where playlist.sourcePlatform in :platformIds
           and exists (
               select link.id
@@ -77,6 +103,22 @@ public interface EmsCollectedPlaylistRepository extends JpaRepository<EmsCollect
         """)
     List<EmsCollectedPlaylistEntity> findRecentWithTracksBySourcePlatforms(
         @Param("platformIds") List<String> platformIds,
+        Pageable pageable
+    );
+
+    @Query("""
+        select playlist
+        from EmsCollectedPlaylistEntity playlist
+        where playlist.collectionSource = :collectionSource
+          and exists (
+              select link.id
+              from EmsCollectedPlaylistTrackEntity link
+              where link.playlist.id = playlist.id
+          )
+        order by playlist.collectedAt desc
+        """)
+    List<EmsCollectedPlaylistEntity> findRecentWithTracksByCollectionSource(
+        @Param("collectionSource") String collectionSource,
         Pageable pageable
     );
 

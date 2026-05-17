@@ -20,7 +20,7 @@ class PopularPlaylistServiceTest {
 
     @Test
     void mapsRepositoryRowsToResponse() {
-        when(repository.findPopularByTrackCount(any(Pageable.class)))
+        when(repository.findPopularByFollowersThenTrackCount(any(Pageable.class)))
             .thenReturn(List.of(
                 playlistOf("pl-1", "Top Tracks", "spotify", 120),
                 playlistOf("pl-2", "Indie Mix", "tidal", 90)
@@ -36,7 +36,7 @@ class PopularPlaylistServiceTest {
 
     @Test
     void clampsLimitToAtLeastOne() {
-        when(repository.findPopularByTrackCount(any(Pageable.class)))
+        when(repository.findPopularByFollowersThenTrackCount(any(Pageable.class)))
             .thenReturn(List.of(playlistOf("pl-1", "Hits", "spotify", 50)));
 
         assertThat(service.findPopular(0)).hasSize(1);
@@ -45,7 +45,7 @@ class PopularPlaylistServiceTest {
 
     @Test
     void returnsEmptyWhenRepositoryEmpty() {
-        when(repository.findPopularByTrackCount(any(Pageable.class)))
+        when(repository.findPopularByFollowersThenTrackCount(any(Pageable.class)))
             .thenReturn(List.of());
 
         assertThat(service.findPopular(6)).isEmpty();

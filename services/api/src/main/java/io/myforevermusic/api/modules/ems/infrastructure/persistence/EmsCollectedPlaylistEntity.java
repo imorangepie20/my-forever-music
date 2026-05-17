@@ -56,6 +56,12 @@ public class EmsCollectedPlaylistEntity {
     @Column(name = "expires_at")
     private Instant expiresAt;
 
+    @Column(name = "followers_count")
+    private Integer followersCount;
+
+    @Column(name = "popularity_refreshed_at")
+    private Instant popularityRefreshedAt;
+
     protected EmsCollectedPlaylistEntity() {}
 
     public EmsCollectedPlaylistEntity(
@@ -116,4 +122,11 @@ public class EmsCollectedPlaylistEntity {
     public String getSearchQuery() { return searchQuery; }
     public Instant getCollectedAt() { return collectedAt; }
     public Instant getExpiresAt() { return expiresAt; }
+    public Integer getFollowersCount() { return followersCount; }
+    public Instant getPopularityRefreshedAt() { return popularityRefreshedAt; }
+
+    public void applyPopularity(Integer followersCount, Instant refreshedAt) {
+        this.followersCount = followersCount;
+        this.popularityRefreshedAt = refreshedAt;
+    }
 }
