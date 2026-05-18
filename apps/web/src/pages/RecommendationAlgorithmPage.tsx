@@ -1,4 +1,4 @@
-import { ArrowLeft, Library, Newspaper, ShieldCheck, Sparkles, Workflow } from 'lucide-react'
+import { ArrowLeft, Brain, Library, Newspaper, Radar, ShieldCheck, Sparkles, Workflow } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import HudCard from '@/components/common/HudCard'
 
@@ -83,6 +83,54 @@ const RecommendationAlgorithmPage = () => {
                     </div>
                 </HudCard>
             </section>
+
+            <HudCard
+                title="개인 AI 모델"
+                subtitle="GMS 안에서 매 사용자마다 따로 학습되는 추천 엔진"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm leading-7 text-hud-text-secondary">
+                        GMS 가 6개 축으로 점수를 매기기 전에, <strong>사용자별로 따로 학습된 개인 AI 모델</strong> 이
+                        먼저 후보 순서를 손봅니다. 모든 사용자가 같은 점수표를 쓰는 게 아니라, 내가 실제로 어떤
+                        음악에 시간을 썼는지가 그대로 모델 안에 반영됩니다. 모델은 사용자별로 격리돼 있어 다른
+                        사람의 행동과 섞이지 않습니다.
+                    </p>
+                    <div className="grid gap-3 md:grid-cols-2">
+                        <div className="flex items-start gap-3 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300">
+                                <Radar size={20} />
+                            </span>
+                            <div className="space-y-1.5">
+                                <p className="text-sm font-semibold text-hud-text-primary">개인화 프로필 (Personalization Profile)</p>
+                                <p className="text-xs leading-5 text-hud-text-secondary">
+                                    좋아요·저장·완청·중간 정지·조기 스킵·거부 같은 행동마다 가중치(+2.0 ~ -2.0)를
+                                    매겨 합산합니다. 결과는 <strong>"내가 자주 듣는 아티스트"</strong> 와
+                                    <strong>"내가 자주 쓰는 플랫폼"</strong> 점수로 누적되어, GMS 가 추천 후보에
+                                    소프트 부스트를 거는 1차 신호로 쓰입니다.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-3 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4">
+                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-400/10 text-indigo-300">
+                                <Brain size={20} />
+                            </span>
+                            <div className="space-y-1.5">
+                                <p className="text-sm font-semibold text-hud-text-primary">시퀀스 모델 (SASRec)</p>
+                                <p className="text-xs leading-5 text-hud-text-secondary">
+                                    내 청취 이력을 <strong>"트랙 → 다음 트랙"</strong> 시퀀스로 보고, 어떤 곡 다음에
+                                    어떤 곡으로 자연스럽게 넘어가는 패턴을 사용자별 트랜스포머가 학습합니다. 정기
+                                    재학습 시 단순 최신성(recency) 기준 베이스라인과 Hit@K · MRR · nDCG 로 비교해
+                                    퇴보가 보이면 즉시 가시화됩니다.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <p className="text-xs leading-5 text-hud-text-muted">
+                        데이터가 적은 신규 사용자는 cold-start 가드로 EMS 풀에서 audio feature 가 채워진 트랙을
+                        후보로 받으므로, 모델이 본격적으로 학습되기 전에도 빈 화면을 보지 않습니다.
+                    </p>
+                </div>
+            </HudCard>
 
             <HudCard
                 title="6개 축 (Six axes)"
