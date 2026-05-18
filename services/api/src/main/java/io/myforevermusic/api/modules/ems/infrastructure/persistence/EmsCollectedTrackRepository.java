@@ -45,6 +45,29 @@ public interface EmsCollectedTrackRepository extends JpaRepository<EmsCollectedT
     Optional<EmsCollectedTrackEntity> findFirstByPreviewUrlIsNotNullOrderByCollectedAtDesc();
 
     @Query("""
+        select count(track)
+        from EmsCollectedTrackEntity track
+        where not exists (
+            select link.id
+            from EmsCollectedPlaylistTrackEntity link
+            where link.track.id = track.id
+        )
+        """)
+    long countUnassignedTracks();
+
+    @Query("""
+        select track
+        from EmsCollectedTrackEntity track
+        where not exists (
+            select link.id
+            from EmsCollectedPlaylistTrackEntity link
+            where link.track.id = track.id
+        )
+        order by track.sourcePlatform asc, track.collectionSource asc, track.collectedAt desc, track.id asc
+        """)
+    List<EmsCollectedTrackEntity> findUnassignedTracks(Pageable pageable);
+
+    @Query("""
         select track
         from EmsCollectedTrackEntity track
         where track.collectionSource = :collectionSource

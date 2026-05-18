@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class GmsPlaylistPreviewServiceTest {
@@ -98,7 +99,7 @@ class GmsPlaylistPreviewServiceTest {
         when(authAccountStore.findByUserId("user-001")).thenReturn(Optional.empty());
         when(pmsUserLibraryStore.findPlaylists("user-001")).thenReturn(List.of(pmsLibraryPlaylist()));
         when(playlistRepository.findById(1L)).thenReturn(Optional.of(playlist));
-        when(playlistRepository.findAll()).thenReturn(List.of(playlist));
+        when(playlistRepository.findRecentWithTracks(PageRequest.of(0, 36))).thenReturn(List.of(playlist));
         when(playlistTrackRepository.findByPlaylistIdOrderBySortOrderAsc(1L)).thenReturn(List.of(
             new EmsCollectedPlaylistTrackEntity(playlist, track, 1)
         ));
@@ -151,7 +152,7 @@ class GmsPlaylistPreviewServiceTest {
         ));
         when(authAccountStore.findByUserId("user-001")).thenReturn(Optional.empty());
         when(pmsUserLibraryStore.findPlaylists("user-001")).thenReturn(List.of(pmsLibraryPlaylist()));
-        when(playlistRepository.findAll()).thenReturn(List.of(playlist));
+        when(playlistRepository.findRecentWithTracks(PageRequest.of(0, 36))).thenReturn(List.of(playlist));
 
         GmsPlaylistPreviewService service = new GmsPlaylistPreviewService(
             authAccountStore,

@@ -19,6 +19,9 @@ import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.
 import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.EmsPlaylistSection;
 import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.EmsPlaylistSectionItem;
 import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.PlaylistAudioStats;
+import io.myforevermusic.api.modules.ems.application.EmsLooseTrackPlaylistService;
+import io.myforevermusic.api.modules.ems.application.EmsLooseTrackPlaylistService.LooseTrackPlaylistMaterializationResult;
+import io.myforevermusic.api.modules.ems.application.EmsLooseTrackPlaylistService.MaterializedPlaylist;
 import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler.EmsPublicPlaylistDiscoveryFailure;
@@ -56,6 +59,9 @@ class EmsCollectionControllerWebMvcTest {
 
     @MockBean
     private EmsPoolIngestService emsPoolIngestService;
+
+    @MockBean
+    private EmsLooseTrackPlaylistService emsLooseTrackPlaylistService;
 
     @MockBean
     private FloSpecialCurationScheduler floSpecialCurationScheduler;
@@ -219,6 +225,41 @@ class EmsCollectionControllerWebMvcTest {
             .andExpect(jsonPath("$.tracks[0].platform_uri").value("tidal:track:track-001"));
 
         verify(emsCollectionService).getTracksForPlaylist(77L);
+    }
+
+    @Test
+    void shouldMaterializeLooseTracksIntoEmsPlaylistsForAdmin() throws Exception {
+        when(emsLooseTrackPlaylistService.materializeLooseTracks(120, 30))
+            .thenReturn(new LooseTrackPlaylistMaterializationResult(
+                199,
+                120,
+                4,
+                120,
+                79,
+                Instant.parse("2026-05-10T04:00:00Z"),
+                List.of(new MaterializedPlaylist(
+                    901L,
+                    "EMS 추천 후보 · Spotify · acquisition pool",
+                    "spotify",
+                    "acquisition_pool",
+                    30
+                ))
+            ));
+
+        mockMvc.perform(post("/api/v1/ems/collection/admin/playlists/materialize-loose-tracks")
+                .param("user_id", "admin-user")
+                .param("track_limit", "120")
+                .param("tracks_per_playlist", "30"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.unassigned_track_count_before").value(199))
+            .andExpect(jsonPath("$.selected_track_count").value(120))
+            .andExpect(jsonPath("$.created_playlist_count").value(4))
+            .andExpect(jsonPath("$.linked_track_count").value(120))
+            .andExpect(jsonPath("$.unassigned_track_count_after").value(79))
+            .andExpect(jsonPath("$.playlists[0].playlist_id").value(901))
+            .andExpect(jsonPath("$.playlists[0].source_collection").value("acquisition_pool"));
+
+        verify(emsPoolIngestService).assertAdminAccess("admin-user");
     }
 
     @Test

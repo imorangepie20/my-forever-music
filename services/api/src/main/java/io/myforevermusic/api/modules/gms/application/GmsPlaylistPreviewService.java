@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -94,9 +95,12 @@ public class GmsPlaylistPreviewService {
 
         List<EmsCollectedPlaylistEntity> source;
         if (preferredPlatform != null) {
-            source = playlistRepository.findBySourcePlatformOrderByCollectedAtDesc(preferredPlatform, safeLimit * 3);
+            source = playlistRepository.findRecentWithTracksBySourcePlatforms(
+                List.of(preferredPlatform),
+                PageRequest.of(0, safeLimit * 3)
+            );
         } else {
-            source = playlistRepository.findAll();
+            source = playlistRepository.findRecentWithTracks(PageRequest.of(0, safeLimit * 3));
         }
 
         Set<String> userArtists = collectUserArtists(userId);

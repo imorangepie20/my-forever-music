@@ -29,6 +29,7 @@ class SchedulingAdminServiceTest {
             environment,
             Optional.empty(),
             Optional.empty(),
+            Optional.empty(),
             Optional.empty()
         );
 
@@ -40,6 +41,7 @@ class SchedulingAdminServiceTest {
                 "ems-acquisition",
                 "ems-public-discovery",
                 "ems-flo-special",
+                "ems-loose-track-playlists",
                 "ems-pool-worker",
                 "sasrec-auto-train",
                 "metadata-apply-accepted-isrcs"
@@ -72,6 +74,14 @@ class SchedulingAdminServiceTest {
                 assertThat(schedule.fixedDelayMs()).isEqualTo(86_400_000L);
                 assertThat(schedule.cadenceLabel()).isEqualTo("daily");
             });
+        assertThat(report.schedules()).filteredOn(schedule -> schedule.id().equals("ems-loose-track-playlists"))
+            .singleElement()
+            .satisfies(schedule -> {
+                assertThat(schedule.status()).isEqualTo("active");
+                assertThat(schedule.fixedDelayMs()).isEqualTo(86_400_000L);
+                assertThat(schedule.cadenceLabel()).isEqualTo("daily");
+                assertThat(schedule.notes()).anyMatch(note -> note.contains("40 unassigned EMS track"));
+            });
     }
 
     @Test
@@ -85,6 +95,7 @@ class SchedulingAdminServiceTest {
         SchedulingAdminService service = new SchedulingAdminService(
             authAccountStore,
             environment,
+            Optional.empty(),
             Optional.empty(),
             Optional.empty(),
             Optional.empty()
@@ -109,6 +120,7 @@ class SchedulingAdminServiceTest {
         SchedulingAdminService service = new SchedulingAdminService(
             authAccountStore,
             new MockEnvironment(),
+            Optional.empty(),
             Optional.empty(),
             Optional.empty(),
             Optional.empty()

@@ -71,6 +71,13 @@ app:
       refresh-interval-ms: ${EMS_FLO_SPECIAL_REFRESH_INTERVAL_MS:86400000}
       initial-delay-ms: ${EMS_FLO_SPECIAL_INITIAL_DELAY_MS:120000}
       display-limit: ${EMS_FLO_SPECIAL_DISPLAY_LIMIT:120}
+    loose-track-playlists:
+      enabled: ${EMS_LOOSE_TRACK_PLAYLISTS_ENABLED:true}
+      refresh-interval-ms: ${EMS_LOOSE_TRACK_PLAYLISTS_REFRESH_INTERVAL_MS:86400000}
+      initial-delay-ms: ${EMS_LOOSE_TRACK_PLAYLISTS_INITIAL_DELAY_MS:300000}
+      track-limit: ${EMS_LOOSE_TRACK_PLAYLISTS_TRACK_LIMIT:5000}
+      tracks-per-playlist: ${EMS_LOOSE_TRACK_PLAYLISTS_TRACKS_PER_PLAYLIST:40}
+      min-track-count: ${EMS_LOOSE_TRACK_PLAYLISTS_MIN_TRACK_COUNT:40}
     acquisition:
       enabled: ${EMS_ACQUISITION_ENABLED:true}
       user-id: ${EMS_ACQUISITION_USER_ID:${EMS_DISCOVERY_USER_ID:}}

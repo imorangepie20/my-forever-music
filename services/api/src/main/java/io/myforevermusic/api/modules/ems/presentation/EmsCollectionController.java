@@ -12,6 +12,8 @@ import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.
 import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.EmsPlaylistSection;
 import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.EmsPlaylistSectionItem;
 import io.myforevermusic.api.modules.ems.application.EmsPlaylistCurationService.PlaylistAudioStats;
+import io.myforevermusic.api.modules.ems.application.EmsLooseTrackPlaylistService;
+import io.myforevermusic.api.modules.ems.application.EmsLooseTrackPlaylistService.LooseTrackPlaylistMaterializationResult;
 import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService;
 import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService.EmsPoolEntrySnapshot;
 import io.myforevermusic.api.modules.ems.application.EmsPoolIngestService.EmsPoolRunDetailSnapshot;
@@ -49,6 +51,7 @@ public class EmsCollectionController {
     private final EmsPlaylistCurationService emsPlaylistCurationService;
     private final EmsPublicPlaylistDiscoveryScheduler emsPublicPlaylistDiscoveryScheduler;
     private final EmsPoolIngestService emsPoolIngestService;
+    private final EmsLooseTrackPlaylistService emsLooseTrackPlaylistService;
     private final FloSpecialCurationScheduler floSpecialCurationScheduler;
     private final FloSpecialProperties floSpecialProperties;
 
@@ -57,6 +60,7 @@ public class EmsCollectionController {
         EmsPlaylistCurationService emsPlaylistCurationService,
         EmsPublicPlaylistDiscoveryScheduler emsPublicPlaylistDiscoveryScheduler,
         EmsPoolIngestService emsPoolIngestService,
+        EmsLooseTrackPlaylistService emsLooseTrackPlaylistService,
         FloSpecialCurationScheduler floSpecialCurationScheduler,
         FloSpecialProperties floSpecialProperties
     ) {
@@ -64,6 +68,7 @@ public class EmsCollectionController {
         this.emsPlaylistCurationService = emsPlaylistCurationService;
         this.emsPublicPlaylistDiscoveryScheduler = emsPublicPlaylistDiscoveryScheduler;
         this.emsPoolIngestService = emsPoolIngestService;
+        this.emsLooseTrackPlaylistService = emsLooseTrackPlaylistService;
         this.floSpecialCurationScheduler = floSpecialCurationScheduler;
         this.floSpecialProperties = floSpecialProperties;
     }
@@ -176,6 +181,40 @@ public class EmsCollectionController {
     ) {
         int deletedCount = emsPoolIngestService.cleanupEmptyPlaylistsForAdmin(userId);
         return new EmsCollectedPlaylistsCleanupResponse("api", "ok", Instant.now(), deletedCount);
+    }
+
+    @Operation(summary = "Materialize loose EMS tracks into synthetic playlists for recommendation candidates")
+    @PostMapping("/admin/playlists/materialize-loose-tracks")
+    public EmsLooseTrackPlaylistMaterializationResponse materializeLooseTrackPlaylists(
+        @RequestParam("user_id") String userId,
+        @RequestParam(value = "track_limit", required = false) Integer trackLimit,
+        @RequestParam(value = "tracks_per_playlist", required = false) Integer tracksPerPlaylist
+    ) {
+        emsPoolIngestService.assertAdminAccess(userId);
+        LooseTrackPlaylistMaterializationResult result = emsLooseTrackPlaylistService.materializeLooseTracks(
+            trackLimit,
+            tracksPerPlaylist
+        );
+        return new EmsLooseTrackPlaylistMaterializationResponse(
+            "api",
+            "ok",
+            Instant.now(),
+            result.unassignedTrackCountBefore(),
+            result.selectedTrackCount(),
+            result.createdPlaylistCount(),
+            result.linkedTrackCount(),
+            result.unassignedTrackCountAfter(),
+            result.materializedAt(),
+            result.playlists().stream()
+                .map(playlist -> new EmsLooseTrackPlaylistItem(
+                    playlist.playlistId(),
+                    playlist.title(),
+                    playlist.sourcePlatform(),
+                    playlist.sourceCollection(),
+                    playlist.trackCount()
+                ))
+                .toList()
+        );
     }
 
     @Operation(summary = "Load tracks for a provider playlist search result and store them in the EMS search pool")
@@ -604,6 +643,29 @@ public class EmsCollectionController {
         String status,
         Instant generatedAt,
         int deletedCount
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsLooseTrackPlaylistMaterializationResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        long unassignedTrackCountBefore,
+        int selectedTrackCount,
+        int createdPlaylistCount,
+        int linkedTrackCount,
+        long unassignedTrackCountAfter,
+        Instant materializedAt,
+        List<EmsLooseTrackPlaylistItem> playlists
+    ) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record EmsLooseTrackPlaylistItem(
+        Long playlistId,
+        String title,
+        String sourcePlatform,
+        String sourceCollection,
+        int trackCount
     ) {}
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)

@@ -4,6 +4,8 @@ import io.myforevermusic.api.modules.auth.application.AuthAccountStore;
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService;
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionRunDetailSnapshot;
 import io.myforevermusic.api.modules.ems.application.EmsAcquisitionService.EmsAcquisitionRunSnapshot;
+import io.myforevermusic.api.modules.ems.application.EmsLooseTrackPlaylistScheduler;
+import io.myforevermusic.api.modules.ems.application.EmsLooseTrackPlaylistScheduler.EmsLooseTrackPlaylistRun;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler;
 import io.myforevermusic.api.modules.ems.application.EmsPublicPlaylistDiscoveryScheduler.EmsPublicPlaylistDiscoveryRun;
 import io.myforevermusic.api.modules.ems.application.FloSpecialCurationScheduler;
@@ -28,19 +30,22 @@ public class SchedulingAdminService {
     private final Optional<EmsAcquisitionService> acquisitionService;
     private final Optional<EmsPublicPlaylistDiscoveryScheduler> discoveryScheduler;
     private final Optional<FloSpecialCurationScheduler> floSpecialScheduler;
+    private final Optional<EmsLooseTrackPlaylistScheduler> looseTrackPlaylistScheduler;
 
     public SchedulingAdminService(
         AuthAccountStore authAccountStore,
         Environment environment,
         Optional<EmsAcquisitionService> acquisitionService,
         Optional<EmsPublicPlaylistDiscoveryScheduler> discoveryScheduler,
-        Optional<FloSpecialCurationScheduler> floSpecialScheduler
+        Optional<FloSpecialCurationScheduler> floSpecialScheduler,
+        Optional<EmsLooseTrackPlaylistScheduler> looseTrackPlaylistScheduler
     ) {
         this.authAccountStore = authAccountStore;
         this.environment = environment;
         this.acquisitionService = acquisitionService;
         this.discoveryScheduler = discoveryScheduler;
         this.floSpecialScheduler = floSpecialScheduler;
+        this.looseTrackPlaylistScheduler = looseTrackPlaylistScheduler;
     }
 
     public SchedulingAdminReport summarize(String adminUserId) {
@@ -49,6 +54,7 @@ public class SchedulingAdminService {
             emsAcquisition(),
             emsPublicDiscovery(),
             emsFloSpecial(),
+            emsLooseTrackPlaylists(),
             emsPoolWorker(),
             sasrecAutoTrain(),
             metadataApplyAcceptedIsrcs()
@@ -63,6 +69,7 @@ public class SchedulingAdminService {
             List.of(
                 "EMS playlist curation is computed at read time; daily updates should refresh acquisition and discovery data.",
                 "FLO Special updates run daily by default and do not require a user credential.",
+                "Loose EMS tracks are materialized into synthetic playlists daily once enough tracks accumulate.",
                 "EMS pool ingest worker should stay near real-time because it only drains queued searches.",
                 "SASRec and metadata schedulers remain opt-in until their admin properties are configured."
             )
@@ -188,6 +195,47 @@ public class SchedulingAdminService {
             List.of(
                 "Default cadence is daily.",
                 "FLO playlists are stored as EMS source_platform=flo and playback resolves at play time through the user's selected provider."
+            )
+        );
+    }
+
+    private ScheduledServiceStatus emsLooseTrackPlaylists() {
+        boolean enabled = booleanProperty("app.ems.loose-track-playlists.enabled", true);
+        long fixedDelayMs = longProperty("app.ems.loose-track-playlists.refresh-interval-ms", ONE_DAY_MS);
+        long initialDelayMs = longProperty("app.ems.loose-track-playlists.initial-delay-ms", 300_000L);
+        long minTrackCount = longProperty("app.ems.loose-track-playlists.min-track-count", 40L);
+        EmsLooseTrackPlaylistRun lastRun = looseTrackPlaylistScheduler
+            .map(EmsLooseTrackPlaylistScheduler::lastRun)
+            .orElse(null);
+
+        return new ScheduledServiceStatus(
+            "ems-loose-track-playlists",
+            "EMS",
+            "EMS Loose Track Playlists",
+            "scheduled",
+            enabled,
+            true,
+            enabled ? "active" : "disabled",
+            fixedDelayMs,
+            initialDelayMs,
+            cadenceLabel(fixedDelayMs),
+            "Materialize EMS tracks without source playlists into synthetic recommendation playlists.",
+            "/ems",
+            lastRun == null ? null : lastRun.status(),
+            lastRun == null ? null : lastRun.message(),
+            lastRun == null ? null : lastRun.startedAt(),
+            lastRun == null ? null : lastRun.completedAt(),
+            List.of(
+                "app.ems.loose-track-playlists.enabled",
+                "app.ems.loose-track-playlists.refresh-interval-ms",
+                "app.ems.loose-track-playlists.initial-delay-ms",
+                "app.ems.loose-track-playlists.track-limit",
+                "app.ems.loose-track-playlists.tracks-per-playlist",
+                "app.ems.loose-track-playlists.min-track-count"
+            ),
+            List.of(
+                "Default cadence is daily.",
+                "Runs only when at least %d unassigned EMS track(s) exist.".formatted(minTrackCount)
             )
         );
     }

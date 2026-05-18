@@ -86,6 +86,10 @@ public class EmsPoolIngestService {
         return collectionService.cleanupEmptyCollectedPlaylists();
     }
 
+    public void assertAdminAccess(String userId) {
+        assertAdmin(userId);
+    }
+
     @Transactional
     public EmsPoolEntrySnapshot retryEntryForAdmin(String userId, Long runId, Long entryId) {
         assertAdmin(userId);
