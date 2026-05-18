@@ -260,7 +260,7 @@ class EmsCollectionServiceTest {
                 "Imported Track",
                 "Imported Artist",
                 "Imported Album",
-                null,
+                "https://resources.tidal.com/images/c6459799/cabd/4177/a42a/2b6c7432ee53/750x750.jpg",
                 "https://tidal.com/browse/track/tidal-track-001",
                 "tidal:track:tidal-track-001",
                 null,
@@ -306,6 +306,11 @@ class EmsCollectionServiceTest {
         assertThat(result.trackCount()).isEqualTo(1);
         assertThat(result.collectionSource()).isEqualTo("user_tidal_url_import");
         verify(playlistTrackRepository).upsertPlaylistTrackLink(70L, 80L, 0);
+        ArgumentCaptor<EmsCollectedPlaylistEntity> playlistCaptor =
+            ArgumentCaptor.forClass(EmsCollectedPlaylistEntity.class);
+        verify(playlistRepository).save(playlistCaptor.capture());
+        assertThat(playlistCaptor.getValue().getCoverImageUrl())
+            .isEqualTo("https://resources.tidal.com/images/c6459799/cabd/4177/a42a/2b6c7432ee53/750x750.jpg");
     }
 
     @Test

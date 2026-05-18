@@ -387,6 +387,7 @@ public class EmsCollectionService {
 
         EmsCollectedPlaylistEntity playlistEntity = upsertPlaylistFromTidal(
             playlist,
+            fallbackPlaylistCoverImageUrl(playlist, tracks),
             USER_TIDAL_URL_IMPORT_SOURCE,
             playlistId,
             collectedAt
@@ -1309,13 +1310,19 @@ public class EmsCollectionService {
     private EmsCollectedPlaylistEntity upsertPlaylistFromTidal(
         TidalPlaylistSummary playlist, String source, String query, Instant now
     ) {
+        return upsertPlaylistFromTidal(playlist, playlist.coverImageUrl(), source, query, now);
+    }
+
+    private EmsCollectedPlaylistEntity upsertPlaylistFromTidal(
+        TidalPlaylistSummary playlist, String coverImageUrl, String source, String query, Instant now
+    ) {
         return playlistRepository.findBySourcePlatformAndExternalPlaylistId("tidal", playlist.playlistId())
             .map(existing -> {
                 existing.applyCollectedMetadata(
                     normalizeRequiredText(playlist.name(), "Untitled TIDAL Playlist", 200),
                     "",
                     normalizeDescription(playlist.description()),
-                    truncate(playlist.coverImageUrl(), 500),
+                    truncate(coverImageUrl, 500),
                     truncate(playlist.externalUrl(), 500),
                     null,
                     playlist.trackCount(),
@@ -1331,7 +1338,7 @@ public class EmsCollectionService {
                 "tidal",
                 "",
                 normalizeDescription(playlist.description()),
-                truncate(playlist.coverImageUrl(), 500),
+                truncate(coverImageUrl, 500),
                 truncate(playlist.externalUrl(), 500),
                 null,
                 playlist.trackCount(),
@@ -1339,6 +1346,17 @@ public class EmsCollectionService {
                 truncate(query, 200),
                 now
             )));
+    }
+
+    private String fallbackPlaylistCoverImageUrl(TidalPlaylistSummary playlist, List<TidalPlaylistTrack> tracks) {
+        if (hasText(playlist.coverImageUrl())) {
+            return playlist.coverImageUrl();
+        }
+        return tracks.stream()
+            .map(TidalPlaylistTrack::albumImageUrl)
+            .filter(this::hasText)
+            .findFirst()
+            .orElse(null);
     }
 
     private EmsCollectedPlaylistEntity upsertPlaylistFromSearchPreview(
