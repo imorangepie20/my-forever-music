@@ -391,6 +391,7 @@ public class EmsCollectionService {
             playlistId,
             collectedAt
         );
+        playlistTrackRepository.deleteByPlaylistId(playlistEntity.getId());
         Map<String, ReccoBeatsAudioFeaturesSnapshot> audioFeaturesByTrackId = resolveTidalAudioFeatures(tracks);
         Instant resolvedAt = Instant.now();
         for (int i = 0; i < tracks.size(); i++) {
