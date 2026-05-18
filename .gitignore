@@ -24,5 +24,6 @@ temp/
 logs/
 *.log
 infra/local-certs/
+.worktrees/
 apps/web/public/eq.html
 services/ai/models/sasrec/
