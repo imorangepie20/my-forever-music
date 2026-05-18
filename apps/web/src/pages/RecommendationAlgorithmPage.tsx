@@ -11,83 +11,82 @@ const RecommendationAlgorithmPage = () => {
                     className="inline-flex items-center gap-2 text-sm text-hud-text-secondary transition-hud hover:text-hud-text-primary"
                 >
                     <ArrowLeft size={16} />
-                    Back to home
+                    메인으로 돌아가기
                 </Link>
                 <span className="text-xs uppercase tracking-[0.28em] text-hud-text-muted">
-                    Recommendation pipeline
+                    추천 파이프라인
                 </span>
             </header>
 
             <section className="relative overflow-hidden rounded-3xl border border-hud-border-secondary bg-gradient-to-br from-hud-bg-primary/95 via-hud-bg-primary/80 to-hud-bg-primary/95 px-8 py-10">
                 <p className="text-[11px] uppercase tracking-[0.32em] text-hud-accent-primary">
-                    Three signals, one feed
+                    세 갈래 신호, 하나의 피드
                 </p>
                 <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-hud-text-primary sm:text-4xl">
-                    Your library, an editorial reading list, and a transparent six-axis ranker.
+                    내 라이브러리, 매거진 리딩리스트, 그리고 투명한 6축 랭커.
                 </h1>
                 <p className="mt-4 max-w-3xl text-sm leading-7 text-hud-text-secondary sm:text-base">
-                    My Forever Music splits recommendation into three stages so the inputs stay legible:
-                    a personal library (PMS), an editorially-curated pool (EMS), and a personalized
-                    ranker (GMS). Every playlist you see on the home page is scored against six explicit
-                    axes — no opaque black box.
+                    My Forever Music 의 추천은 세 단계로 나뉘어 입력이 명확하게 보이도록 설계돼 있습니다 —
+                    내가 가져온 라이브러리(<strong>PMS</strong>), 매거진에서 큐레이션된 풀(<strong>EMS</strong>),
+                    그리고 그 둘을 연결하는 개인화 랭커(<strong>GMS</strong>). 메인에 노출되는 모든 플레이리스트는
+                    단일 인기도 숫자가 아니라 6개 축으로 분해된 점수로 매겨져 있어 블랙박스가 아닙니다.
                 </p>
             </section>
 
             <section className="grid gap-4 md:grid-cols-3">
                 <HudCard
-                    title="PMS — Personal Music Service"
-                    subtitle="Your taste reference"
+                    title="PMS · Personal Music Space"
+                    subtitle="내 음악 공간 — 취향의 기준선"
                 >
                     <div className="flex items-start gap-3">
                         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-hud-accent-primary/10 text-hud-accent-primary">
                             <Library size={20} />
                         </span>
                         <p className="text-sm leading-6 text-hud-text-secondary">
-                            We import the playlists you already love from Spotify and TIDAL. Audio
-                            features (energy, danceability, mood) are resolved per track so the rest of
-                            the pipeline has a stable signal to compare against.
+                            Spotify·TIDAL 에서 가져온 내 플레이리스트가 그대로 취향의 기준선이 됩니다. 각 트랙의
+                            에너지·댄서빌리티·무드 같은 오디오 특성을 함께 저장해 두기 때문에, 다음 단계가
+                            <strong> "내가 좋아하는 음악"</strong> 의 형태를 안정적으로 비교할 수 있습니다.
                         </p>
                     </div>
                 </HudCard>
 
                 <HudCard
-                    title="EMS — Editorial Music Service"
-                    subtitle="Discovery from real journalism"
+                    title="EMS · External Music Space"
+                    subtitle="바깥 음악 공간 — 매거진이 큐레이션한 후보"
                 >
                     <div className="flex items-start gap-3">
                         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-hud-accent-info/10 text-hud-accent-info">
                             <Newspaper size={20} />
                         </span>
                         <p className="text-sm leading-6 text-hud-text-secondary">
-                            A scheduled pipeline reads RSS feeds from Pitchfork, Stereogum,
-                            BrooklynVegan, FACT, The FADER, NME and similar publications, extracts
-                            track mentions, and resolves them against Spotify / TIDAL to fill the
-                            EMS pool with editor-vetted candidates.
+                            Pitchfork·Stereogum·BrooklynVegan·FACT·The FADER·NME 같은 매거진의 RSS 를
+                            주기적으로 읽어들여 등장한 트랙을 추출하고, Spotify·TIDAL 카탈로그와 매칭해
+                            <strong> 에디터가 검증한 후보</strong> 로 EMS 풀을 채웁니다. 알고리즘이 임의로 만든
+                            가짜 데이터가 아니라 실제 매체가 다룬 음악이 들어옵니다.
                         </p>
                     </div>
                 </HudCard>
 
                 <HudCard
-                    title="GMS — Group Music Service"
-                    subtitle="Personalized ranker"
+                    title="GMS · Gateway Music Space"
+                    subtitle="게이트웨이 — PMS ↔ EMS 를 잇는 랭커"
                 >
                     <div className="flex items-start gap-3">
                         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400/10 text-amber-300">
                             <Sparkles size={20} />
                         </span>
                         <p className="text-sm leading-6 text-hud-text-secondary">
-                            For each user, GMS pulls EMS candidates and ranks them against the PMS
-                            profile. The output is the "Recommended for you" surface — composite
-                            scores you can trace back to specific axes, not a one-number popularity
-                            proxy.
+                            사용자별로 EMS 후보를 끌어와 PMS 프로필에 맞춰 다시 정렬하는 관문 단계입니다.
+                            메인의 <strong>"추천"</strong> 영역은 단일 인기도 숫자가 아니라 6개 축으로 분해된
+                            종합 점수에서 나오기 때문에, 왜 이 플레이리스트가 떴는지 축 단위로 추적할 수 있습니다.
                         </p>
                     </div>
                 </HudCard>
             </section>
 
             <HudCard
-                title="The six axes"
-                subtitle="Every recommendation comes with explicit evidence"
+                title="6개 축 (Six axes)"
+                subtitle="추천 하나하나가 명시적 근거를 들고 옵니다"
             >
                 <ul className="grid gap-3 sm:grid-cols-2">
                     {SIX_AXES.map((axis) => (
@@ -101,33 +100,33 @@ const RecommendationAlgorithmPage = () => {
 
             <section className="grid gap-4 md:grid-cols-2">
                 <HudCard
-                    title="No mock data in production paths"
-                    subtitle="Real provider, real PCM, real failure messages"
+                    title="가짜 데이터는 쓰지 않습니다"
+                    subtitle="실제 프로바이더 호출 · 실제 PCM · 실제 에러 메시지"
                 >
                     <div className="flex items-start gap-3">
                         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
                             <ShieldCheck size={20} />
                         </span>
                         <p className="text-sm leading-6 text-hud-text-secondary">
-                            We refuse to silently substitute synthetic data when a real provider call
-                            fails. Errors surface with platform-specific guidance instead of fake
-                            success — you can always tell what the system actually did.
+                            실제 스트리밍 프로바이더 호출이 실패할 때, 합성 데이터로 조용히 대체하지
+                            않습니다. 플랫폼별 안내 메시지가 그대로 화면에 떠 시스템이 실제로 어떤
+                            동작을 했는지 항상 확인할 수 있습니다.
                         </p>
                     </div>
                 </HudCard>
 
                 <HudCard
-                    title="Feedback closes the loop"
-                    subtitle="Likes and saves rewrite your profile"
+                    title="피드백이 루프를 닫습니다"
+                    subtitle="좋아요·저장·완청이 다시 내 프로필로 돌아옵니다"
                 >
                     <div className="flex items-start gap-3">
                         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-fuchsia-400/10 text-fuchsia-300">
                             <Workflow size={20} />
                         </span>
                         <p className="text-sm leading-6 text-hud-text-secondary">
-                            Likes from the dock, recommendation feedback, and playback completions all
-                            feed back into the PMS profile and the GMS ranker. Recommendations are
-                            never frozen — they move with you.
+                            Dock 의 좋아요 토글, 추천 카드의 like/dislike, 트랙 완청 같은 행동이 모두
+                            PMS 프로필과 GMS 랭커로 되돌아갑니다. 추천은 한 번 정해지면 끝나는 게 아니라
+                            사용자와 함께 움직입니다.
                         </p>
                     </div>
                 </HudCard>
@@ -138,19 +137,19 @@ const RecommendationAlgorithmPage = () => {
                     to="/ems"
                     className="inline-flex items-center gap-2 rounded-full border border-hud-border-secondary bg-hud-bg-primary/80 px-4 py-2 text-sm text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
                 >
-                    Explore the EMS workspace
+                    EMS 작업 공간 열기
                 </Link>
                 <Link
                     to="/gms-preview"
                     className="inline-flex items-center gap-2 rounded-full border border-hud-border-secondary bg-hud-bg-primary/80 px-4 py-2 text-sm text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
                 >
-                    Run a GMS preview
+                    GMS 미리보기 실행
                 </Link>
                 <Link
                     to="/platforms"
                     className="inline-flex items-center gap-2 rounded-full border border-hud-border-secondary bg-hud-bg-primary/80 px-4 py-2 text-sm text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
                 >
-                    Connect your streaming platform
+                    스트리밍 플랫폼 연결
                 </Link>
             </div>
         </div>
@@ -159,28 +158,28 @@ const RecommendationAlgorithmPage = () => {
 
 const SIX_AXES = [
     {
-        name: 'Affinity',
-        description: 'How closely a candidate matches the energy/mood/genre fingerprint of your PMS library.',
+        name: 'Affinity · 적합도',
+        description: '후보가 내 PMS 라이브러리의 에너지·무드·장르 지문과 얼마나 가까운지를 측정합니다.',
     },
     {
-        name: 'Novelty',
-        description: 'Bias toward tracks and playlists you have not encountered yet — the opposite of an echo chamber.',
+        name: 'Novelty · 새로움',
+        description: '아직 만나지 않은 트랙·플레이리스트로 약간 기울이는 가중치 — 에코 챔버에 갇히지 않게 합니다.',
     },
     {
-        name: 'Coherence',
-        description: 'Internal consistency of the playlist itself — does it hold a mood, or is it a random pile?',
+        name: 'Coherence · 일관성',
+        description: '플레이리스트 자체가 한 분위기를 유지하는지, 여러 무드가 잡탕으로 섞여 있는지 평가합니다.',
     },
     {
-        name: 'Diversity',
-        description: 'How much the candidate broadens your current pool vs. duplicating what you already have.',
+        name: 'Diversity · 다양성',
+        description: '내가 지금 듣고 있는 풀을 넓혀주는 후보인지, 이미 있는 것과 겹치는 후보인지 구분합니다.',
     },
     {
-        name: 'Redundancy',
-        description: 'Penalty when a candidate overlaps too much with what we already recommended this session.',
+        name: 'Redundancy · 중복도',
+        description: '이번 세션에서 이미 추천한 것과 너무 겹치는 후보에는 페널티를 줍니다.',
     },
     {
-        name: 'Confidence',
-        description: 'Signal strength — fewer features filled, lower confidence, even if the affinity score is high.',
+        name: 'Confidence · 신뢰도',
+        description: '오디오 특성처럼 채워진 신호가 적은 경우, 적합도가 높아도 신뢰도는 낮게 잡힙니다.',
     },
 ]
 
