@@ -899,6 +899,12 @@ public class TidalWebApiClient {
         if (trackCount == null) {
             trackCount = extractAttribute(attrs, "numberOfItems", Integer.class, 0);
         }
+        String imageId = firstNonBlank(
+            extractAttribute(attrs, "imageId", String.class),
+            extractAttribute(attrs, "squareImage", String.class),
+            extractAttribute(attrs, "cover", String.class),
+            extractAttribute(attrs, "image", String.class)
+        );
         return new TidalPlaylistSummary(
             data.id(),
             firstNonBlank(
@@ -907,8 +913,8 @@ public class TidalWebApiClient {
             ),
             extractAttribute(attrs, "description", String.class),
             trackCount,
-            extractAttribute(attrs, "imageId", String.class),
-            buildImageUrl(extractAttribute(attrs, "imageId", String.class)),
+            imageId,
+            firstNonBlank(imageLink(attrs), buildImageUrl(imageId)),
             extractAttribute(attrs, "url", String.class),
             extractAttribute(attrs, "uuid", String.class)
         );
@@ -1337,6 +1343,25 @@ public class TidalWebApiClient {
             return null;
         }
         Object links = attributes.get("externalLinks");
+        if (!(links instanceof List<?> linkList)) {
+            return null;
+        }
+        return linkList.stream()
+            .filter(Map.class::isInstance)
+            .map(Map.class::cast)
+            .map(link -> link.get("href"))
+            .filter(Objects::nonNull)
+            .map(Object::toString)
+            .filter(value -> !value.isBlank())
+            .findFirst()
+            .orElse(null);
+    }
+
+    private String imageLink(Map<String, Object> attributes) {
+        if (attributes == null) {
+            return null;
+        }
+        Object links = attributes.get("imageLinks");
         if (!(links instanceof List<?> linkList)) {
             return null;
         }
