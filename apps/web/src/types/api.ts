@@ -1014,6 +1014,25 @@ export interface GmsPlaylistDismissResponse {
     dismissed_at: string
 }
 
+export interface GmsTidalPlaylistUrlImportRequest {
+    user_id: string
+    playlist_url: string
+}
+
+export interface GmsTidalPlaylistUrlImportResponse {
+    service: string
+    status: string
+    generated_at: string
+    user_id: string
+    ems_playlist_id: number
+    external_playlist_id: string
+    source_platform: string
+    title: string
+    track_count: number
+    collection_source: string
+    collected_at: string
+}
+
 export interface EmsCollectionSearchRequest {
     user_id: string
     platform_id?: string

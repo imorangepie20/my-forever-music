@@ -42,6 +42,7 @@ public class EmsCollectionService {
 
     private static final Logger log = LoggerFactory.getLogger(EmsCollectionService.class);
     private static final String SEARCH_POOL_SOURCE = "search_pool";
+    public static final String USER_TIDAL_URL_IMPORT_SOURCE = "user_tidal_url_import";
     public static final String FLO_SPECIAL_SOURCE = "flo_special";
     public static final String MELON_HOT_100_SOURCE = "melon_hot_100";
     private static final String MELON_HOT_100_PLAYLIST_ID = "melon-hot-100";
@@ -365,6 +366,54 @@ public class EmsCollectionService {
         }
 
         throw new IllegalArgumentException("Unsupported EMS pool entry type: %s".formatted(entry.getEntryType()));
+    }
+
+    @Transactional
+    public EmsTidalPlaylistUrlImportCollection collectTidalPlaylistFromUrlImport(String userId, String playlistId) {
+        Instant collectedAt = Instant.now();
+        PlatformAccountCredential credential = platformCredentialService
+            .findUsableCredential(userId, "tidal")
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Connect TIDAL before importing a TIDAL playlist URL into GMS."
+            ));
+
+        TidalPlaylistSummary playlist = tidalWebApiClient.getPlaylist(credential, playlistId);
+        List<TidalPlaylistTrack> tracks = tidalWebApiClient.getPlaylistTracks(credential, playlistId);
+        if (tracks.isEmpty()) {
+            throw new IllegalArgumentException(
+                "TIDAL playlist does not contain importable tracks: %s".formatted(playlistId)
+            );
+        }
+
+        EmsCollectedPlaylistEntity playlistEntity = upsertPlaylistFromTidal(
+            playlist,
+            USER_TIDAL_URL_IMPORT_SOURCE,
+            playlistId,
+            collectedAt
+        );
+        playlistTrackRepository.deleteByPlaylistId(playlistEntity.getId());
+        Map<String, ReccoBeatsAudioFeaturesSnapshot> audioFeaturesByTrackId = resolveTidalAudioFeatures(tracks);
+        Instant resolvedAt = Instant.now();
+        for (int i = 0; i < tracks.size(); i++) {
+            TidalPlaylistTrack track = tracks.get(i);
+            EmsCollectedTrackEntity trackEntity = upsertTrackFromTidal(
+                track,
+                USER_TIDAL_URL_IMPORT_SOURCE,
+                collectedAt,
+                resolveTidalTrackAudioFeatures(track, audioFeaturesByTrackId.get(track.tidalTrackId()), resolvedAt)
+            );
+            linkPlaylistTrack(playlistEntity, trackEntity, i);
+        }
+
+        return new EmsTidalPlaylistUrlImportCollection(
+            playlistEntity.getId(),
+            playlist.playlistId(),
+            "tidal",
+            playlistEntity.getTitle(),
+            tracks.size(),
+            USER_TIDAL_URL_IMPORT_SOURCE,
+            collectedAt
+        );
     }
 
     private void storeSearchPlaylistTracks(
@@ -1662,6 +1711,16 @@ public class EmsCollectionService {
     public record EmsSearchPoolCollectionResult(
         int collectedPlaylistCount,
         int collectedTrackCount
+    ) {}
+
+    public record EmsTidalPlaylistUrlImportCollection(
+        Long emsPlaylistId,
+        String externalPlaylistId,
+        String sourcePlatform,
+        String title,
+        int trackCount,
+        String collectionSource,
+        Instant collectedAt
     ) {}
 
     public record EmsAudioFeatureCoverage(

@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.myforevermusic.api.modules.auth.application.AuthRegisteredAccount;
 import io.myforevermusic.api.modules.auth.application.AuthAccountStore;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedPlaylistEntity;
 import io.myforevermusic.api.modules.ems.infrastructure.persistence.EmsCollectedPlaylistRepository;
@@ -168,18 +169,69 @@ class GmsPlaylistPreviewServiceTest {
         assertThat(service.preview("user-001", 12).candidates()).isEmpty();
     }
 
+    @Test
+    void shouldIncludeExplicitImportedPlaylistEvenWhenPreferredPlatformDiffers() {
+        AuthAccountStore authAccountStore = mock(AuthAccountStore.class);
+        PmsUserLibraryStore pmsUserLibraryStore = mock(PmsUserLibraryStore.class);
+        EmsCollectedPlaylistRepository playlistRepository = mock(EmsCollectedPlaylistRepository.class);
+        EmsCollectedPlaylistTrackRepository playlistTrackRepository = mock(EmsCollectedPlaylistTrackRepository.class);
+        PmsPersonalPlaylistStore personalPlaylistStore = new InMemoryPmsPersonalPlaylistStore();
+        InMemoryUserMusicEventStore userMusicEventStore = new InMemoryUserMusicEventStore();
+        UserMusicEventService userMusicEventService = new UserMusicEventService(
+            userMusicEventStore,
+            new EventSignalWeights()
+        );
+        PlaylistQualityEvaluator playlistQualityEvaluator = mock(PlaylistQualityEvaluator.class);
+
+        EmsCollectedPlaylistEntity spotifyPlaylist = playlist(1L, "spotify", "acquisition_pool");
+        EmsCollectedPlaylistEntity tidalPlaylist = playlist(2L, "tidal", "user_tidal_url_import");
+        EmsCollectedTrackEntity track = track(20L, "Imported TIDAL Track");
+        when(authAccountStore.findByUserId("user-001")).thenReturn(Optional.of(account("spotify")));
+        when(pmsUserLibraryStore.findPlaylists("user-001")).thenReturn(List.of(pmsLibraryPlaylist()));
+        when(playlistRepository.findRecentWithTracksBySourcePlatforms(
+            List.of("spotify"),
+            PageRequest.of(0, 36)
+        )).thenReturn(List.of(spotifyPlaylist));
+        when(playlistRepository.findById(2L)).thenReturn(Optional.of(tidalPlaylist));
+        when(playlistTrackRepository.findByPlaylistIdOrderBySortOrderAsc(1L)).thenReturn(List.of(
+            new EmsCollectedPlaylistTrackEntity(spotifyPlaylist, track(10L, "Spotify Track"), 1)
+        ));
+        when(playlistTrackRepository.findByPlaylistIdOrderBySortOrderAsc(2L)).thenReturn(List.of(
+            new EmsCollectedPlaylistTrackEntity(tidalPlaylist, track, 1)
+        ));
+
+        GmsPlaylistPreviewService service = new GmsPlaylistPreviewService(
+            authAccountStore,
+            pmsUserLibraryStore,
+            playlistRepository,
+            playlistTrackRepository,
+            personalPlaylistStore,
+            userMusicEventService,
+            userMusicEventStore,
+            playlistQualityEvaluator
+        );
+
+        assertThat(service.preview("user-001", 12, 2L).candidates())
+            .extracting(GmsPlaylistPreviewService.GmsPlaylistPreviewCandidate::playlistId)
+            .contains(2L);
+    }
+
     private static EmsCollectedPlaylistEntity playlist(Long id) {
+        return playlist(id, "spotify", "acquisition_pool");
+    }
+
+    private static EmsCollectedPlaylistEntity playlist(Long id, String sourcePlatform, String collectionSource) {
         EmsCollectedPlaylistEntity playlist = new EmsCollectedPlaylistEntity(
             "playlist-001",
             "EMS Playlist",
-            "spotify",
+            sourcePlatform,
             "curator",
             "description",
             null,
             null,
             null,
             2,
-            "acquisition_pool",
+            collectionSource,
             null,
             Instant.parse("2026-05-15T00:00:00Z")
         );
@@ -237,6 +289,23 @@ class GmsPlaylistPreviewServiceTest {
                 false,
                 null
             ))
+        );
+    }
+
+    private static AuthRegisteredAccount account(String preferredPlatformId) {
+        return new AuthRegisteredAccount(
+            "user-001",
+            "user@example.com",
+            "user@example.com",
+            "User",
+            preferredPlatformId,
+            null,
+            null,
+            false,
+            "registered",
+            Instant.parse("2026-05-09T00:00:00Z"),
+            Instant.parse("2026-05-09T00:00:00Z"),
+            Instant.parse("2026-05-09T00:00:00Z")
         );
     }
 }

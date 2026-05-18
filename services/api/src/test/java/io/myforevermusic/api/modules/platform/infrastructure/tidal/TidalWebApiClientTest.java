@@ -252,6 +252,65 @@ class TidalWebApiClientTest {
     }
 
     @Test
+    void shouldFetchPlaylistMetadataById() throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v2/playlists/0a3d87d2-27dc-4edc-84b6-9f1eaa567f33", exchange -> {
+            String query = exchange.getRequestURI().getQuery();
+            if (query == null || !query.contains("countryCode=KR")) {
+                exchange.sendResponseHeaders(400, -1);
+                exchange.close();
+                return;
+            }
+
+            byte[] response = """
+                {
+                  "data": {
+                    "id": "0a3d87d2-27dc-4edc-84b6-9f1eaa567f33",
+                    "type": "playlists",
+                    "attributes": {
+                      "name": "Night Drive Imports",
+                      "description": "Public TIDAL playlist",
+                      "numberOfItems": 24,
+                      "imageId": "ab12cd34-ef56-7890-ab12-cd34ef567890",
+                      "url": "https://tidal.com/playlist/0a3d87d2-27dc-4edc-84b6-9f1eaa567f33"
+                    }
+                  }
+                }
+                """.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/vnd.api+json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+
+        try {
+            PlatformOAuthProperties properties = new PlatformOAuthProperties();
+            properties.getTidal().setCountryCode("KR");
+            properties.getTidal().setApiBaseUri("http://127.0.0.1:%d/v2".formatted(server.getAddress().getPort()));
+            TidalWebApiClient client = new TidalWebApiClient(
+                properties,
+                new ObjectMapper(),
+                HttpClient.newHttpClient(),
+                properties.getTidal().getApiBaseUri()
+            );
+
+            TidalWebApiClient.TidalPlaylistSummary playlist = client.getPlaylist(
+                tidalCredential(),
+                "0a3d87d2-27dc-4edc-84b6-9f1eaa567f33"
+            );
+
+            assertThat(playlist.playlistId()).isEqualTo("0a3d87d2-27dc-4edc-84b6-9f1eaa567f33");
+            assertThat(playlist.name()).isEqualTo("Night Drive Imports");
+            assertThat(playlist.description()).isEqualTo("Public TIDAL playlist");
+            assertThat(playlist.trackCount()).isEqualTo(24);
+            assertThat(playlist.externalUrl()).isEqualTo("https://tidal.com/playlist/0a3d87d2-27dc-4edc-84b6-9f1eaa567f33");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void shouldParseHomePagePlaylistsFromTidalModuleSource() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/pages/home", exchange -> {

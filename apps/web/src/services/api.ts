@@ -76,6 +76,8 @@ import type {
     GmsPlaylistPreviewResponse,
     GmsPlaylistSaveRequest,
     GmsPlaylistSaveResponse,
+    GmsTidalPlaylistUrlImportRequest,
+    GmsTidalPlaylistUrlImportResponse,
     GmsRecommendationPreviewRequest,
     GmsRecommendationPreviewResponse,
     GmsRecommendationFeedbackRequest,
@@ -1144,16 +1146,29 @@ export const fetchGmsPlaylistPreview = (
     userId: string,
     limit?: number,
     signal?: AbortSignal,
+    includePlaylistId?: number,
 ) => {
     const params = new URLSearchParams({ user_id: userId })
     if (limit != null) {
         params.set('limit', String(limit))
+    }
+    if (includePlaylistId != null) {
+        params.set('include_playlist_id', String(includePlaylistId))
     }
     return requestJson<GmsPlaylistPreviewResponse>(
         `/api/v1/gms/playlists/preview?${params.toString()}`,
         { signal },
     )
 }
+
+export const importTidalPlaylistUrlToGms = (payload: GmsTidalPlaylistUrlImportRequest) =>
+    requestJson<GmsTidalPlaylistUrlImportResponse>('/api/v1/gms/playlists/import/tidal-url', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    })
 
 export const saveGmsPlaylistToPms = (
     playlistId: number,

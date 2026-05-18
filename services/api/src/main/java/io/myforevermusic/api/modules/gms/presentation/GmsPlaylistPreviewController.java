@@ -7,6 +7,7 @@ import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.D
 import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.GmsPlaylistPreviewCandidate;
 import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.GmsPlaylistPreviewResult;
 import io.myforevermusic.api.modules.gms.application.GmsPlaylistPreviewService.SaveResult;
+import io.myforevermusic.api.modules.gms.application.GmsTidalPlaylistUrlImportService;
 import io.myforevermusic.api.modules.recommendation.application.AxisEvidence;
 import io.swagger.v3.oas.annotations.Operation;
 import java.time.Instant;
@@ -24,19 +25,35 @@ import org.springframework.web.bind.annotation.RestController;
 public class GmsPlaylistPreviewController {
 
     private final GmsPlaylistPreviewService service;
+    private final GmsTidalPlaylistUrlImportService tidalPlaylistUrlImportService;
 
-    public GmsPlaylistPreviewController(GmsPlaylistPreviewService service) {
+    public GmsPlaylistPreviewController(
+        GmsPlaylistPreviewService service,
+        GmsTidalPlaylistUrlImportService tidalPlaylistUrlImportService
+    ) {
         this.service = service;
+        this.tidalPlaylistUrlImportService = tidalPlaylistUrlImportService;
     }
 
     @Operation(summary = "List GMS playlist candidates resolved from EMS collected playlists for the requested user")
     @GetMapping("/preview")
     public GmsPlaylistPreviewResponse preview(
         @RequestParam("user_id") String userId,
-        @RequestParam(value = "limit", required = false) Integer limit
+        @RequestParam(value = "limit", required = false) Integer limit,
+        @RequestParam(value = "include_playlist_id", required = false) Long includePlaylistId
     ) {
-        GmsPlaylistPreviewResult result = service.preview(userId, limit);
+        GmsPlaylistPreviewResult result = service.preview(userId, limit, includePlaylistId);
         return GmsPlaylistPreviewResponse.from(result);
+    }
+
+    @Operation(summary = "Import a public TIDAL playlist URL into EMS so it can appear in GMS playlist candidates")
+    @PostMapping("/import/tidal-url")
+    public GmsTidalPlaylistUrlImportResponse importTidalPlaylistUrl(
+        @RequestBody GmsTidalPlaylistUrlImportRequest request
+    ) {
+        GmsTidalPlaylistUrlImportService.ImportResult result =
+            tidalPlaylistUrlImportService.importUrl(request.userId(), request.playlistUrl());
+        return GmsTidalPlaylistUrlImportResponse.from(result);
     }
 
     @Operation(summary = "Save an EMS playlist into the user's PMS personal playlist library")
@@ -67,6 +84,40 @@ public class GmsPlaylistPreviewController {
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record GmsPlaylistSaveRequest(String title, List<Long> excludedTrackIds) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record GmsTidalPlaylistUrlImportRequest(String userId, String playlistUrl) {}
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record GmsTidalPlaylistUrlImportResponse(
+        String service,
+        String status,
+        Instant generatedAt,
+        String userId,
+        Long emsPlaylistId,
+        String externalPlaylistId,
+        String sourcePlatform,
+        String title,
+        int trackCount,
+        String collectionSource,
+        Instant collectedAt
+    ) {
+        static GmsTidalPlaylistUrlImportResponse from(GmsTidalPlaylistUrlImportService.ImportResult result) {
+            return new GmsTidalPlaylistUrlImportResponse(
+                "api",
+                "ok",
+                Instant.now(),
+                result.userId(),
+                result.emsPlaylistId(),
+                result.externalPlaylistId(),
+                result.sourcePlatform(),
+                result.title(),
+                result.trackCount(),
+                result.collectionSource(),
+                result.collectedAt()
+            );
+        }
+    }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record GmsPlaylistDismissResponse(
