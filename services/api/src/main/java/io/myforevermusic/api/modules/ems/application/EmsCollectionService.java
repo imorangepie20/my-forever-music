@@ -43,6 +43,8 @@ public class EmsCollectionService {
     private static final Logger log = LoggerFactory.getLogger(EmsCollectionService.class);
     private static final String SEARCH_POOL_SOURCE = "search_pool";
     public static final String FLO_SPECIAL_SOURCE = "flo_special";
+    public static final String MELON_HOT_100_SOURCE = "melon_hot_100";
+    private static final String MELON_HOT_100_PLAYLIST_ID = "melon-hot-100";
     private static final List<String> TIDAL_HOME_PAGE_SOURCE_IDS = List.of(
         "THE_HITS",
         "POPULAR_MIXES",
@@ -596,6 +598,38 @@ public class EmsCollectionService {
         );
     }
 
+    @Transactional
+    public MelonHot100CollectionResult collectMelonHot100(List<MelonHot100TrackSeed> tracks, Instant snapshotAt) {
+        List<MelonHot100TrackSeed> validTracks = tracks == null
+            ? List.of()
+            : tracks.stream()
+                .filter(track -> track != null && hasText(track.title()) && hasText(track.artistName()))
+                .sorted(java.util.Comparator.comparingInt(MelonHot100TrackSeed::rank))
+                .limit(100)
+                .toList();
+        if (validTracks.isEmpty()) {
+            return new MelonHot100CollectionResult(null, 0, 0, Instant.now());
+        }
+
+        Instant now = Instant.now();
+        Instant effectiveSnapshotAt = snapshotAt == null ? now : snapshotAt;
+        EmsCollectedPlaylistEntity playlistEntity = upsertPlaylistFromMelonHot100(
+            validTracks,
+            effectiveSnapshotAt,
+            now
+        );
+        playlistTrackRepository.deleteByPlaylistId(playlistEntity.getId());
+
+        int linkedTrackCount = 0;
+        for (int i = 0; i < validTracks.size(); i++) {
+            EmsCollectedTrackEntity trackEntity = upsertTrackFromMelonHot100(validTracks.get(i), now);
+            linkPlaylistTrack(playlistEntity, trackEntity, i);
+            linkedTrackCount++;
+        }
+
+        return new MelonHot100CollectionResult(playlistEntity.getId(), 1, linkedTrackCount, now);
+    }
+
     private EmsCollectionSearchResult collectFromProvider(
         String userId,
         String platformId,
@@ -760,6 +794,11 @@ public class EmsCollectionService {
     public List<EmsCollectedPlaylistEntity> getFloSpecialPlaylists(int limit) {
         int clampedLimit = Math.min(Math.max(limit, 1), 300);
         return playlistRepository.findRecentWithTracksByCollectionSource(FLO_SPECIAL_SOURCE, org.springframework.data.domain.PageRequest.of(0, clampedLimit));
+    }
+
+    public List<EmsCollectedPlaylistEntity> getMelonHot100Playlists(int limit) {
+        int clampedLimit = Math.min(Math.max(limit, 1), 5);
+        return playlistRepository.findRecentWithTracksByCollectionSource(MELON_HOT_100_SOURCE, org.springframework.data.domain.PageRequest.of(0, clampedLimit));
     }
 
     public EmsCollectedPlaylistEntity getCollectedPlaylist(Long playlistId) {
@@ -1344,6 +1383,78 @@ public class EmsCollectionService {
         );
     }
 
+    private EmsCollectedPlaylistEntity upsertPlaylistFromMelonHot100(
+        List<MelonHot100TrackSeed> tracks,
+        Instant snapshotAt,
+        Instant now
+    ) {
+        String coverImageUrl = tracks.stream()
+            .map(MelonHot100TrackSeed::imageUrl)
+            .filter(this::hasText)
+            .findFirst()
+            .orElse(null);
+        String description = "Melon Hot 100 chart snapshot from %s. Stored in EMS as a playable trend playlist."
+            .formatted(snapshotAt);
+        return playlistRepository.findBySourcePlatformAndExternalPlaylistId("melon", MELON_HOT_100_PLAYLIST_ID)
+            .map(existing -> {
+                existing.applyCollectedMetadata(
+                    "Melon Hot 100",
+                    "Melon",
+                    normalizeDescription(description),
+                    truncate(coverImageUrl, 500),
+                    "https://www.melon.com/chart/index.htm",
+                    null,
+                    tracks.size(),
+                    MELON_HOT_100_SOURCE,
+                    "Melon Hot 100",
+                    now
+                );
+                return existing;
+            })
+            .orElseGet(() -> playlistRepository.save(new EmsCollectedPlaylistEntity(
+                MELON_HOT_100_PLAYLIST_ID,
+                "Melon Hot 100",
+                "melon",
+                "Melon",
+                normalizeDescription(description),
+                truncate(coverImageUrl, 500),
+                "https://www.melon.com/chart/index.htm",
+                null,
+                tracks.size(),
+                MELON_HOT_100_SOURCE,
+                "Melon Hot 100",
+                now
+            )));
+    }
+
+    private EmsCollectedTrackEntity upsertTrackFromMelonHot100(MelonHot100TrackSeed track, Instant now) {
+        String externalTrackId = hasText(track.melonSongId())
+            ? track.melonSongId()
+            : "rank-%03d".formatted(track.rank());
+        return upsertCollectedTrack(
+            externalTrackId,
+            track.title(),
+            track.artistName(),
+            "melon",
+            null,
+            track.albumTitle(),
+            track.imageUrl(),
+            track.songExternalUrl(),
+            null,
+            null,
+            null,
+            MELON_HOT_100_SOURCE,
+            now,
+            unavailableAudioFeatures(
+                externalTrackId,
+                track.songExternalUrl(),
+                null,
+                null,
+                now
+            )
+        );
+    }
+
     private EmsCollectedPlaylistEntity upsertPlaylistFromFlo(
         FloSpecialCurationService.FloSpecialPlaylist playlist,
         FloSpecialCurationService.FloSpecialSection section,
@@ -1576,6 +1687,24 @@ public class EmsCollectionService {
         long pendingTrackCountAfter,
         double coverageRatioAfter,
         Instant backfilledAt
+    ) {}
+
+    public record MelonHot100TrackSeed(
+        int rank,
+        String melonSongId,
+        String title,
+        String artistName,
+        String albumTitle,
+        String imageUrl,
+        String songExternalUrl,
+        Instant snapshotAt
+    ) {}
+
+    public record MelonHot100CollectionResult(
+        Long playlistId,
+        int collectedPlaylistCount,
+        int collectedTrackCount,
+        Instant collectedAt
     ) {}
 
     public record FloSpecialCollectionResult(

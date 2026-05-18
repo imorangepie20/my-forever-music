@@ -20,6 +20,7 @@ import {
     ApiError,
     fetchEmsCollectedPlaylistDetail,
     fetchEmsFloSpecial,
+    fetchEmsMelonHot100,
     fetchEmsPlaylistSections,
     refreshEmsFloSpecial,
     searchEmsCollection,
@@ -92,6 +93,9 @@ const EmsPage = () => {
     const [isLoadingFloSpecial, setIsLoadingFloSpecial] = useState(false)
     const [isRefreshingFloSpecial, setIsRefreshingFloSpecial] = useState(false)
     const [floSpecialError, setFloSpecialError] = useState<string | null>(null)
+    const [melonHot100Playlists, setMelonHot100Playlists] = useState<EmsCollectionPlaylistItem[]>([])
+    const [isLoadingMelonHot100, setIsLoadingMelonHot100] = useState(false)
+    const [melonHot100Error, setMelonHot100Error] = useState<string | null>(null)
 
     useEffect(() => {
         const controller = new AbortController()
@@ -146,6 +150,31 @@ const EmsPage = () => {
             })
             .finally(() => {
                 setIsLoadingFloSpecial(false)
+            })
+
+        return () => controller.abort()
+    }, [])
+
+    useEffect(() => {
+        const controller = new AbortController()
+
+        setIsLoadingMelonHot100(true)
+        setMelonHot100Error(null)
+
+        fetchEmsMelonHot100(controller.signal)
+            .then((response) => {
+                startTransition(() => setMelonHot100Playlists(response.playlists))
+            })
+            .catch((err: unknown) => {
+                if (err instanceof DOMException && err.name === 'AbortError') return
+                const message =
+                    err instanceof ApiError
+                        ? err.message
+                        : 'Unable to load Melon Hot 100 from EMS.'
+                startTransition(() => setMelonHot100Error(message))
+            })
+            .finally(() => {
+                setIsLoadingMelonHot100(false)
             })
 
         return () => controller.abort()
@@ -468,6 +497,66 @@ const EmsPage = () => {
                     ) : (
                         <div className="rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">
                             FLO Special playlists will appear here after the first refresh stores them in EMS.
+                        </div>
+                    )}
+                </div>
+            </HudCard>
+
+            <HudCard
+                title="Melon Hot 100"
+                subtitle="The latest Melon chart materialized as an EMS playlist"
+                action={
+                    isLoadingMelonHot100 ? (
+                        <span className="inline-flex items-center gap-2 text-xs text-hud-text-muted">
+                            <RefreshCw size={14} className="animate-spin" />
+                            Loading chart
+                        </span>
+                    ) : null
+                }
+            >
+                <div className="space-y-5">
+                    {melonHot100Error && (
+                        <div className="rounded-2xl border border-hud-accent-warning/40 bg-hud-accent-warning/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                            {melonHot100Error}
+                        </div>
+                    )}
+
+                    {melonHot100Playlists.length > 0 ? (
+                        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+                            {melonHot100Playlists.map((playlist) => (
+                                <PlaylistFeatureCard
+                                    key={playlist.id}
+                                    title={playlist.title}
+                                    sourcePlatform={playlist.source_platform}
+                                    curator={playlist.curator || 'Melon'}
+                                    trackCount={playlist.track_count}
+                                    description={playlist.description || 'Melon Hot 100 chart stored in EMS.'}
+                                    supportingText={floPlaylistSupportingText(playlist)}
+                                    imageUrl={playlist.cover_image_url}
+                                    actionLabel="Open Playlist"
+                                    detailPath={buildEmsPlaylistDetailPath(playlist.id)}
+                                    isPlayLoading={preparingPlaylistId === playlist.id}
+                                    onPlay={() => void handlePlayEmsPlaylist(playlist)}
+                                    onOpenExternal={() => openExternal(playlist.platform_external_url)}
+                                />
+                            ))}
+                            <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-5">
+                                <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-hud-text-muted">
+                                    <Tags size={15} />
+                                    EMS chart corner
+                                </div>
+                                <h3 className="mt-3 text-xl font-semibold text-hud-text-primary">
+                                    매일 바뀌는 차트를 EMS 후보군으로 보관
+                                </h3>
+                                <p className="mt-3 text-sm leading-6 text-hud-text-secondary">
+                                    Melon 스크래프가 갱신될 때 같은 순서로 EMS 플레이리스트 링크를 다시 구성합니다.
+                                    상세 페이지에서는 기존 EMS 재생 큐와 같은 방식으로 연속 재생됩니다.
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl border border-dashed border-hud-border-secondary bg-hud-bg-primary/60 p-6 text-sm leading-6 text-hud-text-secondary">
+                            Melon Hot 100 will appear here after the chart scraper materializes it into EMS.
                         </div>
                     )}
                 </div>

@@ -3,6 +3,7 @@ import { Activity, ArrowRight, Globe, Server, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Button from '@/components/common/Button'
 import AlgorithmIntroSection from '@/components/home/AlgorithmIntroSection'
+import FloSpecialHomeSection from '@/components/home/FloSpecialHomeSection'
 import GmsRecommendedPlaylistsSection from '@/components/home/GmsRecommendedPlaylistsSection'
 import HeroEqBanner from '@/components/home/HeroEqBanner'
 import LatestTracksSection from '@/components/home/LatestTracksSection'
@@ -84,6 +85,8 @@ const HomePage = () => {
             <AlgorithmIntroSection />
 
             <GmsRecommendedPlaylistsSection />
+
+            <FloSpecialHomeSection />
 
             <MelonHot100Section />
 

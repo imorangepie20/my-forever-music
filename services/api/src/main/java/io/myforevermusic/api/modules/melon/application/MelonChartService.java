@@ -1,5 +1,6 @@
 package io.myforevermusic.api.modules.melon.application;
 
+import io.myforevermusic.api.modules.ems.application.EmsCollectionService;
 import io.myforevermusic.api.modules.melon.infrastructure.persistence.MelonChartTrackEntity;
 import io.myforevermusic.api.modules.melon.infrastructure.persistence.MelonChartTrackRepository;
 import io.myforevermusic.api.modules.melon.infrastructure.scraping.MelonChartScraper;
@@ -24,16 +25,27 @@ public class MelonChartService {
 
     private final MelonChartTrackRepository repository;
     private final MelonChartScraper scraper;
+    private final EmsCollectionService emsCollectionService;
     private final Clock clock;
 
     @Autowired
-    public MelonChartService(MelonChartTrackRepository repository, MelonChartScraper scraper) {
-        this(repository, scraper, Clock.systemUTC());
+    public MelonChartService(
+        MelonChartTrackRepository repository,
+        MelonChartScraper scraper,
+        EmsCollectionService emsCollectionService
+    ) {
+        this(repository, scraper, emsCollectionService, Clock.systemUTC());
     }
 
-    MelonChartService(MelonChartTrackRepository repository, MelonChartScraper scraper, Clock clock) {
+    MelonChartService(
+        MelonChartTrackRepository repository,
+        MelonChartScraper scraper,
+        EmsCollectionService emsCollectionService,
+        Clock clock
+    ) {
         this.repository = repository;
         this.scraper = scraper;
+        this.emsCollectionService = emsCollectionService;
         this.clock = clock;
     }
 
@@ -72,13 +84,52 @@ public class MelonChartService {
                 now
             ));
         }
-        repository.saveAll(entities);
-        log.info("Melon chart refreshed: {} tracks at {}", entities.size(), now);
+        List<MelonChartTrackEntity> saved = repository.saveAll(entities);
+        EmsCollectionService.MelonHot100CollectionResult emsResult = collectCurrentChartIntoEms(saved, now);
+        log.info(
+            "Melon chart refreshed: {} tracks at {}; EMS playlist={} linked_tracks={}",
+            entities.size(),
+            now,
+            emsResult.playlistId(),
+            emsResult.collectedTrackCount()
+        );
         return entities.size();
+    }
+
+    @Transactional
+    public EmsCollectionService.MelonHot100CollectionResult materializeCurrentChartToEms() {
+        List<MelonChartTrackEntity> tracks = repository.findAllByOrderByRankAsc();
+        Instant snapshotAt = tracks.isEmpty() ? clock.instant() : tracks.get(0).getSnapshotAt();
+        return collectCurrentChartIntoEms(tracks, snapshotAt);
     }
 
     private static MelonChartTrackResponse toResponse(MelonChartTrackEntity entity) {
         return new MelonChartTrackResponse(
+            entity.getRank(),
+            entity.getMelonSongId(),
+            entity.getTitle(),
+            entity.getArtistName(),
+            entity.getAlbumTitle(),
+            entity.getImageUrl(),
+            entity.getSongExternalUrl(),
+            entity.getSnapshotAt()
+        );
+    }
+
+    private EmsCollectionService.MelonHot100CollectionResult collectCurrentChartIntoEms(
+        List<MelonChartTrackEntity> tracks,
+        Instant snapshotAt
+    ) {
+        return emsCollectionService.collectMelonHot100(
+            tracks.stream()
+                .map(MelonChartService::toEmsSeed)
+                .toList(),
+            snapshotAt
+        );
+    }
+
+    private static EmsCollectionService.MelonHot100TrackSeed toEmsSeed(MelonChartTrackEntity entity) {
+        return new EmsCollectionService.MelonHot100TrackSeed(
             entity.getRank(),
             entity.getMelonSongId(),
             entity.getTitle(),

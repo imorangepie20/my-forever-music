@@ -36,50 +36,50 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
     {
-        label: 'Overview',
-        description: 'Project status and service map',
+        label: '홈',
+        description: '추천 홈과 서비스 현황',
         icon: <Home size={20} />,
         path: '/',
     },
     {
-        label: 'Platforms',
-        description: 'Subscription and import sources',
+        label: '플랫폼 연결',
+        description: '스트리밍 계정과 가져오기',
         icon: <Radio size={20} />,
         path: '/platforms',
     },
     {
-        label: 'PMS Library',
-        description: 'Playlists and approved saves',
+        label: '내 음악(PMS)',
+        description: '플레이리스트와 저장한 곡',
         icon: <Music2 size={20} />,
         path: '/pms',
     },
     {
-        label: 'EMS Model',
-        description: 'Candidate evaluation signals',
+        label: '음악 탐색(EMS)',
+        description: '외부 플레이리스트 후보',
         icon: <SlidersHorizontal size={20} />,
         path: '/ems',
     },
     {
-        label: 'GMS Playlists',
-        description: 'EMS 평가 플레이리스트를 PMS에 저장',
+        label: '추천 플레이리스트',
+        description: '취향 모델이 고른 묶음',
         icon: <Sparkles size={20} />,
         path: '/gms-playlists',
     },
     {
-        label: 'GMS Approval',
-        description: 'Review and save candidates',
+        label: '추천 검토(GMS)',
+        description: '추천 후보 저장과 평가',
         icon: <Sparkles size={20} />,
         path: '/gms-preview',
     },
     {
-        label: 'Playback',
-        description: 'Spotify and TIDAL player harness',
+        label: '플레이어 테스트',
+        description: 'Spotify와 TIDAL 재생 확인',
         icon: <PlayCircle size={20} />,
         path: '/playback-harness',
     },
     {
-        label: 'TIDAL Test',
-        description: 'Isolated playlist stream page',
+        label: 'TIDAL 테스트',
+        description: '격리된 플레이리스트 재생',
         icon: <PlayCircle size={20} />,
         path: '/tidal-playlist-test',
     },
@@ -87,44 +87,44 @@ const menuItems: MenuItem[] = [
 
 const adminMenuItems: MenuItem[] = [
     {
-        label: 'Schedules',
-        description: 'Scheduler cadence and health',
+        label: '스케줄 관리',
+        description: '주기 작업과 상태 확인',
         icon: <CalendarClock size={20} />,
         path: '/admin/schedules',
     },
     {
-        label: 'EMS Acquire',
-        description: 'Editorial source collection runs',
+        label: 'EMS 수집',
+        description: '음악 소스 수집 실행',
         icon: <Rss size={20} />,
         path: '/ems/acquisition-admin',
     },
     {
-        label: 'EMS Pool',
-        description: 'Search ingest queue monitor',
+        label: 'EMS 큐',
+        description: '검색 적재 큐 모니터',
         icon: <Activity size={20} />,
         path: '/ems/pool-admin',
     },
     {
-        label: 'Playlist Quality',
-        description: 'Recent GMS 6-axis summary',
+        label: '추천 품질',
+        description: '최근 6축 평가 요약',
         icon: <BarChart3 size={20} />,
         path: '/recommendations/quality-admin',
     },
     {
-        label: 'Feature Coverage',
-        description: 'PMS, EMS, learning signal readiness',
+        label: '특성 커버리지',
+        description: 'PMS, EMS, 학습 신호 준비도',
         icon: <Gauge size={20} />,
         path: '/recommendations/feature-coverage',
     },
     {
-        label: 'SASRec Model',
-        description: 'Promote, disable, rollback policy',
+        label: 'SASRec 모델',
+        description: '승격, 비활성화, 롤백 정책',
         icon: <BadgeCheck size={20} />,
         path: '/recommendations/sasrec-admin',
     },
     {
-        label: 'Metadata Normalize',
-        description: 'MusicBrainz lookup + candidate review',
+        label: '메타데이터 정규화',
+        description: 'MusicBrainz 후보 검토',
         icon: <Compass size={20} />,
         path: '/recommendations/metadata-admin',
     },
@@ -132,9 +132,40 @@ const adminMenuItems: MenuItem[] = [
 
 const Sidebar = ({ collapsed, open, onClose, onCollapseToggle }: SidebarProps) => {
     const { session } = useAuthSession()
-    const items = session?.email.toLowerCase() === 'jowoosungtidal@gmail.com'
-        ? [...menuItems, ...adminMenuItems]
-        : menuItems
+    const isAdmin = session?.email.toLowerCase() === 'jowoosungtidal@gmail.com'
+
+    const renderMenuList = (items: MenuItem[]) => (
+        <ul className="space-y-2">
+            {items.map((item) => (
+                <li key={item.path}>
+                    <NavLink
+                        to={item.path}
+                        end={item.path === '/'}
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                            `group flex items-center gap-3 rounded-2xl border px-3 py-3 transition-hud ${
+                                isActive
+                                    ? 'border-hud-border-primary bg-hud-accent-primary/10 text-hud-accent-primary shadow-hud'
+                                    : 'border-transparent text-hud-text-secondary hover:border-hud-border-secondary hover:bg-hud-bg-hover hover:text-hud-text-primary'
+                            }`
+                        }
+                    >
+                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-hud-bg-primary/80">
+                            {item.icon}
+                        </span>
+                        {!collapsed && (
+                            <span className="min-w-0">
+                                <span className="block text-sm font-medium">{item.label}</span>
+                                <span className="mt-0.5 block text-xs text-hud-text-muted">
+                                    {item.description}
+                                </span>
+                            </span>
+                        )}
+                    </NavLink>
+                </li>
+            ))}
+        </ul>
+    )
 
     return (
         <>
@@ -163,7 +194,7 @@ const Sidebar = ({ collapsed, open, onClose, onCollapseToggle }: SidebarProps) =
                                     My Forever Music
                                 </p>
                                 <h2 className="mt-1 text-lg font-semibold text-hud-text-primary">
-                                    Rebuild Shell
+                                    음악 추천 홈
                                 </h2>
                             </div>
                         )}
@@ -172,38 +203,17 @@ const Sidebar = ({ collapsed, open, onClose, onCollapseToggle }: SidebarProps) =
 
                 <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-5">
                     <div className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-hud-text-muted">
-                        {!collapsed ? 'Workspace' : 'WS'}
+                        {!collapsed ? '음악 공간' : '공간'}
                     </div>
-                    <ul className="space-y-2">
-                        {items.map((item) => (
-                            <li key={item.path}>
-                                <NavLink
-                                    to={item.path}
-                                    end={item.path === '/'}
-                                    onClick={onClose}
-                                    className={({ isActive }) =>
-                                        `group flex items-center gap-3 rounded-2xl border px-3 py-3 transition-hud ${
-                                            isActive
-                                                ? 'border-hud-border-primary bg-hud-accent-primary/10 text-hud-accent-primary shadow-hud'
-                                                : 'border-transparent text-hud-text-secondary hover:border-hud-border-secondary hover:bg-hud-bg-hover hover:text-hud-text-primary'
-                                        }`
-                                    }
-                                >
-                                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-hud-bg-primary/80">
-                                        {item.icon}
-                                    </span>
-                                    {!collapsed && (
-                                        <span className="min-w-0">
-                                            <span className="block text-sm font-medium">{item.label}</span>
-                                            <span className="mt-0.5 block text-xs text-hud-text-muted">
-                                                {item.description}
-                                            </span>
-                                        </span>
-                                    )}
-                                </NavLink>
-                            </li>
-                        ))}
-                    </ul>
+                    {renderMenuList(menuItems)}
+                    {isAdmin && (
+                        <div className="mt-6">
+                            <div className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-hud-text-muted">
+                                관리
+                            </div>
+                            {renderMenuList(adminMenuItems)}
+                        </div>
+                    )}
                 </nav>
 
                 <div className="border-t border-hud-border-secondary px-3 py-4">
@@ -215,7 +225,7 @@ const Sidebar = ({ collapsed, open, onClose, onCollapseToggle }: SidebarProps) =
                             {!collapsed && (
                                 <div>
                                     <p className="text-xs uppercase tracking-[0.22em] text-hud-text-muted">
-                                        Flow
+                                        추천 흐름
                                     </p>
                                     <p className="mt-1 text-sm text-hud-text-primary">
                                         {'PMS -> EMS -> GMS'}
@@ -225,7 +235,7 @@ const Sidebar = ({ collapsed, open, onClose, onCollapseToggle }: SidebarProps) =
                         </div>
                         {!collapsed && (
                             <p className="mt-3 text-xs leading-5 text-hud-text-muted">
-                                Current focus is the GMS preview loop between React, Spring Boot, and FastAPI.
+                                내 음악을 기준으로 외부 후보를 모으고 추천 결과를 다시 저장합니다.
                             </p>
                         )}
                     </div>
@@ -235,7 +245,7 @@ const Sidebar = ({ collapsed, open, onClose, onCollapseToggle }: SidebarProps) =
                         className="mt-3 hidden w-full items-center justify-center gap-2 rounded-xl border border-hud-border-secondary bg-hud-bg-primary/80 px-3 py-2.5 text-sm text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary lg:flex"
                     >
                         {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-                        {!collapsed && 'Collapse'}
+                        {!collapsed && '접기'}
                     </button>
 
                     <button
@@ -243,7 +253,7 @@ const Sidebar = ({ collapsed, open, onClose, onCollapseToggle }: SidebarProps) =
                         className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-hud-border-secondary bg-hud-bg-primary/80 px-3 py-2.5 text-sm text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary lg:hidden"
                     >
                         <Activity size={16} />
-                        Close Menu
+                        메뉴 닫기
                     </button>
                 </div>
             </aside>

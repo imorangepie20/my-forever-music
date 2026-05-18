@@ -11,40 +11,72 @@ interface HeaderProps {
 
 const pageCopy: Record<string, { title: string; subtitle: string }> = {
     '/': {
-        title: 'My Forever Music Control Room',
-        subtitle: 'Rebuild status, service links, and the current delivery track.',
+        title: '내 음악 추천 홈',
+        subtitle: '플레이리스트를 모으고, 취향을 학습하고, 오늘 들을 음악을 추천받으세요.',
     },
     '/platforms': {
-        title: 'Platform Intake Workspace',
-        subtitle: 'Choose the streaming source that will feed PMS and define how audio features will be enriched.',
+        title: '플랫폼 연결',
+        subtitle: '사용 중인 스트리밍 플랫폼을 연결해 내 음악 보관함을 채우세요.',
     },
     '/platforms/oauth/authorize': {
-        title: 'Platform OAuth Approval',
-        subtitle: 'Review the provider consent step before the callback completes.',
+        title: '플랫폼 연결 승인',
+        subtitle: '제공자 동의 화면을 확인한 뒤 연결을 마무리합니다.',
     },
     '/platforms/oauth/callback': {
-        title: 'Platform OAuth Callback',
-        subtitle: 'Finalize provider authorization and move into the next onboarding stage.',
+        title: '플랫폼 연결 완료',
+        subtitle: '인증 결과를 확인하고 다음 설정 단계로 이동합니다.',
     },
     '/pms': {
-        title: 'PMS Library Workspace',
-        subtitle: 'Import playlists, play library tracks, and collect approved GMS saves.',
+        title: '내 음악 보관함(PMS)',
+        subtitle: '가져온 플레이리스트와 저장한 추천곡을 한곳에서 관리하세요.',
     },
     '/ems': {
-        title: 'EMS Model Workspace',
-        subtitle: 'Evaluate candidates against the PMS library and listening signals.',
+        title: '음악 탐색 풀(EMS)',
+        subtitle: '외부 플레이리스트와 트렌드에서 새로운 추천 후보를 찾습니다.',
+    },
+    '/gms-playlists': {
+        title: '추천 플레이리스트',
+        subtitle: '내 취향 모델이 고른 EMS 플레이리스트를 확인하고 PMS에 저장하세요.',
+    },
+    '/playback-harness': {
+        title: '플레이어 테스트',
+        subtitle: 'Spotify와 TIDAL 재생 경계를 격리해서 확인합니다.',
+    },
+    '/tidal-playlist-test': {
+        title: 'TIDAL 재생 테스트',
+        subtitle: 'TIDAL 플레이리스트 스트림을 별도 화면에서 확인합니다.',
     },
     '/ems/pool-admin': {
-        title: 'EMS Pool Admin',
-        subtitle: 'Monitor search-result queue ingestion into the EMS collection database.',
+        title: 'EMS 큐 관리',
+        subtitle: '검색 결과가 EMS 데이터베이스로 적재되는 상태를 확인합니다.',
     },
     '/ems/acquisition-admin': {
-        title: 'EMS Acquisition Admin',
-        subtitle: 'Run editorial source collection and inspect acquisition signals.',
+        title: 'EMS 수집 관리',
+        subtitle: '음악 소스 수집을 실행하고 acquisition 신호를 점검합니다.',
     },
     '/gms-preview': {
-        title: 'GMS Approval Preview',
-        subtitle: 'Review generated candidates, approve saves, and feed PMS learning events.',
+        title: '추천 검토(GMS)',
+        subtitle: '내 취향에 맞게 걸러진 추천을 확인하고 마음에 드는 곡을 저장하세요.',
+    },
+    '/admin/schedules': {
+        title: '스케줄 관리',
+        subtitle: '주기 작업의 실행 주기와 최근 상태를 확인합니다.',
+    },
+    '/recommendations/quality-admin': {
+        title: '추천 품질 관리',
+        subtitle: '최근 GMS 추천의 6축 평가와 품질 신호를 확인합니다.',
+    },
+    '/recommendations/feature-coverage': {
+        title: '특성 커버리지',
+        subtitle: 'PMS, EMS, 학습 신호가 추천에 충분히 준비됐는지 확인합니다.',
+    },
+    '/recommendations/sasrec-admin': {
+        title: 'SASRec 모델 관리',
+        subtitle: '학습된 추천 모델의 승격, 비활성화, 롤백 상태를 관리합니다.',
+    },
+    '/recommendations/metadata-admin': {
+        title: '메타데이터 정규화',
+        subtitle: 'MusicBrainz 후보와 ISRC 보강 결과를 검토합니다.',
     },
 }
 
@@ -55,7 +87,7 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
     const { resetWorkspace } = useRecommendationWorkspace()
     const currentPage = pageCopy[location.pathname] ?? {
         title: 'My Forever Music',
-        subtitle: 'Music service rebuild workspace.',
+        subtitle: '내 음악을 모으고 추천으로 이어가는 공간입니다.',
     }
 
     const handleSignOut = () => {
@@ -71,7 +103,7 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
                     <button
                         onClick={onMenuToggle}
                         className="mt-1 rounded-lg border border-hud-border-secondary bg-hud-bg-primary/80 p-2 text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary lg:hidden"
-                        aria-label="Toggle navigation"
+                        aria-label="메뉴 열기"
                     >
                         <Menu size={20} />
                     </button>
@@ -79,7 +111,7 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
                     <div>
                         <div className="flex items-center gap-2">
                             <span className="rounded-full border border-hud-border-primary bg-hud-accent-primary/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-hud-accent-primary">
-                                Rebuild
+                                추천 홈
                             </span>
                             <span className="rounded-full border border-hud-border-secondary bg-hud-bg-primary/80 px-2.5 py-1 text-[11px] font-medium text-hud-text-muted">
                                 {getApiConnectionLabel()}
@@ -98,7 +130,7 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
                     {session ? (
                         <div className="rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/80 px-4 py-3">
                             <p className="text-xs uppercase tracking-[0.2em] text-hud-text-muted">
-                                Signed In
+                                로그인 중
                             </p>
                             <p className="mt-1 text-sm font-medium text-hud-text-primary">
                                 {session.displayName}
@@ -107,7 +139,7 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
                     ) : (
                         <Link to="/login">
                             <Button type="button" variant="ghost">
-                                Sign In
+                                로그인
                             </Button>
                         </Link>
                     )}
@@ -115,7 +147,7 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
                     {!session && (
                         <Link to="/signup">
                             <Button type="button" variant="outline">
-                                Sign Up
+                                회원가입
                             </Button>
                         </Link>
                     )}
@@ -127,7 +159,7 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
                             </div>
                             <div>
                                 <p className="text-xs uppercase tracking-[0.2em] text-hud-text-muted">
-                                    Active Chain
+                                    동작 경로
                                 </p>
                                 <p className="mt-1 text-sm text-hud-text-primary">
                                     {'Web -> Spring Boot -> FastAPI'}
@@ -143,7 +175,7 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
                         className="inline-flex items-center gap-2 rounded-xl border border-hud-border-secondary bg-hud-bg-primary/80 px-4 py-2.5 text-sm font-medium text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
                     >
                         <Activity size={16} />
-                        API Docs
+                        API 문서
                         <ExternalLink size={14} />
                     </a>
 
@@ -154,13 +186,13 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
                         className="inline-flex items-center gap-2 rounded-xl border border-hud-border-secondary bg-hud-bg-primary/80 px-4 py-2.5 text-sm font-medium text-hud-text-secondary transition-hud hover:border-hud-border-primary hover:text-hud-text-primary"
                     >
                         <Sparkles size={16} />
-                        AI Docs
+                        AI 문서
                         <ExternalLink size={14} />
                     </a>
 
                     {session && (
                         <Button type="button" variant="ghost" onClick={handleSignOut}>
-                            Sign Out
+                            로그아웃
                         </Button>
                     )}
                 </div>

@@ -2,6 +2,7 @@ package io.myforevermusic.api.modules.melon.presentation;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import io.myforevermusic.api.modules.ems.application.EmsCollectionService;
 import io.myforevermusic.api.modules.melon.application.MelonChartService;
 import java.time.Instant;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,7 +25,29 @@ public class MelonChartAdminController {
         return new ScrapeResponse("ok", count, Instant.now());
     }
 
+    @PostMapping("/materialize-ems")
+    public MaterializeEmsResponse materializeEms() {
+        EmsCollectionService.MelonHot100CollectionResult result = melonChartService.materializeCurrentChartToEms();
+        return new MaterializeEmsResponse(
+            "ok",
+            result.playlistId(),
+            result.collectedPlaylistCount(),
+            result.collectedTrackCount(),
+            result.collectedAt()
+        );
+    }
+
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record ScrapeResponse(String status, int trackCount, Instant ranAt) {
+    }
+
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record MaterializeEmsResponse(
+        String status,
+        Long playlistId,
+        int collectedPlaylistCount,
+        int collectedTrackCount,
+        Instant materializedAt
+    ) {
     }
 }

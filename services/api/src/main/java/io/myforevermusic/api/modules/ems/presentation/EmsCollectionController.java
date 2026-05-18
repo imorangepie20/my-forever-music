@@ -346,6 +346,18 @@ public class EmsCollectionController {
         );
     }
 
+    @Operation(summary = "Browse the Melon Hot 100 playlist materialized into EMS")
+    @GetMapping("/melon-hot-100")
+    public EmsCollectionPlaylistBrowseResponse browseMelonHot100(
+        @RequestParam(value = "limit", defaultValue = "1") int limit
+    ) {
+        List<EmsCollectedPlaylistEntity> playlists = emsCollectionService.getMelonHot100Playlists(limit);
+        return new EmsCollectionPlaylistBrowseResponse(
+            "api", "ok", Instant.now(), "melon",
+            playlists.stream().map(this::toPlaylistItem).toList()
+        );
+    }
+
     @Operation(summary = "Refresh FLO special playlists into EMS immediately")
     @PostMapping("/flo-special/refresh")
     public EmsFloSpecialRefreshResponse refreshFloSpecial() {

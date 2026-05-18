@@ -710,6 +710,12 @@ export const fetchEmsFloSpecial = (signal?: AbortSignal, limit: number = 120) =>
         { signal, cache: 'no-store' },
     )
 
+export const fetchEmsMelonHot100 = (signal?: AbortSignal, limit: number = 1) =>
+    requestJson<EmsCollectionPlaylistBrowseResponse>(
+        `/api/v1/ems/collection/melon-hot-100?limit=${encodeURIComponent(String(limit))}`,
+        { signal, cache: 'no-store' },
+    )
+
 export const refreshEmsFloSpecial = () =>
     requestJson<EmsFloSpecialRefreshResponse>(
         '/api/v1/ems/collection/flo-special/refresh',

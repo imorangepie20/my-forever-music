@@ -299,6 +299,47 @@ class EmsCollectionServiceTest {
     }
 
     @Test
+    void shouldMaterializeMelonHot100AsStoredEmsPlaylist() {
+        EmsCollectionService.MelonHot100TrackSeed seed = new EmsCollectionService.MelonHot100TrackSeed(
+            1,
+            "424991128",
+            "Riding",
+            "하성운",
+            "Riding",
+            "https://cdnimg.melon.co.kr/album.jpg",
+            "https://www.melon.com/song/detail.htm?songId=424991128",
+            Instant.parse("2026-05-17T00:00:00Z")
+        );
+        EmsCollectedTrackEntity trackEntity = collectedTrack("424991128", "melon", "Riding", "하성운", null);
+        ReflectionTestUtils.setField(trackEntity, "id", 28L);
+
+        when(playlistRepository.findBySourcePlatformAndExternalPlaylistId("melon", "melon-hot-100"))
+            .thenReturn(Optional.empty());
+        when(playlistRepository.save(any(EmsCollectedPlaylistEntity.class))).thenAnswer(invocation -> {
+            EmsCollectedPlaylistEntity playlist = invocation.getArgument(0);
+            ReflectionTestUtils.setField(playlist, "id", 27L);
+            return playlist;
+        });
+        when(trackRepository.findBySourcePlatformAndExternalTrackId("melon", "424991128"))
+            .thenReturn(Optional.of(trackEntity));
+
+        EmsCollectionService.MelonHot100CollectionResult result = service()
+            .collectMelonHot100(List.of(seed), seed.snapshotAt());
+
+        assertThat(result.playlistId()).isEqualTo(27L);
+        assertThat(result.collectedPlaylistCount()).isEqualTo(1);
+        assertThat(result.collectedTrackCount()).isEqualTo(1);
+        ArgumentCaptor<EmsCollectedPlaylistEntity> playlistCaptor =
+            ArgumentCaptor.forClass(EmsCollectedPlaylistEntity.class);
+        verify(playlistRepository).save(playlistCaptor.capture());
+        assertThat(playlistCaptor.getValue().getSourcePlatform()).isEqualTo("melon");
+        assertThat(playlistCaptor.getValue().getCollectionSource()).isEqualTo(EmsCollectionService.MELON_HOT_100_SOURCE);
+        assertThat(playlistCaptor.getValue().getTrackCount()).isEqualTo(1);
+        verify(playlistTrackRepository).deleteByPlaylistId(27L);
+        verify(playlistTrackRepository).upsertPlaylistTrackLink(27L, 28L, 0);
+    }
+
+    @Test
     void shouldClampSearchPoolPlaylistMetadataToDatabaseColumnLengths() {
         PlatformAccountCredential credential = credential("spotify");
         String longDescription = "k-pop ".repeat(260);
