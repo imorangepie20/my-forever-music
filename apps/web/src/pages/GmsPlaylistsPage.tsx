@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
 import {
     ArrowDownToLine,
     CheckCircle2,
@@ -27,6 +28,7 @@ import {
     dismissGmsPlaylist,
     fetchEmsCollectedPlaylistDetail,
     fetchGmsPlaylistPreview,
+    importTidalPlaylistUrlToGms,
     saveGmsPlaylistToPms,
 } from '@/services/api'
 import type {
@@ -34,6 +36,7 @@ import type {
     GmsPlaylistPreviewItem,
     GmsPlaylistPreviewResponse,
     GmsPlaylistSaveResponse,
+    GmsTidalPlaylistUrlImportResponse,
 } from '@/types/api'
 
 const DEFAULT_LIMIT = 12
@@ -103,13 +106,17 @@ const GmsPlaylistsPage = () => {
     const [previewLoading, setPreviewLoading] = useState(false)
     const [previewError, setPreviewError] = useState<string | null>(null)
     const [removedPreviewTrackIds, setRemovedPreviewTrackIds] = useState<Set<number>>(new Set())
+    const [tidalPlaylistUrl, setTidalPlaylistUrl] = useState('')
+    const [isImportingTidalUrl, setIsImportingTidalUrl] = useState(false)
+    const [lastTidalImportResult, setLastTidalImportResult] = useState<GmsTidalPlaylistUrlImportResponse | null>(null)
+    const [includedPlaylistId, setIncludedPlaylistId] = useState<number | null>(null)
 
     useEffect(() => {
         playQueueRef.current = playQueue
     }, [playQueue])
 
     const loadPreview = useCallback(
-        (signal?: AbortSignal) => {
+        (signal?: AbortSignal, includeOverride?: number | null) => {
             if (!userId) {
                 setPreview(null)
                 setErrorMessage('Sign in to load GMS playlist candidates.')
@@ -119,7 +126,12 @@ const GmsPlaylistsPage = () => {
             setIsLoading(true)
             setErrorMessage(null)
 
-            fetchGmsPlaylistPreview(userId, DEFAULT_LIMIT, signal)
+            fetchGmsPlaylistPreview(
+                userId,
+                DEFAULT_LIMIT,
+                signal,
+                includeOverride ?? includedPlaylistId ?? undefined,
+            )
                 .then((response) => {
                     setPreview(response)
                 })
@@ -138,7 +150,7 @@ const GmsPlaylistsPage = () => {
                     setIsLoading(false)
                 })
         },
-        [userId],
+        [includedPlaylistId, userId],
     )
 
     useEffect(() => {
@@ -324,6 +336,43 @@ const GmsPlaylistsPage = () => {
         }
     }
 
+    const handleTidalPlaylistUrlImport = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
+        if (!userId) {
+            setErrorMessage('Sign in to import a TIDAL playlist URL.')
+            return
+        }
+
+        const normalizedUrl = tidalPlaylistUrl.trim()
+        if (!/^https?:\/\/(www\.)?tidal\.com\/(browse\/)?playlist\/[A-Za-z0-9][A-Za-z0-9_-]{2,159}([/?#].*)?$/.test(normalizedUrl)) {
+            setErrorMessage('Enter a valid TIDAL playlist URL.')
+            return
+        }
+
+        setIsImportingTidalUrl(true)
+        setErrorMessage(null)
+        setLastTidalImportResult(null)
+
+        try {
+            const result = await importTidalPlaylistUrlToGms({
+                user_id: userId,
+                playlist_url: normalizedUrl,
+            })
+            setLastTidalImportResult(result)
+            setIncludedPlaylistId(result.ems_playlist_id)
+            setTidalPlaylistUrl('')
+            loadPreview(undefined, result.ems_playlist_id)
+        } catch (requestError: unknown) {
+            const message =
+                requestError instanceof ApiError
+                    ? requestError.message
+                    : 'Unable to import this TIDAL playlist URL.'
+            setErrorMessage(message)
+        } finally {
+            setIsImportingTidalUrl(false)
+        }
+    }
+
     return (
         <div className="space-y-6">
             <HudCard
@@ -362,6 +411,46 @@ const GmsPlaylistsPage = () => {
                         </p>
                     </div>
                 </div>
+
+                <form
+                    className="mt-4 flex flex-col gap-3 rounded-2xl border border-hud-border-secondary bg-hud-bg-primary/70 p-4 md:flex-row md:items-end"
+                    onSubmit={handleTidalPlaylistUrlImport}
+                >
+                    <label className="flex-1 text-xs font-medium uppercase tracking-[0.18em] text-hud-text-muted">
+                        TIDAL Playlist URL
+                        <input
+                            type="url"
+                            value={tidalPlaylistUrl}
+                            onChange={(event) => setTidalPlaylistUrl(event.target.value)}
+                            placeholder="https://tidal.com/playlist/..."
+                            className="mt-2 w-full rounded-lg border border-hud-border-secondary bg-hud-bg-secondary/70 px-3 py-2 text-sm normal-case tracking-normal text-hud-text-primary outline-none transition-hud placeholder:text-hud-text-muted focus:border-hud-accent-primary"
+                            disabled={isImportingTidalUrl || !userId}
+                        />
+                    </label>
+                    <Button
+                        type="submit"
+                        variant="primary"
+                        size="sm"
+                        disabled={isImportingTidalUrl || !userId || !tidalPlaylistUrl.trim()}
+                    >
+                        <ArrowDownToLine size={14} className={isImportingTidalUrl ? 'animate-pulse' : ''} />
+                        {isImportingTidalUrl ? 'Importing' : 'Import'}
+                    </Button>
+                </form>
+
+                {lastTidalImportResult && (
+                    <div className="mt-4 flex items-start gap-3 rounded-2xl border border-hud-accent-primary/40 bg-hud-accent-primary/10 p-4 text-sm leading-6 text-hud-text-secondary">
+                        <CheckCircle2 size={18} className="mt-0.5 text-hud-accent-primary" />
+                        <div>
+                            <p className="font-medium text-hud-text-primary">
+                                Imported TIDAL playlist: {lastTidalImportResult.title}
+                            </p>
+                            <p className="mt-1 text-xs text-hud-text-muted">
+                                {lastTidalImportResult.track_count} track(s) added to EMS for GMS review.
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {errorMessage && (
                     <div className="mt-4 rounded-2xl border border-hud-accent-danger/40 bg-hud-accent-danger/10 p-4 text-sm leading-6 text-hud-text-secondary">
