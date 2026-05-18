@@ -683,6 +683,41 @@ public class TidalWebApiClient {
         }
     }
 
+    public TidalPlaylistSummary getPlaylist(
+        PlatformAccountCredential credential,
+        String playlistId
+    ) {
+        String countryCode = countryCodeForCredential(credential);
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("%s/playlists/%s?countryCode=%s".formatted(
+                    apiBaseUri,
+                    URLEncoder.encode(playlistId, StandardCharsets.UTF_8),
+                    countryCode
+                )))
+                .header("Accept", ACCEPT_HEADER)
+                .header("Authorization", "Bearer %s".formatted(credential.accessToken()))
+                .GET()
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new IllegalArgumentException("TIDAL playlist metadata request failed: %s".formatted(response.statusCode()));
+            }
+
+            JsonApiRoot jsonApi = objectMapper.readValue(response.body(), JsonApiRoot.class);
+            return Optional.ofNullable(jsonApi.data())
+                .filter(data -> "playlists".equals(data.type()))
+                .map(this::toPlaylistSummary)
+                .orElseThrow(() -> new IllegalArgumentException("TIDAL playlist metadata response missing playlist data"));
+        } catch (IOException exception) {
+            throw new IllegalStateException("TIDAL playlist metadata response could not be parsed.", exception);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("TIDAL playlist metadata request was interrupted.", exception);
+        }
+    }
+
     /**
      * Get playlist items (tracks) from TIDAL.
      */
@@ -860,11 +895,18 @@ public class TidalWebApiClient {
 
     private TidalPlaylistSummary toPlaylistSummary(JsonApiData data) {
         Map<String, Object> attrs = data.attributes();
+        Integer trackCount = extractAttribute(attrs, "numberOfTracks", Integer.class);
+        if (trackCount == null) {
+            trackCount = extractAttribute(attrs, "numberOfItems", Integer.class, 0);
+        }
         return new TidalPlaylistSummary(
             data.id(),
-            extractAttribute(attrs, "title", String.class),
+            firstNonBlank(
+                extractAttribute(attrs, "title", String.class),
+                extractAttribute(attrs, "name", String.class)
+            ),
             extractAttribute(attrs, "description", String.class),
-            extractAttribute(attrs, "numberOfTracks", Integer.class, 0),
+            trackCount,
             extractAttribute(attrs, "imageId", String.class),
             buildImageUrl(extractAttribute(attrs, "imageId", String.class)),
             extractAttribute(attrs, "url", String.class),
