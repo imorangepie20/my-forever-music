@@ -72,6 +72,10 @@ public class GmsPlaylistPreviewService {
     }
 
     public GmsPlaylistPreviewResult preview(String userId, Integer limit) {
+        return preview(userId, limit, null);
+    }
+
+    public GmsPlaylistPreviewResult preview(String userId, Integer limit, Long includePlaylistId) {
         if (userId == null || userId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "user_id is required.");
         }
@@ -103,17 +107,34 @@ public class GmsPlaylistPreviewService {
             source = playlistRepository.findRecentWithTracks(PageRequest.of(0, safeLimit * 3));
         }
 
+        List<EmsCollectedPlaylistEntity> candidateSource = new ArrayList<>(source);
+        if (includePlaylistId != null && candidateSource.stream().noneMatch(playlist ->
+            includePlaylistId.equals(playlist.getId())
+        )) {
+            playlistRepository.findById(includePlaylistId).ifPresent(candidateSource::add);
+        }
+
         Set<String> userArtists = collectUserArtists(userId);
         Set<Long> dismissedPlaylistIds = dismissedPlaylistIds(userId);
         Set<Long> savedPlaylistIds = savedPlaylistIds(userId);
 
-        List<GmsPlaylistPreviewCandidate> candidates = source.stream()
+        List<GmsPlaylistPreviewCandidate> candidates = candidateSource.stream()
             .filter(playlist -> playlist.getId() != null
                 && !dismissedPlaylistIds.contains(playlist.getId())
                 && !savedPlaylistIds.contains(playlist.getId()))
             .map(playlist -> scoreCandidate(playlist, userArtists))
-            .filter(candidate -> candidate.affinityScore() > 0.0d)
-            .sorted((left, right) -> Double.compare(right.compositeScore(), left.compositeScore()))
+            .filter(candidate -> includePlaylistId != null && includePlaylistId.equals(candidate.playlistId())
+                || candidate.affinityScore() > 0.0d)
+            .sorted((left, right) -> {
+                if (includePlaylistId != null) {
+                    boolean leftExplicit = includePlaylistId.equals(left.playlistId());
+                    boolean rightExplicit = includePlaylistId.equals(right.playlistId());
+                    if (leftExplicit != rightExplicit) {
+                        return leftExplicit ? -1 : 1;
+                    }
+                }
+                return Double.compare(right.compositeScore(), left.compositeScore());
+            })
             .limit(safeLimit)
             .toList();
 
