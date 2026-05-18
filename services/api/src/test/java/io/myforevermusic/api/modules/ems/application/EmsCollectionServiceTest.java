@@ -1,6 +1,7 @@
 package io.myforevermusic.api.modules.ems.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -235,6 +236,99 @@ class EmsCollectionServiceTest {
             .containsExactly("tidal-track-001");
         verify(playlistTrackRepository).upsertPlaylistTrackLink(7L, 8L, 0);
         verifyNoInteractions(reccoBeatsAudioFeaturesClient);
+    }
+
+    @Test
+    void shouldCollectTidalPlaylistUrlImportIntoEms() {
+        PlatformAccountCredential credential = credential("tidal");
+        io.myforevermusic.api.modules.platform.infrastructure.tidal.TidalWebApiClient.TidalPlaylistSummary playlist =
+            new io.myforevermusic.api.modules.platform.infrastructure.tidal.TidalWebApiClient.TidalPlaylistSummary(
+                "0a3d87d2-27dc-4edc-84b6-9f1eaa567f33",
+                "Night Drive Imports",
+                "Public TIDAL playlist",
+                1,
+                null,
+                null,
+                "https://tidal.com/playlist/0a3d87d2-27dc-4edc-84b6-9f1eaa567f33",
+                "0a3d87d2-27dc-4edc-84b6-9f1eaa567f33"
+            );
+        io.myforevermusic.api.modules.platform.infrastructure.tidal.TidalWebApiClient.TidalPlaylistTrack track =
+            new io.myforevermusic.api.modules.platform.infrastructure.tidal.TidalWebApiClient.TidalPlaylistTrack(
+                "tidal-track-001",
+                "Imported Track",
+                "Imported Artist",
+                "Imported Album",
+                null,
+                "https://tidal.com/browse/track/tidal-track-001",
+                "tidal:track:tidal-track-001",
+                null,
+                "USRC17607839",
+                180000
+            );
+        EmsCollectedPlaylistEntity savedPlaylist = collectedPlaylist(
+            "0a3d87d2-27dc-4edc-84b6-9f1eaa567f33",
+            "tidal",
+            "Night Drive Imports",
+            1
+        );
+        ReflectionTestUtils.setField(savedPlaylist, "id", 70L);
+        EmsCollectedTrackEntity savedTrack = collectedTrack(
+            "tidal-track-001",
+            "tidal",
+            "Imported Track",
+            "Imported Artist",
+            "USRC17607839"
+        );
+        ReflectionTestUtils.setField(savedTrack, "id", 80L);
+
+        when(platformCredentialService.findUsableCredential("user-001", "tidal"))
+            .thenReturn(Optional.of(credential));
+        when(tidalWebApiClient.getPlaylist(credential, "0a3d87d2-27dc-4edc-84b6-9f1eaa567f33"))
+            .thenReturn(playlist);
+        when(tidalWebApiClient.getPlaylistTracks(credential, "0a3d87d2-27dc-4edc-84b6-9f1eaa567f33"))
+            .thenReturn(List.of(track));
+        when(reccoBeatsAudioFeaturesClient.getAudioFeaturesForExternalTracksByIsrc(any()))
+            .thenReturn(Map.of());
+        when(playlistRepository.findBySourcePlatformAndExternalPlaylistId("tidal", playlist.playlistId()))
+            .thenReturn(Optional.empty());
+        when(playlistRepository.save(any(EmsCollectedPlaylistEntity.class))).thenReturn(savedPlaylist);
+        when(trackRepository.findBySourcePlatformAndExternalTrackId("tidal", "tidal-track-001"))
+            .thenReturn(Optional.of(savedTrack));
+
+        EmsCollectionService.EmsTidalPlaylistUrlImportCollection result =
+            service().collectTidalPlaylistFromUrlImport("user-001", playlist.playlistId());
+
+        assertThat(result.emsPlaylistId()).isEqualTo(70L);
+        assertThat(result.externalPlaylistId()).isEqualTo(playlist.playlistId());
+        assertThat(result.title()).isEqualTo("Night Drive Imports");
+        assertThat(result.trackCount()).isEqualTo(1);
+        assertThat(result.collectionSource()).isEqualTo("user_tidal_url_import");
+        verify(playlistTrackRepository).upsertPlaylistTrackLink(70L, 80L, 0);
+    }
+
+    @Test
+    void shouldRejectTidalPlaylistUrlImportWhenPlaylistHasNoTracks() {
+        PlatformAccountCredential credential = credential("tidal");
+        io.myforevermusic.api.modules.platform.infrastructure.tidal.TidalWebApiClient.TidalPlaylistSummary playlist =
+            new io.myforevermusic.api.modules.platform.infrastructure.tidal.TidalWebApiClient.TidalPlaylistSummary(
+                "empty-playlist",
+                "Empty Playlist",
+                "",
+                0,
+                null,
+                null,
+                "https://tidal.com/playlist/empty-playlist",
+                "empty-playlist"
+            );
+
+        when(platformCredentialService.findUsableCredential("user-001", "tidal"))
+            .thenReturn(Optional.of(credential));
+        when(tidalWebApiClient.getPlaylist(credential, "empty-playlist")).thenReturn(playlist);
+        when(tidalWebApiClient.getPlaylistTracks(credential, "empty-playlist")).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service().collectTidalPlaylistFromUrlImport("user-001", "empty-playlist"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("does not contain importable tracks");
     }
 
     @Test
